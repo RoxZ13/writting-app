@@ -29,9 +29,10 @@ import {
 import { MarkerCard } from '../components/MarkerCard'
 import { Faces } from '../components/Refs'
 import { SceneSheet } from '../components/SceneSheet'
-import { chapterCharacters, markerPayoffChapter, markerSetupChapter, markerStatus, type ProjectData } from '../lib/hooks'
+import { chapterCharacters, markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
 import { MARKER_STATES, statusOf } from '../lib/status'
 import { InlineEdit, Modal, toast } from '../lib/ui'
+import { deadlineText } from '../lib/stories'
 
 type Lens = { kind: 'all' } | { kind: 'line'; id: string } | { kind: 'markers' }
 
@@ -223,6 +224,15 @@ function Column({
               ⋯
             </summary>
             <div className="menu-list card">
+              <label className="menu-field" style={{ padding: '4px 10px 8px' }}>
+                <span>Дедлайн главы</span>
+                <input
+                  className="input"
+                  type="date"
+                  defaultValue={chapter.deadline ?? ''}
+                  onChange={(e) => void patch<Chapter>('chapters', chapter.id, { deadline: e.target.value || undefined })}
+                />
+              </label>
               <button onClick={() => onMove(-1)}>← Сдвинуть левее</button>
               <button onClick={() => onMove(1)}>Сдвинуть правее →</button>
               {!isFirst && (
@@ -246,6 +256,12 @@ function Column({
           value={chapter.goal}
           onSave={(goal) => void patch<Chapter>('chapters', chapter.id, { goal })}
         />
+        {deadlineText(chapter.deadline) && (
+          <div className={`deadline column-deadline ${deadlineText(chapter.deadline)!.late ? 'late' : ''}`}>
+            ⏳ {deadlineText(chapter.deadline)!.text}
+            {scenes.some((x) => x.status !== 'done') && ` · не готово ${scenes.filter((x) => x.status !== 'done').length} сц.`}
+          </div>
+        )}
         <div className="column-meta">
           {scenes.length} сц. · {words.toLocaleString('ru-RU')} сл.
           <Faces data={data} ids={people} max={5} />
@@ -341,8 +357,9 @@ function Card({ data, scene, lens, overlay }: { data: ProjectData; scene: Scene;
           ))}
         </div>
       )}
-      <div className="card-title">{scene.title || 'Без названия'}</div>
-      {scene.goal && <div className="card-goal">{scene.goal}</div>}
+      {scene.epigraph && <div className="card-epigraph">♪ {scene.epigraph}</div>}
+      <div className={`card-title ${scene.title.trim() ? '' : 'untitled'}`}>{sceneName(data, scene)}</div>
+      {scene.goal ? <div className="card-goal">{scene.goal}</div> : scene.excerpt && <div className="card-excerpt">{scene.excerpt}</div>}
       <div className="card-foot">
         <span className="status-dot" style={{ background: st.color }} title={st.label} />
         {scene.wordCount > 0 ? <span>{scene.wordCount.toLocaleString('ru-RU')}</span> : <span>план</span>}

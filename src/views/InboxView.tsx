@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { uid, type Note, type NoteKind } from '../db/db'
 import { updateBeats } from '../components/ChapterContext'
 import { createMarker, createNote, patch, remove } from '../db/repo'
-import { sceneLabel, type ProjectData } from '../lib/hooks'
+import { sceneLabel, sceneName, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { NOTE_KINDS, noteKind, timeAgo } from '../lib/status'
 import { toast } from '../lib/ui'
@@ -142,12 +142,34 @@ function NoteRow({ note, data }: { note: Note; data: ProjectData }) {
                 <optgroup key={chapter.id} label={chapter.title}>
                   {scenes.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.title}
+                      {sceneName(data, s)}
                     </option>
                   ))}
                 </optgroup>
               ))}
             </select>
+            {(note.kind === 'quote' || note.kind === 'dialogue') && (
+              <div className="chips">
+                {data.characters.map((c) => {
+                  const on = (note.characterIds ?? []).includes(c.id)
+                  return (
+                    <button
+                      key={c.id}
+                      className={`ref-chip ${on ? 'on' : ''}`}
+                      style={{ '--c': c.color } as React.CSSProperties}
+                      onClick={() =>
+                        void patch<Note>('notes', note.id, {
+                          characterIds: on ? (note.characterIds ?? []).filter((x) => x !== c.id) : [...(note.characterIds ?? []), c.id],
+                        })
+                      }
+                    >
+                      <span className="dot" />
+                      {c.name}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
             <div className="row">
               {scene && (
                 <button className="btn sm" onClick={() => void toBeat()}>

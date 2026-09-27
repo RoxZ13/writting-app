@@ -121,8 +121,7 @@ export function sceneLabel(data: ProjectData, sceneId: string | undefined): stri
   if (!sceneId) return '—'
   const s = data.sceneById.get(sceneId)
   if (!s) return 'удалённая сцена'
-  const ci = data.chapterIndex.get(s.chapterId)
-  return `${ci !== undefined ? `Гл. ${ci + 1} · ` : ''}${s.title}`
+  return `${data.chapterById.get(s.chapterId)?.title ?? ''} · ${sceneName(data, s)}`
 }
 
 /** How to name a chapter in breadcrumbs: its own title if it already says "Часть 2", otherwise "Глава N · title". */
@@ -132,4 +131,11 @@ export function chapterLabel(data: ProjectData, chapterId: string, short = false
   if (!c) return short ? `Гл. ${n}` : `Глава ${n}`
   if (/^\s*(глава|часть|пролог|эпилог|интерлюдия)/i.test(c.title)) return c.title
   return short ? `Гл. ${n}` : `Глава ${n} · ${c.title}`
+}
+
+/** A scene's name: its own title, or "Сцена N" by position in its chapter. */
+export function sceneName(data: ProjectData, scene: Scene): string {
+  if (scene.title.trim()) return scene.title
+  const n = data.scenes.filter((s) => s.chapterId === scene.chapterId).indexOf(scene) + 1
+  return `Сцена ${n || ''}`.trim()
 }

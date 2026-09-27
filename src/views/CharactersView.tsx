@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Character, Note } from '../db/db'
-import { createCharacter, createLine, createNote, patch, remove } from '../db/repo'
+import { createLine, createNote, findOrCreateCharacter, mergeCharacters, patch, remove } from '../db/repo'
 import type { ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { InlineEdit, toast } from '../lib/ui'
@@ -10,7 +10,7 @@ export function CharactersView({ data }: { data: ProjectData }) {
   const [name, setName] = useState('')
   const add = async () => {
     if (!name.trim()) return
-    await createCharacter(data.project.id, name.trim())
+    await findOrCreateCharacter(data.project.id, name.trim())
     setName('')
   }
   return (
@@ -58,6 +58,21 @@ function Person({ data, c }: { data: ProjectData; c: Character }) {
             ⋯
           </summary>
           <div className="menu-list card">
+            {data.characters.length > 1 && <div className="menu-label">Это тот же человек, что…</div>}
+            {data.characters
+              .filter((o) => o.id !== c.id)
+              .map((o) => (
+                <button
+                  key={o.id}
+                  onClick={async () => {
+                    if (!confirm(`Слить «${c.name}» в «${o.name}»? Сцены, цитаты и заметки перейдут к «${o.name}», карточка «${c.name}» исчезнет.`)) return
+                    await mergeCharacters(c.id, o.id)
+                    toast(`Теперь это один герой — «${o.name}»`)
+                  }}
+                >
+                  ⇢ {o.name}
+                </button>
+              ))}
             <button className="danger" onClick={() => confirm(`Удалить героя «${c.name}»?`) && void remove('characters', c.id)}>
               Удалить героя
             </button>

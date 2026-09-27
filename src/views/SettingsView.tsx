@@ -14,16 +14,8 @@ import { ImportPanel } from '../components/ImportPanel'
 import { chapterToFicbook, download, exportDocx, type ExportChapter } from '../lib/exporter'
 import type { ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
-import {
-  applyTextFont,
-  applyTextSize,
-  applyTheme,
-  getTextFont,
-  getTextSize,
-  getTheme,
-  type TextFont,
-  type Theme,
-} from '../lib/session'
+import { applyTheme, getTheme, type Theme } from '../lib/session'
+import { TypoControls } from '../components/TypoControls'
 import { timeAgo } from '../lib/status'
 import { InlineEdit, toast } from '../lib/ui'
 
@@ -49,8 +41,6 @@ export function SettingsView({
   sync: SyncStatus
 }) {
   const [theme, setTheme] = useState<Theme>(getTheme)
-  const [size, setSize] = useState(getTextSize)
-  const [font, setFont] = useState<TextFont>(getTextFont)
   const [ficChapter, setFicChapter] = useState(data.chapters[0]?.id ?? '')
 
   const exportWord = async () => {
@@ -85,6 +75,16 @@ export function SettingsView({
         <label>
           <span className="field-label">Название текущей</span>
           <InlineEdit className="input" value={data.project.title} onSave={(title) => void patch<Project>('projects', data.project.id, { title })} />
+        </label>
+        <label>
+          <span className="field-label">Дедлайн истории</span>
+          <input
+            className="input"
+            type="date"
+            style={{ maxWidth: 220 }}
+            defaultValue={data.project.deadline ?? ''}
+            onChange={(e) => void patch<Project>('projects', data.project.id, { deadline: e.target.value || undefined })}
+          />
         </label>
         <label>
           <span className="field-label">О книге</span>
@@ -197,46 +197,8 @@ export function SettingsView({
             ))}
           </div>
         </div>
-        <div className="row">
-          <span className="field-label" style={{ margin: 0, minWidth: 90 }}>
-            Шрифт текста
-          </span>
-          <div className="seg">
-            {(
-              [
-                ['serif', 'С засечками'],
-                ['sans', 'Без засечек'],
-              ] as [TextFont, string][]
-            ).map(([f, label]) => (
-              <button
-                key={f}
-                aria-pressed={font === f}
-                onClick={() => {
-                  setFont(f)
-                  applyTextFont(f)
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="row">
-          <span className="field-label" style={{ margin: 0, minWidth: 90 }}>
-            Размер текста
-          </span>
-          <input
-            type="range"
-            min={16}
-            max={26}
-            value={size}
-            onChange={(e) => {
-              setSize(Number(e.target.value))
-              applyTextSize(Number(e.target.value))
-            }}
-          />
-          <span className="small muted">{size}px</span>
-        </div>
+        <span className="field-label">Текст рукописи</span>
+        <TypoControls />
       </section>
 
       <section className="card settings-section stack">

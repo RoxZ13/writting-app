@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import type { Note, NoteKind } from '../db/db'
-import { createCharacter, createMarker, createNote, patch } from '../db/repo'
+import { createMarker, createNote, findOrCreateCharacter, patch } from '../db/repo'
 import type { ProjectData } from '../lib/hooks'
 import { session } from '../lib/session'
 import { Modal, toast } from '../lib/ui'
@@ -45,9 +45,15 @@ export function QuickCapture({ data, onClose }: { data: ProjectData; onClose: ()
       })
       toast('Маячок сохранён — он не потеряется')
     } else {
+      // A name typed but not confirmed with Enter still counts.
+      const who = [...people]
+      if (withPeople && newName.trim()) {
+        const c = await findOrCreateCharacter(data.project.id, newName.trim())
+        if (!who.includes(c.id)) who.push(c.id)
+      }
       const n = await createNote(t, kind, data.project.id, withPeople ? undefined : scene)
-      if (withPeople && people.length) await patch<Note>('notes', n.id, { characterIds: people })
-      toast(withPeople && people.length ? 'Сохранено — всплывёт в главах с этими героями' : 'Сохранено во «Входящие»')
+      if (withPeople && who.length) await patch<Note>('notes', n.id, { characterIds: who })
+      toast(withPeople && who.length ? 'Сохранено — всплывёт в главах с этими героями' : 'Сохранено во «Входящие»')
     }
     onClose()
   }
@@ -115,7 +121,7 @@ export function QuickCapture({ data, onClose }: { data: ProjectData; onClose: ()
               onKeyDown={async (e) => {
                 if (e.key !== 'Enter' || !newName.trim()) return
                 e.preventDefault()
-                const c = await createCharacter(data.project.id, newName.trim())
+                const c = await findOrCreateCharacter(data.project.id, newName.trim())
                 setPeople((p) => [...p, c.id])
                 setNewName('')
                 input.current?.focus()

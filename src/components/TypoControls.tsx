@@ -1,0 +1,91 @@
+import { useState } from 'react'
+import { applyTypo, DEFAULT_TYPO, loadTypo, type Typo } from '../lib/typography'
+
+type Opt<K extends keyof Typo> = [Typo[K], string]
+
+function Choice<K extends keyof Typo>({ label, k, t, set, options }: { label: string; k: K; t: Typo; set: (t: Typo) => void; options: Opt<K>[] }) {
+  return (
+    <div className="typo-row">
+      <span className="typo-label">{label}</span>
+      <div className="seg">
+        {options.map(([v, name]) => (
+          <button key={String(v)} aria-pressed={t[k] === v} onClick={() => set({ ...t, [k]: v })}>
+            {name}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** Font, size, width, spacing — changes apply live to the open text. */
+export function TypoControls() {
+  const [t, setT] = useState<Typo>(loadTypo)
+  const set = (next: Typo) => {
+    setT(next)
+    applyTypo(next)
+  }
+  return (
+    <div className="typo">
+      <Choice
+        label="Шрифт"
+        k="font"
+        t={t}
+        set={set}
+        options={[
+          ['serif', 'С засечками'],
+          ['sans', 'Без засечек'],
+          ['mono', 'Машинка'],
+        ]}
+      />
+      <div className="typo-row">
+        <span className="typo-label">Размер</span>
+        <div className="size">
+          <button className="icon-btn" onClick={() => set({ ...t, size: Math.max(13, t.size - 1) })} aria-label="Меньше">
+            A−
+          </button>
+          <input type="range" min={13} max={26} value={t.size} onChange={(e) => set({ ...t, size: Number(e.target.value) })} />
+          <button className="icon-btn" onClick={() => set({ ...t, size: Math.min(26, t.size + 1) })} aria-label="Больше">
+            A+
+          </button>
+          <span className="small muted">{t.size}</span>
+        </div>
+      </div>
+      <Choice
+        label="Ширина"
+        k="width"
+        t={t}
+        set={set}
+        options={[
+          ['narrow', 'Узко'],
+          ['medium', 'Средне'],
+          ['wide', 'Широко'],
+        ]}
+      />
+      <Choice
+        label="Межстрочный"
+        k="leading"
+        t={t}
+        set={set}
+        options={[
+          ['tight', 'Плотно'],
+          ['normal', 'Обычно'],
+          ['loose', 'Свободно'],
+        ]}
+      />
+      <Choice
+        label="Абзацы"
+        k="para"
+        t={t}
+        set={set}
+        options={[
+          ['gap', 'С отбивкой'],
+          ['indent', 'Красная строка'],
+        ]}
+      />
+      <button className="link small" style={{ alignSelf: 'flex-start' }} onClick={() => set(DEFAULT_TYPO)}>
+        Сбросить
+      </button>
+    </div>
+  )
+}

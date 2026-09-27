@@ -45,39 +45,3 @@ export function applyTheme(t: Theme) {
   if (t === 'auto') delete document.documentElement.dataset.theme
   else document.documentElement.dataset.theme = t
 }
-
-const SIZE_KEY = 'manuscript.textSize'
-export function getTextSize(): number {
-  try {
-    return Number(localStorage.getItem(SIZE_KEY)) || 20
-  } catch {
-    return 20
-  }
-}
-export function applyTextSize(px: number) {
-  try {
-    localStorage.setItem(SIZE_KEY, String(px))
-  } catch {
-    /* ignore */
-  }
-  document.documentElement.style.setProperty('--text-size', `${px}px`)
-}
-
-const FONT_KEY = 'manuscript.textFont'
-export type TextFont = 'serif' | 'sans'
-export function getTextFont(): TextFont {
-  try {
-    return localStorage.getItem(FONT_KEY) === 'sans' ? 'sans' : 'serif'
-  } catch {
-    return 'serif'
-  }
-}
-export function applyTextFont(f: TextFont) {
-  try {
-    localStorage.setItem(FONT_KEY, f)
-  } catch {
-    /* ignore */
-  }
-  if (f === 'sans') document.documentElement.dataset.font = 'sans'
-  else delete document.documentElement.dataset.font
-}

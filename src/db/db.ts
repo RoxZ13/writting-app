@@ -16,6 +16,10 @@ export interface Project extends Base {
   description?: string
   /** "Note to future self", written when finishing a session. */
   nextStep?: string
+  /** Cover colour in the library. */
+  color?: string
+  /** Target date, YYYY-MM-DD. */
+  deadline?: string
 }
 
 export interface Chapter extends Base {
@@ -24,6 +28,8 @@ export interface Chapter extends Base {
   order: number
   /** What this chapter is for, in one or two sentences. */
   goal: string
+  /** Target date, YYYY-MM-DD. */
+  deadline?: string
 }
 
 export type SceneStatus = 'idea' | 'draft' | 'written' | 'logic' | 'style' | 'done'
@@ -48,6 +54,10 @@ export interface Scene extends Base {
   wordCount: number
   /** Cursor position when the author last left the scene (per record, good enough across devices). */
   lastPos?: number
+  /** The opening of the text, refreshed while writing — shown on cards when the scene has no title. */
+  excerpt?: string
+  /** A song or quote line that opens the scene. */
+  epigraph?: string
   /** Story lines (ветки) this scene belongs to. */
   lineIds?: string[]
   /** Characters present in the scene. */

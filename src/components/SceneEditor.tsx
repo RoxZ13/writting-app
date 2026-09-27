@@ -6,7 +6,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useRef } from 'react'
 import { db, type Scene, type SceneText } from '../db/db'
 import { patch, save } from '../db/repo'
-import { docWordCount } from '../lib/text'
+import { docParagraphs, docWordCount } from '../lib/text'
+import { makeExcerpt } from '../lib/importer'
 import { session } from '../lib/session'
 import { MarkerMark } from './MarkerMark'
 
@@ -86,8 +87,10 @@ export function SceneEditor({
     }
     onWords(wordCount)
     const current = await db.scenes.get(scene.id)
-    if (current && (current.wordCount !== wordCount || current.lastPos !== state.selection.from)) {
-      await patch<Scene>('scenes', scene.id, { wordCount, lastPos: state.selection.from })
+    const paras = docParagraphs(content).map((p) => p.trim()).filter(Boolean)
+    const excerpt = makeExcerpt(current?.epigraph && paras[0] === current.epigraph ? paras.slice(1) : paras)
+    if (current && (current.wordCount !== wordCount || current.lastPos !== state.selection.from || current.excerpt !== excerpt)) {
+      await patch<Scene>('scenes', scene.id, { wordCount, lastPos: state.selection.from, excerpt })
     }
   }
 

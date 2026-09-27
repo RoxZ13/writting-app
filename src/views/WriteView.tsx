@@ -5,10 +5,11 @@ import { db, type Beat, type Marker, type Project, type Scene, type SceneText } 
 import { createMarker, patch, save, snapshotScene } from '../db/repo'
 import { ChapterContext, updateBeats } from '../components/ChapterContext'
 import { Icon } from '../components/Icon'
+import { TypoControls } from '../components/TypoControls'
 import { MarkerCard } from '../components/MarkerCard'
 import { PlacePicker } from '../components/Refs'
 import { SceneEditor, type SelectionAction } from '../components/SceneEditor'
-import { markerPayoffChapter, markerSetupChapter, markerStatus, type ProjectData } from '../lib/hooks'
+import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { session } from '../lib/session'
 import { MARKER_STATES, statusOf } from '../lib/status'
@@ -70,6 +71,7 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
   const [typing, setTyping] = useState(false)
   const [askRewrite, setAskRewrite] = useState(false)
   const [finishing, setFinishing] = useState(false)
+  const [typoOpen, setTypoOpen] = useState(false)
   const [bannerHidden, setBannerHidden] = useState(() => sessionStorage.getItem('manuscript.banner') === '1')
 
   // While typing, everything around the text fades out; moving the mouse or touching brings it back.
@@ -175,7 +177,7 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
             <span className="hide-sm" style={{ whiteSpace: 'nowrap' }}>
               {chapter?.title} ›
             </span>
-            <InlineEdit value={scene.title} onSave={(title) => void patch<Scene>('scenes', scene.id, { title })} />
+            <InlineEdit value={scene.title} placeholder={sceneName(data, scene)} onSave={(title) => void patch<Scene>('scenes', scene.id, { title })} />
           </div>
           <div className="modes" role="group" aria-label="Режим">
             {(
@@ -194,6 +196,19 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
           <span className="small muted hide-sm" style={{ whiteSpace: 'nowrap' }}>
             {formatWords(words ?? scene.wordCount)}
           </span>
+          <div className="typo-anchor">
+            <button className={`icon-btn aa ${typoOpen ? 'on' : ''}`} title="Шрифт, размер, ширина текста" onClick={() => setTypoOpen(!typoOpen)}>
+              Aa
+            </button>
+            {typoOpen && (
+              <>
+                <div className="typo-back" onClick={() => setTypoOpen(false)} />
+                <div className="typo-pop card">
+                  <TypoControls />
+                </div>
+              </>
+            )}
+          </div>
           <button className="icon-btn" title="Маячок здесь (⌘/Ctrl + M)" onClick={() => editor && setAction(selectionForMarker(editor))}>
             <Icon name="spark" size={18} />
           </button>
@@ -314,7 +329,7 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
                 }}
               >
                 <span className="dot" style={{ background: statusOf(s.status).color }} />
-                <span className="nav-scene-title">{s.title}</span>
+                <span className="nav-scene-title">{sceneName(data, s)}</span>
               </button>
             ))}
         </div>
