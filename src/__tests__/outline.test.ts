@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { ManuscriptDB, useDatabase, db } from '../db/db'
-import { alive, createChapter, createScene, mergeIntoPrevious, splitChapterAt, applyOutline } from '../db/repo'
+import { alive, createChapter, createScene, mergeIntoPrevious, mergeSceneIntoPrevious, moveScene, splitChapterAt, applyOutline } from '../db/repo'
 
 let n = 0
 async function outline() {
@@ -52,5 +52,26 @@ describe('outline restructuring', () => {
       { type: 'scene', id: id('e') },
     ])
     expect(await outline()).toEqual([['Глава 1', 'a', 'b'], ['Глава 2', 'd', 'c', 'e']])
+  })
+
+  it('moves a scene into another chapter at a position (board drag)', async () => {
+    const all = await db.scenes.toArray()
+    const c2 = (await db.chapters.toArray()).find((c) => c.title === 'Глава 2')!
+    await moveScene(all.find((s) => s.title === 'b')!.id, c2.id, 0)
+    expect(await outline()).toEqual([['Глава 1', 'a', 'c', 'd'], ['Глава 2', 'b', 'e']])
+  })
+
+  it('merges a scene into the previous one, keeping both texts', async () => {
+    const all = await db.scenes.toArray()
+    const a = all.find((s) => s.title === 'a')!
+    const b = all.find((s) => s.title === 'b')!
+    await db.texts.update(a.id, { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Раз' }] }] }, wordCount: 1 })
+    await db.texts.update(b.id, { content: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Два' }] }] }, wordCount: 1 })
+    await mergeSceneIntoPrevious(b.id)
+    expect((await outline())[0]).toEqual(['Глава 1', 'a', 'c', 'd'])
+    const t = await db.texts.get(a.id)
+    expect(JSON.stringify(t!.content)).toContain('Раз')
+    expect(JSON.stringify(t!.content)).toContain('Два')
+    expect(t!.wordCount).toBe(2)
   })
 })

@@ -10,6 +10,8 @@ import {
   type Scene,
   type SceneText,
   type Snapshot,
+  type Line,
+  type Character,
   type SyncedTable,
 } from './db'
 import { emptyDoc } from '../lib/text'
@@ -157,7 +159,7 @@ export type MarkerState = 'hanging' | 'waiting' | 'closed'
 
 export function markerState(m: Marker): MarkerState {
   if (m.resolved) return 'closed'
-  if (!m.payoffSceneId) return 'hanging'
+  if (!m.payoffSceneId && !m.payoffChapterId) return 'hanging'
   return 'waiting'
 }
 
@@ -240,4 +242,90 @@ export async function mergeIntoPrevious(chapterId: string) {
   items.splice(at, 1)
   await applyOutline(items)
   await remove('chapters', chapterId)
+}
+
+// ---------- lines & characters ----------
+
+export const PALETTE = ['#3b82f6', '#e5484d', '#22b573', '#a47be3', '#f08c1a', '#0ea5a4', '#e0529c', '#8a8f98', '#c9a227', '#6366f1']
+
+export async function createLine(projectId: string, name: string): Promise<Line> {
+  const existing = alive(await db.lines.where('projectId').equals(projectId).toArray())
+  return save<Line>('lines', {
+    id: uid(),
+    projectId,
+    name,
+    color: PALETTE[existing.length % PALETTE.length],
+    order: existing.length,
+    updatedAt: 0,
+  })
+}
+
+export async function createCharacter(projectId: string, name: string): Promise<Character> {
+  const existing = alive(await db.characters.where('projectId').equals(projectId).toArray())
+  return save<Character>('characters', {
+    id: uid(),
+    projectId,
+    name,
+    about: '',
+    color: PALETTE[(existing.length + 3) % PALETTE.length],
+    order: existing.length,
+    updatedAt: 0,
+  })
+}
+
+/** Toggle an id in a scene's list field (lines or characters) using the freshest stored copy. */
+export async function toggleSceneRef(sceneId: string, field: 'lineIds' | 'characterIds', id: string) {
+  const s = await db.scenes.get(sceneId)
+  if (!s) return
+  const list = s[field] ?? []
+  await save<Scene>('scenes', { ...s, [field]: list.includes(id) ? list.filter((x) => x !== id) : [...list, id] })
+}
+
+/** Move a scene to a chapter at a position (board drag and drop). */
+export async function moveScene(sceneId: string, chapterId: string, index: number) {
+  const scene = await db.scenes.get(sceneId)
+  if (!scene) return
+  const siblings = alive(await db.scenes.where('chapterId').equals(chapterId).toArray())
+    .filter((s) => s.id !== sceneId)
+    .sort((a, b) => a.order - b.order)
+  siblings.splice(Math.max(0, Math.min(index, siblings.length)), 0, scene)
+  await reorderScenes(chapterId, siblings.map((s) => s.id))
+}
+
+/** Glue a scene onto the end of the previous scene in its chapter (for "***" that was only a pause). */
+export async function mergeSceneIntoPrevious(sceneId: string): Promise<string | undefined> {
+  const scene = await db.scenes.get(sceneId)
+  if (!scene) return
+  const siblings = alive(await db.scenes.where('chapterId').equals(scene.chapterId).toArray()).sort((a, b) => a.order - b.order)
+  const prev = siblings[siblings.indexOf(siblings.find((s) => s.id === sceneId)!) - 1]
+  if (!prev) return
+  const [a, b] = await Promise.all([db.texts.get(prev.id), db.texts.get(sceneId)])
+  const content = {
+    type: 'doc',
+    content: [
+      ...(((a?.content as { content?: unknown[] })?.content ?? []) as unknown[]),
+      ...(((b?.content as { content?: unknown[] })?.content ?? []) as unknown[]),
+    ],
+  }
+  const wordCount = (a?.wordCount ?? 0) + (b?.wordCount ?? 0)
+  if (a) await save<SceneText>('texts', { ...a, content, wordCount })
+  await save<Scene>('scenes', {
+    ...prev,
+    wordCount,
+    beats: [...prev.beats, ...scene.beats],
+    lineIds: [...new Set([...(prev.lineIds ?? []), ...(scene.lineIds ?? [])])],
+    characterIds: [...new Set([...(prev.characterIds ?? []), ...(scene.characterIds ?? [])])],
+  })
+  for (const m of alive(await db.markers.where('projectId').equals(scene.projectId).toArray())) {
+    if (m.setupSceneId === sceneId || m.payoffSceneId === sceneId) {
+      await save<Marker>('markers', {
+        ...m,
+        setupSceneId: m.setupSceneId === sceneId ? prev.id : m.setupSceneId,
+        payoffSceneId: m.payoffSceneId === sceneId ? prev.id : m.payoffSceneId,
+      })
+    }
+  }
+  await remove('scenes', sceneId)
+  await remove('texts', sceneId)
+  return prev.id
 }

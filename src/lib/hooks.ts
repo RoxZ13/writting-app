@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo } from 'react'
-import { db, type Chapter, type Marker, type Note, type Project, type Scene } from '../db/db'
+import { db, type Chapter, type Character, type Line, type Marker, type Note, type Project, type Scene } from '../db/db'
 import { alive, markerState } from '../db/repo'
 
 export interface ProjectData {
@@ -11,6 +11,10 @@ export interface ProjectData {
   outline: { chapter: Chapter; scenes: Scene[] }[]
   markers: Marker[]
   notes: Note[]
+  lines: Line[]
+  characters: Character[]
+  lineById: Map<string, Line>
+  characterById: Map<string, Character>
   sceneById: Map<string, Scene>
   chapterById: Map<string, Chapter>
   /** Position of each scene in reading order, used for "before / after" checks. */
@@ -27,11 +31,13 @@ export function useProjectData(projectId: string | undefined): ProjectData | und
     if (!projectId) return null
     const project = await db.projects.get(projectId)
     if (!project || project.deleted) return null
-    const [chapters, scenes, markers, notes] = await Promise.all([
+    const [chapters, scenes, markers, notes, lines, characters] = await Promise.all([
       db.chapters.where('projectId').equals(projectId).toArray(),
       db.scenes.where('projectId').equals(projectId).toArray(),
       db.markers.where('projectId').equals(projectId).toArray(),
       db.notes.toArray(),
+      db.lines.where('projectId').equals(projectId).toArray(),
+      db.characters.where('projectId').equals(projectId).toArray(),
     ])
     return {
       project,
@@ -39,6 +45,8 @@ export function useProjectData(projectId: string | undefined): ProjectData | und
       scenes: alive(scenes),
       markers: alive(markers),
       notes: alive(notes).filter((n) => !n.projectId || n.projectId === projectId),
+      lines: alive(lines).sort((a, b) => a.order - b.order),
+      characters: alive(characters).sort((a, b) => a.order - b.order),
     }
   }, [projectId])
 
@@ -63,19 +71,50 @@ export function useProjectData(projectId: string | undefined): ProjectData | und
       sceneIndex,
       chapterIndex,
       markers: [...raw.markers].sort((a, b) => a.createdAt - b.createdAt),
+      lineById: new Map(raw.lines.map((l) => [l.id, l])),
+      characterById: new Map(raw.characters.map((c) => [c.id, c])),
       notes: [...raw.notes].sort((a, b) => b.createdAt - a.createdAt),
     }
   }, [raw])
 }
 
-/** Marker state, including "late": its payoff scene is before where the author currently is. */
+/** The chapter a marker is planted in / pays off in: from its scene if known, else its planned chapter. */
+export function markerSetupChapter(m: Marker, data: ProjectData): string | undefined {
+  return (m.setupSceneId && data.sceneById.get(m.setupSceneId)?.chapterId) || m.setupChapterId
+}
+export function markerPayoffChapter(m: Marker, data: ProjectData): string | undefined {
+  return (m.payoffSceneId && data.sceneById.get(m.payoffSceneId)?.chapterId) || m.payoffChapterId
+}
+
+/** Marker state, including "late": its payoff was planned before the chapter the author is in now. */
 export function markerStatus(m: Marker, data: ProjectData): 'hanging' | 'waiting' | 'late' | 'closed' {
   const st = markerState(m)
   if (st !== 'waiting') return st
-  const cur = data.project.lastSceneId ? data.sceneIndex.get(data.project.lastSceneId) : undefined
-  const pay = m.payoffSceneId ? data.sceneIndex.get(m.payoffSceneId) : undefined
+  const curScene = data.project.lastSceneId ? data.sceneById.get(data.project.lastSceneId) : undefined
+  const cur = curScene ? data.chapterIndex.get(curScene.chapterId) : undefined
+  const payCh = markerPayoffChapter(m, data)
+  const pay = payCh ? data.chapterIndex.get(payCh) : undefined
   if (cur !== undefined && pay !== undefined && pay < cur) return 'late'
   return 'waiting'
+}
+
+/** Quotes and dialogues of the given characters that have not been used in the text yet. */
+export function unusedLines(data: ProjectData, characterIds: string[]): Note[] {
+  if (!characterIds.length) return []
+  return data.notes.filter(
+    (n) =>
+      !n.archived &&
+      !n.used &&
+      (n.kind === 'quote' || n.kind === 'dialogue') &&
+      (n.characterIds ?? []).some((id) => characterIds.includes(id)),
+  )
+}
+
+/** Characters in a chapter: everyone marked in any of its scenes. */
+export function chapterCharacters(data: ProjectData, chapterId: string): string[] {
+  const ids = new Set<string>()
+  for (const s of data.scenes) if (s.chapterId === chapterId) for (const id of s.characterIds ?? []) ids.add(id)
+  return [...ids]
 }
 
 export function sceneLabel(data: ProjectData, sceneId: string | undefined): string {

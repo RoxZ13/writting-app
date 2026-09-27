@@ -1,22 +1,25 @@
 import { useEffect, useState } from 'react'
 
 export type Route =
-  | { view: 'home' }
-  | { view: 'plan' }
-  | { view: 'markers' }
+  | { view: 'text'; sceneId?: string }
+  | { view: 'board' }
+  | { view: 'characters' }
   | { view: 'inbox' }
   | { view: 'settings' }
-  | { view: 'write'; sceneId: string }
 
 export function parseHash(hash: string): Route {
   const [, view, id] = hash.replace(/^#/, '').split('/')
-  if (view === 'write' && id) return { view: 'write', sceneId: id }
-  if (view === 'plan' || view === 'markers' || view === 'inbox' || view === 'settings') return { view }
-  return { view: 'home' }
+  if (view === 'write' || view === 'text') return { view: 'text', sceneId: id || undefined }
+  if (view === 'board' || view === 'characters' || view === 'inbox' || view === 'settings') return { view }
+  return { view: 'text' }
 }
 
-export function go(route: Route) {
-  const hash = route.view === 'write' ? `#/write/${route.sceneId}` : route.view === 'home' ? '#/' : `#/${route.view}`
+/** Back-compat: old code paths ask for { view: 'write', sceneId }. */
+type Target = Route | { view: 'write'; sceneId: string }
+
+export function go(route: Target) {
+  const r: Route = route.view === 'write' ? { view: 'text', sceneId: route.sceneId } : route
+  const hash = r.view === 'text' ? (r.sceneId ? `#/text/${r.sceneId}` : '#/text') : `#/${r.view}`
   if (location.hash !== hash) location.hash = hash
 }
 
