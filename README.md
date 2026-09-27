@@ -33,13 +33,15 @@
 
 > Важно для iPhone/iPad: Safari может очищать данные сайтов, которые не открывались 7 дней. Установленное на экран «Домой» приложение этого не касается, а синхронизация хранит копию в облаке — включи её.
 
-## Публикация (Netlify, бесплатно, работает с приватным репозиторием)
+## Публикация (GitHub Pages — открывается из России без VPN)
 
-1. Зарегистрироваться на [netlify.com](https://netlify.com) через GitHub.
-2. **Add new site → Import an existing project → GitHub** → выбрать `writting-app`, ветку `main`.
-   Настройки сборки подтянутся сами из `netlify.toml` — просто **Deploy**.
-3. Через минуту появится адрес вида `https://что-то.netlify.app` (имя можно поменять в **Site configuration → Change site name**).
-4. Каждое обновление в `main` публикуется само.
+1. **Settings → General → Danger Zone → Change visibility → Make public.**
+   Публичным становится только код приложения. Тексты в репозитории не хранятся никогда — они живут на устройствах и в личном облаке.
+2. **Settings → Pages → Build and deployment → Source: GitHub Actions.**
+3. **Actions → Publish to GitHub Pages → Run workflow** (или просто любое обновление `main`).
+4. Через пару минут приложение будет по адресу `https://roxz13.github.io/writting-app/`.
+
+Netlify (`netlify.toml`) тоже поддерживается, но из России `netlify.app` открывается нестабильно.
 
 ## Синхронизация между устройствами (Supabase, бесплатно)
 
@@ -50,7 +52,7 @@
 4. **Project Settings → API**: скопировать **Project URL** и **anon public key**.
 5. Вставить их в приложении: **Ещё → Синхронизация → Подключить**, затем «Создать аккаунт».
    На остальных устройствах — то же самое, но «Войти».
-   (Или один раз записать их в Netlify: **Site configuration → Environment variables** как `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` и пересобрать — тогда вставлять вручную не придётся.)
+   (Или один раз записать их в репозитории: **Settings → Secrets and variables → Actions → Variables** как `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` — тогда вставлять вручную не придётся.)
 
 Как это работает: всё пишется сначала на устройство, потом, когда есть сеть, отправляется в облако. Индикатор рядом с логотипом: зелёный — синхронизировано, серый — только на устройстве.
 
