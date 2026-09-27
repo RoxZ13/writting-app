@@ -4,6 +4,8 @@ import type { Editor } from '@tiptap/react'
 export const session: {
   sceneId?: string
   editor?: Editor | null
+  /** Text to select once the next scene opens (from book search). */
+  find?: string
 } = {}
 
 export function returnFocus() {
@@ -45,3 +47,7 @@ export function applyTheme(t: Theme) {
   if (t === 'auto') delete document.documentElement.dataset.theme
   else document.documentElement.dataset.theme = t
 }
+
+/** Keyboard shortcut hints only make sense where there is a keyboard. */
+export const isTouch = () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches
+export const hotkey = (hint: string) => (isTouch() ? '' : hint)

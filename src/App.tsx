@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSyncStatus, onSyncStatus, startCloudSync, type SyncStatus } from './db/cloud'
-import { useProjectData, useProjects, type ProjectData } from './lib/hooks'
+import { markerStatus, useProjectData, useProjects, type ProjectData } from './lib/hooks'
 import { tidyImportedScenes } from './db/repo'
 import { go, useRoute, type Route } from './lib/router'
-import { getCurrentProjectId, returnFocus, setCurrentProjectId } from './lib/session'
+import { getCurrentProjectId, hotkey, returnFocus, setCurrentProjectId } from './lib/session'
 import { Toaster } from './lib/ui'
 import { Icon } from './components/Icon'
 import { QuickCapture } from './components/QuickCapture'
+import { SearchModal } from './components/SearchModal'
 import { BoardView } from './views/BoardView'
 import { CharactersView } from './views/CharactersView'
 import { InboxView } from './views/InboxView'
@@ -14,6 +15,8 @@ import { SettingsView } from './views/SettingsView'
 import { WriteView } from './views/WriteView'
 import { Welcome } from './views/Welcome'
 import { LibraryView } from './views/LibraryView'
+import { BookView } from './views/BookView'
+import { HelpView } from './views/HelpView'
 import { deadlineText } from './lib/stories'
 
 const TABS: { view: Route['view']; label: string; ico: string }[] = [
@@ -27,6 +30,7 @@ export function App() {
   const projects = useProjects()
   const [projectId, setProjectId] = useState(getCurrentProjectId)
   const [capture, setCapture] = useState(false)
+  const [searching, setSearching] = useState(false)
   const [sync, setSync] = useState<SyncStatus>(getSyncStatus)
 
   // Tell the boot watchdog in index.html that storage answered and the app is alive.
@@ -65,6 +69,10 @@ export function App() {
         e.preventDefault()
         setCapture(true)
       }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setSearching(true)
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
@@ -88,11 +96,48 @@ export function App() {
         data.scenes[0]?.id
       : undefined
 
+  if (route.view === 'library' || route.view === 'settings' || route.view === 'help') {
+    return (
+      <div className="lib-shell">
+        <aside className="lib-side">
+          <div className="brand">
+            <div className="logo">Manuscript.</div>
+            <div className="tagline">The writer’s studio</div>
+          </div>
+          <div className="side-label">Menu</div>
+          <nav className="lib-nav">
+            {(
+              [
+                ['library', 'Истории', 'book'],
+                ['settings', 'Настройки', 'settings'],
+                ['help', 'Справка', 'help'],
+              ] as [Route['view'], string, string][]
+            ).map(([v, label, ico]) => (
+              <button key={v} aria-current={route.view === v ? 'page' : undefined} onClick={() => go({ view: v } as Route)}>
+                <Icon name={ico} />
+                {label}
+              </button>
+            ))}
+          </nav>
+          <button className="lib-back" onClick={() => go({ view: 'text' })}>
+            ← К «{data.project.title}»
+          </button>
+        </aside>
+        <main className="lib-main">
+          {route.view === 'library' && <LibraryView projects={projects} currentId={data.project.id} onOpen={selectProject} />}
+          {route.view === 'settings' && <SettingsView sync={sync} />}
+          {route.view === 'help' && <HelpView />}
+        </main>
+        <Toaster />
+      </div>
+    )
+  }
+
   return (
     <div className={`app app-${route.view}`}>
-      <AppHeader data={data} route={route} sync={sync} />
+      <AppHeader data={data} route={route} sync={sync} onSearch={() => setSearching(true)} />
       {route.view === 'text' && textScene && (
-        <WriteView key={textScene} data={data} sceneId={textScene} onCapture={() => setCapture(true)} />
+        <WriteView key={textScene} data={data} sceneId={textScene} onCapture={() => setCapture(true)} onSearch={() => setSearching(true)} />
       )}
       {route.view === 'text' && !textScene && (
         <main className="page">
@@ -110,8 +155,7 @@ export function App() {
           {route.view === 'board' && <BoardView data={data} />}
           {route.view === 'characters' && <CharactersView data={data} />}
           {route.view === 'inbox' && <InboxView data={data} />}
-          {route.view === 'library' && <LibraryView projects={projects} currentId={data.project.id} onOpen={selectProject} />}
-          {route.view === 'settings' && <SettingsView data={data} projects={projects} onSelectProject={selectProject} sync={sync} />}
+          {route.view === 'book' && <BookView data={data} />}
         </main>
       )}
       {route.view !== 'text' && (
@@ -120,12 +164,13 @@ export function App() {
         </button>
       )}
       {capture && <QuickCapture data={data} onClose={closeCapture} />}
+      {searching && <SearchModal data={data} onClose={() => setSearching(false)} />}
       <Toaster />
     </div>
   )
 }
 
-function AppHeader({ data, route, sync }: { data: ProjectData; route: Route; sync: SyncStatus }) {
+function AppHeader({ data, route, sync, onSearch }: { data: ProjectData; route: Route; sync: SyncStatus; onSearch: () => void }) {
   const inbox = data.notes.filter((n) => !n.archived && !n.sceneId && !n.used && !(n.characterIds ?? []).length).length
   const syncTitle =
     sync.state === 'ok'
@@ -148,6 +193,7 @@ function AppHeader({ data, route, sync }: { data: ProjectData; route: Route; syn
           {data.project.title} <span className="caret">▾</span>
         </button>
         <span className="sync-dot" data-state={sync.state} title={syncTitle} />
+        <MarkerStatus data={data} />
         {deadlineText(data.project.deadline) && (
           <span className={`deadline hide-sm ${deadlineText(data.project.deadline)!.late ? 'late' : ''}`}>⏳ {deadlineText(data.project.deadline)!.text}</span>
         )}
@@ -161,6 +207,12 @@ function AppHeader({ data, route, sync }: { data: ProjectData; route: Route; syn
             <span className="tab-label">{t.label}</span>
           </button>
         ))}
+        <button className="tab-aux hide-on-phone" title={`Поиск по книге${hotkey(' (⌘/Ctrl + Shift + F)')}`} onClick={onSearch}>
+          <span className="tab-ico">
+            <Icon name="search" />
+          </span>
+          <span className="tab-label">Поиск</span>
+        </button>
         <button className="tab-aux" aria-current={route.view === 'inbox' ? 'page' : undefined} title="Входящие: быстрые мысли" onClick={() => go({ view: 'inbox' })}>
           <span className="tab-ico">
             <Icon name="inbox" />
@@ -168,13 +220,31 @@ function AppHeader({ data, route, sync }: { data: ProjectData; route: Route; syn
           <span className="tab-label">Входящие</span>
           {inbox > 0 && <span className="badge">{inbox}</span>}
         </button>
-        <button className="tab-aux" aria-current={route.view === 'settings' ? 'page' : undefined} title="Настройки" onClick={() => go({ view: 'settings' })}>
+        <button className="tab-aux" aria-current={route.view === 'book' ? 'page' : undefined} title="О книге: обложка, дедлайн, экспорт" onClick={() => go({ view: 'book' })}>
           <span className="tab-ico">
-            <Icon name="settings" />
+            <Icon name="book" />
           </span>
-          <span className="tab-label">Ещё</span>
+          <span className="tab-label">Книга</span>
         </button>
       </nav>
     </header>
+  )
+}
+
+/** Always visible: are all markers accounted for? One tap shows the ones waiting. */
+function MarkerStatus({ data }: { data: ProjectData }) {
+  if (!data.markers.length) return null
+  const waiting = data.markers.filter((m) => ['hanging', 'late'].includes(markerStatus(m, data))).length
+  return (
+    <button
+      className={`marker-status ${waiting ? 'due' : ''}`}
+      title={waiting ? 'Маячки без места раскрытия или пропущенные' : 'У каждого маячка есть место раскрытия'}
+      onClick={() => {
+        sessionStorage.setItem('manuscript.lens', 'markers')
+        go({ view: 'board' })
+      }}
+    >
+      ✦ {waiting ? `${waiting} ждут` : 'все на месте'}
+    </button>
   )
 }

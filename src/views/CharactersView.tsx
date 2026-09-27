@@ -1,4 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { db, type Scene } from '../db/db'
+import { alive, save } from '../db/repo'
+import { countMentions, heroesFromDescription, mentionPatterns } from '../lib/heroes'
+import { docParagraphs } from '../lib/text'
+import { Modal } from '../lib/ui'
 import type { Character, Note } from '../db/db'
 import { createLine, createNote, findOrCreateCharacter, mergeCharacters, patch, remove } from '../db/repo'
 import type { ProjectData } from '../lib/hooks'
@@ -13,11 +18,38 @@ export function CharactersView({ data }: { data: ProjectData }) {
     await findOrCreateCharacter(data.project.id, name.trim())
     setName('')
   }
+  const norm = (x: string) => x.trim().toLowerCase().replace(/ё/g, 'е')
+  const known = new Set(data.characters.map((c) => norm(c.name)))
+  const suggested = heroesFromDescription(data.project.description).filter((n) => !known.has(norm(n)))
+  const [tagging, setTagging] = useState(false)
+
   return (
     <div>
       <div className="toolbar">
         <h1 style={{ marginRight: 'auto' }}>Герои</h1>
+        {data.characters.length > 0 && (
+          <button className="btn" onClick={() => setTagging(true)}>
+            Найти героев в сценах
+          </button>
+        )}
       </div>
+      {suggested.length > 0 && (
+        <div className="card suggest">
+          <div>
+            <strong>В описании книги нашлись герои:</strong> {suggested.join(', ')}
+          </div>
+          <button
+            className="btn primary"
+            onClick={async () => {
+              for (const n of suggested) await findOrCreateCharacter(data.project.id, n)
+              toast('Герои добавлены. Теперь можно найти, в каких сценах они есть')
+            }}
+          >
+            Добавить их
+          </button>
+        </div>
+      )}
+      {tagging && <TagScenes data={data} onClose={() => setTagging(false)} />}
       <div className="people">
         {data.characters.map((c) => (
           <Person key={c.id} data={data} c={c} />
@@ -145,5 +177,86 @@ function QuoteRow({ n, data }: { n: Note; data: ProjectData }) {
         </button>
       )}
     </div>
+  )
+}
+
+/** Look through the whole book and mark each scene with the heroes who appear in it. */
+function TagScenes({ data, onClose }: { data: ProjectData; onClose: () => void }) {
+  const [found, setFound] = useState<Map<string, string[]> | null>(null)
+  const [picked, setPicked] = useState<Set<string>>(new Set(data.characters.map((c) => c.id)))
+
+  useEffect(() => {
+    void (async () => {
+      const patterns = mentionPatterns(data.characters)
+      const texts = alive(await db.texts.where('projectId').equals(data.project.id).toArray())
+      const map = new Map<string, string[]>()
+      for (const t of texts) {
+        if (!data.sceneById.has(t.id)) continue
+        const plain = docParagraphs(t.content).join('\n')
+        for (const [cid, re] of patterns) {
+          // Two mentions or more: a name dropped once in passing does not make someone part of the scene.
+          if (countMentions(plain, re) >= 2) map.set(cid, [...(map.get(cid) ?? []), t.id])
+        }
+      }
+      setFound(map)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const apply = async () => {
+    if (!found) return
+    const add = new Map<string, Set<string>>()
+    for (const [cid, scenes] of found) if (picked.has(cid)) for (const sid of scenes) add.set(sid, (add.get(sid) ?? new Set()).add(cid))
+    for (const [sid, ids] of add) {
+      const s = await db.scenes.get(sid)
+      if (!s) continue
+      const next = [...new Set([...(s.characterIds ?? []), ...ids])]
+      if (next.length !== (s.characterIds ?? []).length) await save<Scene>('scenes', { ...s, characterIds: next })
+    }
+    toast(`Отмечено в ${add.size} сценах`)
+    onClose()
+  }
+
+  return (
+    <Modal onClose={onClose} label="Найти героев в сценах">
+      <div className="stack">
+        <h2>Где кто появляется</h2>
+        {!found ? (
+          <div className="muted">Читаю книгу…</div>
+        ) : (
+          <>
+            <div className="small muted">Сцена отмечается, если имя встречается в ней хотя бы дважды. Уже отмеченное не снимается.</div>
+            {data.characters.map((c) => (
+              <label key={c.id} className="row" style={{ flexWrap: 'nowrap' }}>
+                <input
+                  type="checkbox"
+                  checked={picked.has(c.id)}
+                  onChange={(e) => {
+                    const next = new Set(picked)
+                    if (e.target.checked) next.add(c.id)
+                    else next.delete(c.id)
+                    setPicked(next)
+                  }}
+                />
+                <span className="avatar small" style={{ background: c.color }}>
+                  {c.name.trim()[0]?.toUpperCase()}
+                </span>
+                <span style={{ flex: 1 }}>{c.name}</span>
+                <span className="muted small">{found.get(c.id)?.length ?? 0} сц.</span>
+              </label>
+            ))}
+            <div className="row">
+              <span className="spacer" />
+              <button className="btn ghost" onClick={onClose}>
+                Отмена
+              </button>
+              <button className="btn primary" onClick={() => void apply()}>
+                Отметить
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
   )
 }

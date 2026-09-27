@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { uid, type Note, type NoteKind } from '../db/db'
-import { updateBeats } from '../components/ChapterContext'
+import { updateBeats } from '../components/ScenePassport'
 import { createMarker, createNote, patch, remove } from '../db/repo'
 import { sceneLabel, sceneName, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'

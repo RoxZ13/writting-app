@@ -7,6 +7,8 @@ export interface Base {
   deleted?: boolean
 }
 
+export type StoryStage = 'idea' | 'writing' | 'editing' | 'publishing' | 'done'
+
 export interface Project extends Base {
   title: string
   createdAt: number
@@ -18,6 +20,9 @@ export interface Project extends Base {
   nextStep?: string
   /** Cover colour in the library. */
   color?: string
+  /** Free text: «Фэнтези», «Гет, макси». */
+  genre?: string
+  stage?: StoryStage
   /** Target date, YYYY-MM-DD. */
   deadline?: string
 }

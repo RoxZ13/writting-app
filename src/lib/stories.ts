@@ -4,7 +4,7 @@ import { importBook } from '../components/ImportPanel'
 import { parseBook, readFileAsBlocks } from './importer'
 
 /** Create a story, optionally from a file (its header gives the title when none is typed). */
-export async function createStory(opts: { title?: string; file?: File; color?: string; deadline?: string }) {
+export async function createStory(opts: { title?: string; file?: File; color?: string; deadline?: string; genre?: string }) {
   const book = opts.file ? parseBook(await readFileAsBlocks(opts.file)) : undefined
   const name = opts.title?.trim() || book?.title || opts.file?.name.replace(/\.[^.]+$/, '') || 'Новая история'
   const project = await createProject(name)
@@ -21,7 +21,7 @@ export async function createStory(opts: { title?: string; file?: File; color?: s
     await save('projects', { ...(await db.projects.get(project.id))!, lastSceneId: first })
   }
   const fresh = (await db.projects.get(project.id))!
-  await save('projects', { ...fresh, color: opts.color, deadline: opts.deadline || undefined })
+  await save('projects', { ...fresh, color: opts.color, deadline: opts.deadline || undefined, genre: opts.genre?.trim() || undefined, stage: 'writing' })
   return project.id
 }
 
@@ -39,3 +39,12 @@ export function deadlineText(date: string | undefined): { text: string; late: bo
 }
 
 export const COVERS = ['#0b0b0c', '#3a3a3f', '#5b5b63', '#1f3a5f', '#3b82f6', '#7c5cd6', '#c2417a', '#e5484d', '#f08c1a', '#22b573', '#0ea5a4']
+
+export const STAGES: { id: import('../db/db').StoryStage; label: string }[] = [
+  { id: 'idea', label: 'Идея' },
+  { id: 'writing', label: 'Пишу' },
+  { id: 'editing', label: 'Правлю' },
+  { id: 'publishing', label: 'Выкладываю' },
+  { id: 'done', label: 'Готово' },
+]
+export const stageLabel = (id?: string) => STAGES.find((s) => s.id === id)?.label ?? 'Пишу'

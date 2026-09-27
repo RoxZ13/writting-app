@@ -1,9 +1,9 @@
 import type { Editor } from '@tiptap/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useState } from 'react'
-import { db, type Beat, type Marker, type Project, type Scene, type SceneText } from '../db/db'
-import { createMarker, patch, save, snapshotScene } from '../db/repo'
-import { ChapterContext, updateBeats } from '../components/ChapterContext'
+import { db, type Marker, type Note, type Project, type Scene, type SceneText } from '../db/db'
+import { createMarker, createNote, patch, save, snapshotScene } from '../db/repo'
+import { ScenePassport } from '../components/ScenePassport'
 import { Icon } from '../components/Icon'
 import { TypoControls } from '../components/TypoControls'
 import { MarkerCard } from '../components/MarkerCard'
@@ -11,7 +11,7 @@ import { PlacePicker } from '../components/Refs'
 import { SceneEditor, type SelectionAction } from '../components/SceneEditor'
 import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
-import { session } from '../lib/session'
+import { hotkey, session } from '../lib/session'
 import { MARKER_STATES, statusOf } from '../lib/status'
 import { docParagraphs, emptyDoc, formatWords } from '../lib/text'
 import { InlineEdit, Modal, toast } from '../lib/ui'
@@ -20,12 +20,12 @@ type Mode = 'write' | 'edit' | 'rewrite'
 const PANELS_KEY = 'manuscript.panels'
 const MODE_KEY = 'manuscript.mode'
 
-function loadPanels(): { nav: boolean; brief: boolean } {
+function loadPanels(): { nav: boolean } {
   const wide = typeof matchMedia !== 'undefined' && matchMedia('(min-width: 1101px)').matches
   try {
-    return { nav: wide, brief: false, ...JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}') }
+    return { nav: wide, ...JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}') }
   } catch {
-    return { nav: wide, brief: false }
+    return { nav: wide }
   }
 }
 function loadMode(): Mode {
@@ -59,7 +59,7 @@ function selectionForMarker(editor: Editor): SelectionAction {
   return { kind: 'setup', from, to, text: editor.state.doc.textBetween(from, to, ' ') }
 }
 
-export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sceneId: string; onCapture: () => void }) {
+export function WriteView({ data, sceneId, onCapture, onSearch }: { data: ProjectData; sceneId: string; onCapture: () => void; onSearch: () => void }) {
   const scene = data.sceneById.get(sceneId)
   const text = useLiveQuery(() => db.texts.get(sceneId), [sceneId])
   const [panels, setPanels] = useState(loadPanels)
@@ -68,10 +68,12 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
   const [editor, setEditor] = useState<Editor | null>(null)
   const [action, setAction] = useState<SelectionAction | null>(null)
   const [openMarker, setOpenMarker] = useState<string | null>(null)
+  const [openComment, setOpenComment] = useState<string | null>(null)
   const [typing, setTyping] = useState(false)
   const [askRewrite, setAskRewrite] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [typoOpen, setTypoOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [bannerHidden, setBannerHidden] = useState(() => sessionStorage.getItem('manuscript.banner') === '1')
 
   // While typing, everything around the text fades out; moving the mouse or touching brings it back.
@@ -121,12 +123,8 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
       /* ignore */
     }
   }
-  const togglePanel = (k: 'nav' | 'brief') => {
-    const next = { ...panels, [k]: !panels[k] }
-    if (!matchMedia('(min-width: 1101px)').matches) next[k === 'nav' ? 'brief' : 'nav'] = false
-    persistPanels(next)
-  }
-  const closeOverlays = () => setPanels((p) => ({ ...p, nav: false, brief: false }))
+  const togglePanel = (k: 'nav') => persistPanels({ ...panels, [k]: !panels[k] })
+  const closeOverlays = () => setPanels((p) => ({ ...p, nav: false }))
 
   const setMode = (m: Mode) => {
     if (m === 'rewrite' && !scene?.rewriteFrom) {
@@ -139,7 +137,6 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
     } catch {
       /* ignore */
     }
-    if (m === 'edit' && !panels.brief && matchMedia('(min-width: 1101px)').matches) persistPanels({ ...panels, brief: true })
   }
 
   const onWords = useCallback((n: number) => setWords(n), [])
@@ -152,7 +149,6 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
     'write',
     `mode-${mode}`,
     panels.nav && 'nav-open',
-    panels.brief && 'brief-open',
     typing && 'typing',
     rewriting && 'rewriting',
   ]
@@ -170,35 +166,25 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
 
       <div className="write-center">
         <div className="write-top">
-          <button className="icon-btn" title={panels.nav ? 'Скрыть структуру' : 'Показать структуру'} onClick={() => togglePanel('nav')}>
-            <Icon name="panel" size={18} />
+          <button className={`tool ${panels.nav ? 'on' : ''}`} title={panels.nav ? 'Скрыть структуру книги' : 'Показать структуру книги'} onClick={() => togglePanel('nav')}>
+            <Icon name="panel" size={17} />
+            <span className="tool-label">Структура</span>
           </button>
           <div className="crumbs">
             <span className="hide-sm" style={{ whiteSpace: 'nowrap' }}>
               {chapter?.title} ›
             </span>
             <InlineEdit value={scene.title} placeholder={sceneName(data, scene)} onSave={(title) => void patch<Scene>('scenes', scene.id, { title })} />
-          </div>
-          <div className="modes" role="group" aria-label="Режим">
-            {(
-              [
-                ['write', 'Писать'],
-                ['edit', 'Править'],
-                ['rewrite', 'Переписывать'],
-              ] as [Mode, string][]
-            ).map(([m, label]) => (
-              <button key={m} aria-pressed={mode === m} onClick={() => setMode(m)}>
-                {label}
-              </button>
-            ))}
+            {mode !== 'write' && <span className="mode-chip">{mode === 'edit' ? 'правка' : 'переписываю'}</span>}
           </div>
           <span className="spacer" />
           <span className="small muted hide-sm" style={{ whiteSpace: 'nowrap' }}>
             {formatWords(words ?? scene.wordCount)}
           </span>
           <div className="typo-anchor">
-            <button className={`icon-btn aa ${typoOpen ? 'on' : ''}`} title="Шрифт, размер, ширина текста" onClick={() => setTypoOpen(!typoOpen)}>
-              Aa
+            <button className={`tool ${typoOpen ? 'on' : ''}`} title="Шрифт, размер, ширина текста" onClick={() => setTypoOpen(!typoOpen)}>
+              <span className="aa">Aa</span>
+              <span className="tool-label">Шрифт</span>
             </button>
             {typoOpen && (
               <>
@@ -209,16 +195,89 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
               </>
             )}
           </div>
-          <button className="icon-btn" title="Маячок здесь (⌘/Ctrl + M)" onClick={() => editor && setAction(selectionForMarker(editor))}>
-            <Icon name="spark" size={18} />
+          <button className="tool" title={`Маячок: что потом нужно раскрыть${hotkey(' (⌘/Ctrl + M)')}`} onClick={() => editor && setAction(selectionForMarker(editor))}>
+            <Icon name="spark" size={17} />
+            <span className="tool-label">Маячок</span>
           </button>
-          <button className="icon-btn" title="Быстрая запись: мысль, цитата, вопрос (⌘/Ctrl + J)" onClick={onCapture}>
-            <Icon name="bolt" size={18} />
-          </button>
-          <button className={`icon-btn ${panels.brief ? 'on' : ''}`} title="Всё к этой главе" onClick={() => togglePanel('brief')}>
-            <Icon name="sidebar" size={18} />
-          </button>
-          <button className="btn sm ghost hide-sm" onClick={() => setFinishing(true)}>
+          <div className="typo-anchor">
+            <button className={`tool ${menuOpen ? 'on' : ''}`} title="Режимы и прочее" aria-label="Ещё" onClick={() => setMenuOpen(!menuOpen)}>
+              ⋯
+            </button>
+            {menuOpen && (
+              <>
+                <div className="typo-back" onClick={() => setMenuOpen(false)} />
+                <div className="typo-pop card write-menu">
+                  <div className="menu-label">Режим</div>
+                  {(
+                    [
+                      ['write', 'Писать', 'Только текст. Ничего лишнего.'],
+                      ['edit', 'Править', 'Текст на странице, маячки подсвечены.'],
+                      ['rewrite', 'Переписывать', 'Прежний текст тихо сбоку, новый — рядом.'],
+                    ] as [Mode, string, string][]
+                  ).map(([m, label, hint]) => (
+                    <button
+                      key={m}
+                      className={`mode-item ${mode === m ? 'on' : ''}`}
+                      onClick={() => {
+                        setMenuOpen(false)
+                        setMode(m)
+                      }}
+                    >
+                      <span className="mode-dot">{mode === m ? '●' : '○'}</span>
+                      <span>
+                        <strong>{label}</strong>
+                        <span className="mode-hint">{hint}</span>
+                      </span>
+                    </button>
+                  ))}
+                  <div className="hr" />
+                  <button
+                    className="mode-item"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      onCapture()
+                    }}
+                  >
+                    <span className="mode-dot">⚡</span>
+                    <span>
+                      <strong>Быстрая запись</strong>
+                      <span className="mode-hint">Мысль, цитата, вопрос{hotkey(' · ⌘/Ctrl + J')}</span>
+                    </span>
+                  </button>
+                  <button
+                    className="mode-item"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      onSearch()
+                    }}
+                  >
+                    <span className="mode-dot">⌕</span>
+                    <span>
+                      <strong>Поиск по книге</strong>
+                      <span className="mode-hint">Где у меня было…{hotkey(' · ⌘/Ctrl + Shift + F')}</span>
+                    </span>
+                  </button>
+                  <button
+                    className="mode-item show-sm-flex"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      setFinishing(true)
+                    }}
+                  >
+                    <span className="mode-dot">✓</span>
+                    <span>
+                      <strong>Закончить на сегодня</strong>
+                      <span className="mode-hint">Оставить записку себе на следующий раз</span>
+                    </span>
+                  </button>
+                  <div className="small muted" style={{ padding: '8px 10px 2px' }}>
+                    {formatWords(words ?? scene.wordCount)} в сцене
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <button className="btn sm hide-sm finish-btn" onClick={() => setFinishing(true)}>
             Закончить
           </button>
         </div>
@@ -238,7 +297,9 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
             </button>
           </div>
         )}
-        <Compass scene={scene} onOpenBrief={() => !panels.brief && togglePanel('brief')} />
+        <div className="passport-wrap">
+          <ScenePassport data={data} scene={scene} editor={editor} onOpenMarker={setOpenMarker} />
+        </div>
 
         <div className="editor-area">
           {rewriting && <RewriteOld scene={scene} editor={editor} onDone={() => setModeState('write')} />}
@@ -251,27 +312,20 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
                 onWords={onWords}
                 onSelectionAction={setAction}
                 onMarkerClick={setOpenMarker}
+                onCommentClick={setOpenComment}
               />
             )}
           </div>
         </div>
       </div>
 
-      <aside className="write-brief" aria-label="Всё к этой главе">
-        <div className="inner">
-          <div className="row" style={{ marginBottom: 4 }}>
-            <span className="eyebrow">Всё к этой главе</span>
-            <span className="spacer" />
-            <button className="icon-btn" onClick={() => togglePanel('brief')} aria-label="Скрыть">
-              ×
-            </button>
-          </div>
-          <ChapterContext data={data} scene={scene} editor={editor} />
-        </div>
-      </aside>
       <div className="write-backdrop" onClick={closeOverlays} />
 
-      {action && editor && <MarkerFromSelection data={data} scene={scene} action={action} editor={editor} onClose={() => setAction(null)} />}
+      {action && editor && action.kind === 'comment' && (
+        <CommentDialog data={data} scene={scene} action={action} editor={editor} onClose={() => setAction(null)} />
+      )}
+      {openComment && <CommentPopup data={data} noteId={openComment} editor={editor} onClose={() => setOpenComment(null)} />}
+      {action && editor && action.kind !== 'comment' && <MarkerFromSelection data={data} scene={scene} action={action} editor={editor} onClose={() => setAction(null)} />}
       {openMarker && <MarkerPopup data={data} markerId={openMarker} editor={editor} onClose={() => setOpenMarker(null)} />}
       {askRewrite && (
         <StartRewrite
@@ -335,44 +389,6 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
         </div>
       ))}
     </>
-  )
-}
-
-/** Quiet line above the text: the current beat of the scene's plan. One tap ticks it off. */
-function Compass({ scene, onOpenBrief }: { scene: Scene; onOpenBrief: () => void }) {
-  const next = scene.beats.find((b) => !b.done)
-  const done = scene.beats.filter((b) => b.done).length
-  const tick = (b: Beat) => void updateBeats(scene.id, (all) => all.map((x) => (x.id === b.id ? { ...x, done: true } : x)))
-
-  if (!scene.beats.length) {
-    return (
-      <button className="compass" onClick={onOpenBrief}>
-        <span className="now muted">{scene.goal ? scene.goal : 'Что должно произойти в этой сцене? Набросай пару пунктов — не будешь кружить.'}</span>
-        <span className="prog">план →</span>
-      </button>
-    )
-  }
-  if (!next) {
-    return (
-      <button className="compass" onClick={onOpenBrief}>
-        <span className="now">Всё по плану сцены написано.</span>
-        <span className="prog">
-          {done}/{scene.beats.length}
-        </span>
-      </button>
-    )
-  }
-  return (
-    <div className="compass" role="group" aria-label="Сейчас в сцене">
-      <button className="compass-check" title="Готово — к следующему пункту" onClick={() => tick(next)} />
-      <span className="now" onClick={onOpenBrief}>
-        <span className="muted">Сейчас: </span>
-        {next.text}
-      </span>
-      <span className="prog">
-        {done}/{scene.beats.length}
-      </span>
-    </div>
   )
 }
 
@@ -639,6 +655,99 @@ function MarkerPopup({ data, markerId, editor, onClose }: { data: ProjectData; m
           </button>
           <span className="spacer" />
           <button className="btn" onClick={onClose}>
+            Закрыть
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+/** Remove a mark (marker or comment) with the given id from the whole scene. */
+function unmarkAll(editor: Editor, markName: string, id: string) {
+  const { state } = editor
+  const tr = state.tr
+  state.doc.descendants((node, pos) => {
+    node.marks.forEach((mk) => {
+      if (mk.type.name === markName && mk.attrs.id === id) tr.removeMark(pos, pos + node.nodeSize, mk)
+    })
+  })
+  editor.view.dispatch(tr)
+}
+
+function CommentDialog({
+  data,
+  scene,
+  action,
+  editor,
+  onClose,
+}: {
+  data: ProjectData
+  scene: Scene
+  action: SelectionAction
+  editor: Editor
+  onClose: () => void
+}) {
+  const [text, setText] = useState('')
+  const quote = action.text.length > 90 ? action.text.slice(0, 88) + '…' : action.text
+  const create = async () => {
+    if (!text.trim()) return onClose()
+    const n = await createNote(text.trim(), 'note', data.project.id, scene.id)
+    if (action.from !== action.to) {
+      editor.chain().focus().setTextSelection({ from: action.from, to: action.to }).setMark('comment', { id: n.id }).run()
+    }
+    toast('Заметка на полях сохранена')
+    onClose()
+  }
+  return (
+    <Modal onClose={onClose} label="Заметка на полях">
+      <div className="stack">
+        <h2>Заметка на полях</h2>
+        {quote && <div className="quote-text">«{quote}»</div>}
+        <textarea
+          className="textarea"
+          rows={3}
+          autoFocus
+          placeholder="Что здесь поправить или проверить? Например: «читатель просил пояснить, откуда амулет»"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void create()
+          }}
+        />
+        <div className="row">
+          <span className="spacer" />
+          <button className="btn ghost" onClick={onClose}>
+            Отмена
+          </button>
+          <button className="btn primary" onClick={() => void create()}>
+            Сохранить
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+function CommentPopup({ data, noteId, editor, onClose }: { data: ProjectData; noteId: string; editor: Editor | null; onClose: () => void }) {
+  const note = data.notes.find((n) => n.id === noteId)
+  const resolve = async () => {
+    if (note) await patch<Note>('notes', note.id, { archived: true })
+    if (editor) unmarkAll(editor, 'comment', noteId)
+    toast('Готово — заметка убрана')
+    onClose()
+  }
+  return (
+    <Modal onClose={onClose} label="Заметка на полях">
+      <div className="stack">
+        <span className="eyebrow">Заметка на полях</span>
+        <div style={{ whiteSpace: 'pre-wrap', fontSize: 16 }}>{note && !note.archived ? note.text : 'Эта заметка уже закрыта.'}</div>
+        <div className="row">
+          <button className="btn primary" onClick={() => void resolve()}>
+            ✓ Сделано
+          </button>
+          <span className="spacer" />
+          <button className="btn ghost" onClick={onClose}>
             Закрыть
           </button>
         </div>

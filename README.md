@@ -52,18 +52,23 @@
 
 Netlify (`netlify.toml`) тоже поддерживается, но из России `netlify.app` открывается нестабильно.
 
-## Синхронизация между устройствами (Supabase, бесплатно)
+## Синхронизация между устройствами
 
-1. Зарегистрироваться на [supabase.com](https://supabase.com) → **New project**.
-2. **SQL Editor → New query** → вставить содержимое [`supabase/schema.sql`](supabase/schema.sql) → **Run**.
-3. **Authentication → URL Configuration → Site URL** — адрес опубликованного приложения.
-   Чтобы не подтверждать почту письмом: **Authentication → Sign In / Providers → Email → Confirm email** — выключить.
+Настраивается **один раз владельцем**, после этого все (и ты на всех устройствах, и покупатели) просто входят по почте и паролю — никаких ключей.
+
+1. Зарегистрироваться на [supabase.com](https://supabase.com) → **New project** (бесплатно).
+2. **SQL Editor → New query** → вставить [`supabase/schema.sql`](supabase/schema.sql) → **Run**.
+3. **Authentication → URL Configuration → Site URL**: `https://roxz13.github.io/writting-app/`.
 4. **Project Settings → API**: скопировать **Project URL** и **anon public key**.
-5. Вставить их в приложении: **Ещё → Синхронизация → Подключить**, затем «Создать аккаунт».
-   На остальных устройствах — то же самое, но «Войти».
-   (Или один раз записать их в репозитории: **Settings → Secrets and variables → Actions → Variables** как `VITE_SUPABASE_URL` и `VITE_SUPABASE_ANON_KEY` — тогда вставлять вручную не придётся.)
+5. В GitHub: репозиторий → **Settings → Secrets and variables → Actions → Variables → New repository variable**:
+   `VITE_SUPABASE_URL` = Project URL, `VITE_SUPABASE_ANON_KEY` = anon key.
+6. **Actions → Publish to GitHub Pages → Run workflow**.
 
-Как это работает: всё пишется сначала на устройство, потом, когда есть сеть, отправляется в облако. Индикатор рядом с логотипом: зелёный — синхронизировано, серый — только на устройстве.
+Дальше в приложении: **Истории → Настройки → Устройства → Создать аккаунт** (на первом устройстве; придёт письмо — нажать ссылку), на остальных — **Войти**.
+
+Всё пишется сначала на устройство и работает без интернета; когда сеть есть — уходит в облако. Если одну сцену правили на двух устройствах, второй вариант сохраняется в «Версиях».
+
+> Supabase из России может открываться нестабильно — это стоит проверить с телефона без VPN до того, как рассказывать о синхронизации покупателям.
 
 ## Разработка
 

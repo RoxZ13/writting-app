@@ -1,8 +1,8 @@
 import { useRef, useState } from 'react'
 import type { Note, NoteKind } from '../db/db'
 import { createMarker, createNote, findOrCreateCharacter, patch } from '../db/repo'
-import type { ProjectData } from '../lib/hooks'
-import { session } from '../lib/session'
+import { sceneName, type ProjectData } from '../lib/hooks'
+import { isTouch, session } from '../lib/session'
 import { Modal, toast } from '../lib/ui'
 
 type Kind = NoteKind | 'marker'
@@ -132,12 +132,12 @@ export function QuickCapture({ data, onClose }: { data: ProjectData; onClose: ()
         {sceneId && !withPeople && (
           <label className="row small muted">
             <input type="checkbox" checked={attach} onChange={(e) => setAttach(e.target.checked)} />
-            К сцене «{data.sceneById.get(sceneId)?.title}»
+            К сцене «{sceneName(data, data.sceneById.get(sceneId)!)}»
           </label>
         )}
         <div className="row">
           <span className="small muted">
-            {kind === 'dialogue' ? '⌘/Ctrl+Enter — сохранить' : 'Enter — сохранить · Shift+Enter — новая строка'}
+            {isTouch() ? '' : kind === 'dialogue' ? '⌘/Ctrl+Enter — сохранить' : 'Enter — сохранить · Shift+Enter — новая строка'}
           </span>
           <span className="spacer" />
           <button className="btn primary" onClick={() => void saveIt()}>
