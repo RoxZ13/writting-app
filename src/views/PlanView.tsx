@@ -8,22 +8,35 @@ import {
   useSensors,
   type DragEndEvent,
 } from '@dnd-kit/core'
-import { arrayMove, rectSortingStrategy, SortableContext, sortableKeyboardCoordinates, useSortable } from '@dnd-kit/sortable'
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useState } from 'react'
 import type { Chapter, Scene, SceneStatus } from '../db/db'
-import { createChapter, createScene, deleteChapter, patch, reorderChapters, reorderScenes } from '../db/repo'
+import {
+  applyOutline,
+  createChapter,
+  createScene,
+  deleteChapter,
+  mergeIntoPrevious,
+  patch,
+  splitChapterAt,
+  type OutlineItem,
+} from '../db/repo'
 import { markerStatus, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { STATUSES, statusOf } from '../lib/status'
-import { InlineEdit } from '../lib/ui'
+import { InlineEdit, toast } from '../lib/ui'
+
+type Filter = 'all' | 'nogoal' | SceneStatus
 
 export function PlanView({ data }: { data: ProjectData }) {
-  const [filter, setFilter] = useState<SceneStatus | 'all' | 'nogoal'>('all')
+  const [filter, setFilter] = useState<Filter>('all')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
+  const [arrange, setArrange] = useState(false)
 
   const visible = (s: Scene) =>
     filter === 'all' ? true : filter === 'nogoal' ? !s.goal.trim() && s.beats.length === 0 : s.status === filter
+  const sceneNo = (s: Scene) => (data.sceneIndex.get(s.id) ?? 0) + 1
 
   const toggle = (id: string) =>
     setCollapsed((prev) => {
@@ -33,206 +46,289 @@ export function PlanView({ data }: { data: ProjectData }) {
       return next
     })
 
-  const moveChapter = (i: number, dir: -1 | 1) => {
-    const ids = data.chapters.map((c) => c.id)
-    const j = i + dir
-    if (j < 0 || j >= ids.length) return
-    void reorderChapters(arrayMove(ids, i, j))
-  }
+  const allCollapsed = collapsed.size > 0
 
   return (
     <div>
       <div className="toolbar">
         <h1 style={{ marginRight: 'auto' }}>План</h1>
-        <div className="seg">
-          <button aria-pressed={filter === 'all'} onClick={() => setFilter('all')}>
-            Все
-          </button>
-          {STATUSES.map((s) => (
-            <button key={s.id} aria-pressed={filter === s.id} onClick={() => setFilter(s.id)}>
-              {s.label}
+        {!arrange && (
+          <>
+            <select className="select" style={{ width: 'auto' }} value={filter} onChange={(e) => setFilter(e.target.value as Filter)}>
+              <option value="all">Все сцены</option>
+              <option value="nogoal">Без цели и плана</option>
+              {STATUSES.map((s) => (
+                <option key={s.id} value={s.id}>
+                  Только «{s.label}»
+                </option>
+              ))}
+            </select>
+            <button
+              className="btn ghost"
+              onClick={() => setCollapsed(allCollapsed ? new Set() : new Set(data.chapters.map((c) => c.id)))}
+            >
+              {allCollapsed ? 'Развернуть главы' : 'Свернуть главы'}
             </button>
-          ))}
-          <button aria-pressed={filter === 'nogoal'} onClick={() => setFilter('nogoal')} title="Сцены, где не записано, что должно произойти">
-            Без цели
-          </button>
-        </div>
-        <button className="btn sm ghost" onClick={() => setCollapsed(collapsed.size ? new Set() : new Set(data.chapters.map((c) => c.id)))}>
-          {collapsed.size ? 'Развернуть всё' : 'Только главы'}
+          </>
+        )}
+        <button
+          className={`btn ${arrange ? 'primary' : ''}`}
+          onClick={() => {
+            setArrange(!arrange)
+            setFilter('all')
+          }}
+        >
+          {arrange ? 'Готово' : 'Переставить'}
         </button>
       </div>
 
-      {data.outline.map(({ chapter, scenes }, i) => (
-        <ChapterBlock
-          key={chapter.id}
-          data={data}
-          chapter={chapter}
-          number={i + 1}
-          scenes={scenes.filter(visible)}
-          allScenes={scenes}
-          collapsed={collapsed.has(chapter.id)}
-          onToggle={() => toggle(chapter.id)}
-          onMove={(dir) => moveChapter(i, dir)}
-          filtered={filter !== 'all'}
-        />
-      ))}
-
-      <button className="btn" onClick={() => void createChapter(data.project.id, `Глава ${data.chapters.length + 1}`)}>
-        + Глава
-      </button>
+      {arrange ? (
+        <ArrangeList data={data} />
+      ) : (
+        <>
+          {data.outline.map(({ chapter, scenes }, i) => {
+            const shown = scenes.filter(visible)
+            if (filter !== 'all' && shown.length === 0) return null
+            return (
+              <section className="chapter" key={chapter.id}>
+                <ChapterHeader
+                  chapter={chapter}
+                  number={i + 1}
+                  scenes={scenes}
+                  collapsed={collapsed.has(chapter.id)}
+                  onToggle={() => toggle(chapter.id)}
+                />
+                {!collapsed.has(chapter.id) && (
+                  <div className="scene-list">
+                    {shown.map((s, j) => (
+                      <SceneRow
+                        key={s.id}
+                        data={data}
+                        scene={s}
+                        number={sceneNo(s)}
+                        canSplit={j > 0 || scenes.indexOf(s) > 0}
+                      />
+                    ))}
+                    {filter === 'all' && (
+                      <button
+                        className="add-row"
+                        onClick={async () => {
+                          const s = await createScene(data.project.id, chapter.id, 'Новая сцена')
+                          go({ view: 'write', sceneId: s.id })
+                        }}
+                      >
+                        + сцена в эту главу
+                      </button>
+                    )}
+                  </div>
+                )}
+              </section>
+            )
+          })}
+          <button className="btn" onClick={() => void createChapter(data.project.id, `Глава ${data.chapters.length + 1}`)}>
+            + Глава в конец
+          </button>
+        </>
+      )}
     </div>
   )
 }
 
-function ChapterBlock({
-  data,
+function ChapterHeader({
   chapter,
   number,
   scenes,
-  allScenes,
   collapsed,
   onToggle,
-  onMove,
-  filtered,
 }: {
-  data: ProjectData
   chapter: Chapter
   number: number
   scenes: Scene[]
-  allScenes: Scene[]
   collapsed: boolean
   onToggle: () => void
-  onMove: (dir: -1 | 1) => void
-  filtered: boolean
 }) {
+  const words = scenes.reduce((n, s) => n + s.wordCount, 0)
+  const done = scenes.filter((s) => s.status === 'done').length
+  const first = number === 1
+  return (
+    <div className="chapter-head">
+      <button className="icon-btn" onClick={onToggle} aria-label={collapsed ? 'Развернуть' : 'Свернуть'}>
+        {collapsed ? '▸' : '▾'}
+      </button>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
+          {!/^\s*глава\b/i.test(chapter.title) && <span className="chapter-num">Глава {number}</span>}
+          <InlineEdit className="chapter-title" value={chapter.title} onSave={(title) => void patch<Chapter>('chapters', chapter.id, { title })} />
+        </div>
+        <InlineEdit
+          className="chapter-goal"
+          multiline
+          placeholder="О чём эта глава? Что в ней должно сдвинуться?"
+          value={chapter.goal}
+          onSave={(goal) => void patch<Chapter>('chapters', chapter.id, { goal })}
+        />
+        <div className="small muted">
+          {scenes.length} сц. · {words.toLocaleString('ru-RU')} сл.{done ? ` · готово ${done}/${scenes.length}` : ''}
+        </div>
+      </div>
+      <details className="menu">
+        <summary className="icon-btn" aria-label="Действия с главой">
+          ⋯
+        </summary>
+        <div className="menu-list card">
+          {!first && (
+            <button
+              onClick={async (e) => {
+                ;(e.currentTarget.closest('details') as HTMLDetailsElement).open = false
+                await mergeIntoPrevious(chapter.id)
+                toast('Сцены перенесены в предыдущую главу')
+              }}
+            >
+              Объединить с предыдущей главой
+            </button>
+          )}
+          <button
+            className="danger"
+            onClick={() => {
+              if (confirm(`Удалить «${chapter.title}» вместе со сценами (${scenes.length})? Это не отменить.`)) void deleteChapter(chapter.id)
+            }}
+          >
+            Удалить главу со сценами
+          </button>
+        </div>
+      </details>
+    </div>
+  )
+}
+
+function SceneRow({ data, scene, number, canSplit }: { data: ProjectData; scene: Scene; number: number; canSplit: boolean }) {
+  const st = statusOf(scene.status)
+  const setups = data.markers.filter((m) => m.setupSceneId === scene.id)
+  const hanging = setups.filter((m) => markerStatus(m, data) === 'hanging').length
+  const openPayoffs = data.markers.filter((m) => m.payoffSceneId === scene.id && !m.resolved).length
+  const done = scene.beats.filter((b) => b.done).length
+  const current = data.project.lastSceneId === scene.id
+
+  return (
+    <div className={`scene-row ${current ? 'current' : ''}`} onClick={() => go({ view: 'write', sceneId: scene.id })}>
+      <span className="scene-num">{number}</span>
+      <span className="status-dot" style={{ background: st.color }} title={st.label} />
+      <div className="scene-main">
+        <div className="title">
+          {scene.title}
+          {current && <span className="chip here">ты здесь</span>}
+        </div>
+        {scene.goal && <div className="goal">{scene.goal}</div>}
+      </div>
+      <div className="scene-meta">
+        {scene.beats.length > 0 && <span title="Пункты плана">☑ {done}/{scene.beats.length}</span>}
+        {setups.length > 0 && (
+          <span style={{ color: hanging ? 'var(--mk-hanging)' : undefined }} title={hanging ? 'Висят маячки без раскрытия' : 'Маячки посеяны здесь'}>
+            ✦ {setups.length}
+          </span>
+        )}
+        {openPayoffs > 0 && (
+          <span style={{ color: 'var(--mk-waiting)' }} title="Здесь нужно раскрыть маячки">
+            ◎ {openPayoffs}
+          </span>
+        )}
+        <span className="words">{scene.wordCount.toLocaleString('ru-RU')}</span>
+      </div>
+      {canSplit && (
+        <button
+          className="split-btn"
+          title="Сделать эту сцену началом новой главы"
+          onClick={async (e) => {
+            e.stopPropagation()
+            const title = prompt('Название новой главы (она начнётся с этой сцены):', `Глава ${(data.chapterIndex.get(scene.chapterId) ?? 0) + 2}`)
+            if (title === null) return
+            await splitChapterAt(scene.id, title.trim() || 'Новая глава')
+            toast('Новая глава начинается с этой сцены')
+          }}
+        >
+          ⤒ глава отсюда
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** Rearrange mode: one list in reading order. A scene belongs to the nearest chapter above it. */
+function ArrangeList({ data }: { data: ProjectData }) {
+  const items: OutlineItem[] = data.outline.flatMap(({ chapter, scenes }) => [
+    { type: 'chapter' as const, id: chapter.id },
+    ...scenes.map((s) => ({ type: 'scene' as const, id: s.id })),
+  ])
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 6 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   )
   const onDragEnd = (e: DragEndEvent) => {
     if (!e.over || e.active.id === e.over.id) return
-    const ids = allScenes.map((s) => s.id)
-    void reorderScenes(chapter.id, arrayMove(ids, ids.indexOf(String(e.active.id)), ids.indexOf(String(e.over.id))))
+    const ids = items.map((i) => i.id)
+    const next = arrayMove(items, ids.indexOf(String(e.active.id)), ids.indexOf(String(e.over.id)))
+    if (next[0]?.type !== 'chapter') return // a scene cannot sit above the first chapter
+    void applyOutline(next)
   }
-  if (filtered && scenes.length === 0) return null
-  const words = allScenes.reduce((n, s) => n + s.wordCount, 0)
+  const move = (id: string, dir: -1 | 1) => {
+    const i = items.findIndex((x) => x.id === id)
+    const j = i + dir
+    if (j < 1 || j >= items.length) return
+    void applyOutline(arrayMove(items, i, j))
+  }
 
   return (
-    <section className="chapter">
-      <div className="chapter-head">
-        <button className="icon-btn" onClick={onToggle} aria-label={collapsed ? 'Развернуть' : 'Свернуть'}>
-          {collapsed ? '▸' : '▾'}
-        </button>
-        <span className="num">{number}</span>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <InlineEdit className="chapter-title" value={chapter.title} onSave={(title) => void patch<Chapter>('chapters', chapter.id, { title })} />
-          <InlineEdit
-            className="chapter-goal"
-            multiline
-            placeholder="О чём эта глава? Что в ней должно сдвинуться?"
-            value={chapter.goal}
-            onSave={(goal) => void patch<Chapter>('chapters', chapter.id, { goal })}
-          />
-          {collapsed && (
-            <div className="small muted">
-              {allScenes.length} сц. · {words.toLocaleString('ru-RU')} сл.
-            </div>
-          )}
-        </div>
-        <button className="icon-btn" title="Выше" onClick={() => onMove(-1)}>
-          ↑
-        </button>
-        <button className="icon-btn" title="Ниже" onClick={() => onMove(1)}>
-          ↓
-        </button>
-        <button
-          className="icon-btn"
-          title="Удалить главу"
-          onClick={() => {
-            if (confirm(`Удалить «${chapter.title}» вместе со сценами (${allScenes.length})?`)) void deleteChapter(chapter.id)
-          }}
-        >
-          ×
-        </button>
-      </div>
-      {!collapsed && (
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-          <SortableContext items={scenes.map((s) => s.id)} strategy={rectSortingStrategy}>
-            <div className="scene-grid">
-              {scenes.map((s) => (
-                <SceneCard key={s.id} scene={s} data={data} />
-              ))}
-              {!filtered && (
-                <button
-                  className="add-scene"
-                  onClick={async () => {
-                    const s = await createScene(data.project.id, chapter.id, 'Новая сцена')
-                    go({ view: 'write', sceneId: s.id })
-                  }}
-                >
-                  + Сцена
-                </button>
-              )}
-            </div>
-          </SortableContext>
-        </DndContext>
-      )}
-    </section>
+    <>
+      <p className="muted" style={{ marginTop: -8 }}>
+        Тащи сцену за ⋮⋮ или жми стрелки. Если перетащить сцену ниже заголовка другой главы, она перейдёт в эту главу.
+      </p>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+        <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
+          <div className="arrange-list">
+            {items.map((item) =>
+              item.type === 'chapter' ? (
+                <ArrangeChapter key={item.id} data={data} chapter={data.chapterById.get(item.id)!} />
+              ) : (
+                <ArrangeScene key={item.id} data={data} scene={data.sceneById.get(item.id)!} onMove={(d) => move(item.id, d)} />
+              ),
+            )}
+          </div>
+        </SortableContext>
+      </DndContext>
+    </>
   )
 }
 
-function SceneCard({ scene, data }: { scene: Scene; data: ProjectData }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: scene.id })
-  const st = statusOf(scene.status)
-  const setups = data.markers.filter((m) => m.setupSceneId === scene.id)
-  const hangingHere = setups.filter((m) => markerStatus(m, data) === 'hanging').length
-  const payoffs = data.markers.filter((m) => m.payoffSceneId === scene.id)
-  const openPayoffs = payoffs.filter((m) => !m.resolved).length
-  const done = scene.beats.filter((b) => b.done).length
+function ArrangeChapter({ data, chapter }: { data: ProjectData; chapter: Chapter }) {
+  const { setNodeRef, transform, transition } = useSortable({ id: chapter.id, disabled: true })
+  return (
+    <div ref={setNodeRef} className="arrange-chapter" style={{ transform: CSS.Transform.toString(transform), transition }}>
+      {/^\s*глава\b/i.test(chapter.title) ? chapter.title : `Глава ${(data.chapterIndex.get(chapter.id) ?? 0) + 1} · ${chapter.title}`}
+    </div>
+  )
+}
 
+function ArrangeScene({ data, scene, onMove }: { data: ProjectData; scene: Scene; onMove: (dir: -1 | 1) => void }) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({ id: scene.id })
   return (
     <div
       ref={setNodeRef}
-      className={`scene-card ${data.project.lastSceneId === scene.id ? 'current' : ''}`}
-      style={
-        {
-          '--status-color': st.color,
-          transform: CSS.Transform.toString(transform),
-          transition,
-          opacity: isDragging ? 0.6 : 1,
-          zIndex: isDragging ? 5 : undefined,
-        } as React.CSSProperties
-      }
-      onClick={() => go({ view: 'write', sceneId: scene.id })}
-      {...attributes}
-      {...listeners}
+      className={`arrange-scene ${isDragging ? 'dragging' : ''}`}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
     >
-      <div className="title">{scene.title}</div>
-      {scene.goal ? <div className="goal">{scene.goal}</div> : <div className="goal muted">Цель не записана</div>}
-      <div className="meta">
-        <span title={st.label}>{st.label}</span>
-        {scene.beats.length > 0 && <span>☑ {done}/{scene.beats.length}</span>}
-        {scene.wordCount > 0 && <span>{scene.wordCount.toLocaleString('ru-RU')} сл.</span>}
-        {setups.length > 0 && (
-          <span
-            className="mk-pill"
-            style={{ color: hangingHere ? 'var(--mk-hanging)' : 'var(--ink-3)' }}
-            title={hangingHere ? `${hangingHere} посеянных здесь маячков без раскрытия` : 'Маячки посеяны здесь'}
-          >
-            ✦ {setups.length}
-          </span>
-        )}
-        {payoffs.length > 0 && (
-          <span
-            className="mk-pill"
-            style={{ color: openPayoffs ? 'var(--mk-waiting)' : 'var(--mk-closed)' }}
-            title={openPayoffs ? `Здесь нужно раскрыть: ${openPayoffs}` : 'Раскрытия здесь выполнены'}
-          >
-            ◎ {payoffs.length}
-          </span>
-        )}
-      </div>
+      <button ref={setActivatorNodeRef} className="handle" aria-label="Перетащить" {...attributes} {...listeners}>
+        ⋮⋮
+      </button>
+      <span className="scene-num">{(data.sceneIndex.get(scene.id) ?? 0) + 1}</span>
+      <span className="status-dot" style={{ background: statusOf(scene.status).color }} />
+      <span className="arrange-title">{scene.title}</span>
+      <button className="icon-btn" title="Выше" onClick={() => onMove(-1)}>
+        ↑
+      </button>
+      <button className="icon-btn" title="Ниже" onClick={() => onMove(1)}>
+        ↓
+      </button>
     </div>
   )
 }

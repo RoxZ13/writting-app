@@ -176,3 +176,68 @@ export async function createNote(text: string, kind: NoteKind, projectId?: strin
     updatedAt: now,
   })
 }
+
+// ---------- restructuring the outline ----------
+
+export type OutlineItem = { type: 'chapter'; id: string } | { type: 'scene'; id: string }
+
+/**
+ * Persist a whole outline given in reading order: every scene belongs to the nearest chapter above it.
+ * Only records whose chapter or position actually changed are written.
+ */
+export async function applyOutline(items: OutlineItem[]) {
+  let chapterOrder = 0
+  let sceneOrder = 0
+  let chapterId: string | undefined
+  for (const item of items) {
+    if (item.type === 'chapter') {
+      chapterId = item.id
+      sceneOrder = 0
+      const c = await db.chapters.get(item.id)
+      if (c && c.order !== chapterOrder) await save<Chapter>('chapters', { ...c, order: chapterOrder })
+      chapterOrder++
+    } else if (chapterId) {
+      const s = await db.scenes.get(item.id)
+      if (s && (s.order !== sceneOrder || s.chapterId !== chapterId)) {
+        await save<Scene>('scenes', { ...s, order: sceneOrder, chapterId })
+      }
+      sceneOrder++
+    }
+  }
+}
+
+async function outlineOf(projectId: string): Promise<OutlineItem[]> {
+  const chapters = alive(await db.chapters.where('projectId').equals(projectId).toArray()).sort((a, b) => a.order - b.order)
+  const scenes = alive(await db.scenes.where('projectId').equals(projectId).toArray())
+  return chapters.flatMap((c) => [
+    { type: 'chapter' as const, id: c.id },
+    ...scenes
+      .filter((s) => s.chapterId === c.id)
+      .sort((a, b) => a.order - b.order)
+      .map((s) => ({ type: 'scene' as const, id: s.id })),
+  ])
+}
+
+/** Start a new chapter at this scene: it and every scene after it in its chapter move to the new chapter. */
+export async function splitChapterAt(sceneId: string, title: string): Promise<Chapter | undefined> {
+  const scene = await db.scenes.get(sceneId)
+  if (!scene) return
+  const chapter = await createChapter(scene.projectId, title, 1e6)
+  const items = (await outlineOf(scene.projectId)).filter((i) => i.id !== chapter.id)
+  const at = items.findIndex((i) => i.id === sceneId)
+  items.splice(at, 0, { type: 'chapter', id: chapter.id })
+  await applyOutline(items)
+  return chapter
+}
+
+/** Append this chapter's scenes to the previous chapter and delete the now-empty chapter. */
+export async function mergeIntoPrevious(chapterId: string) {
+  const chapter = await db.chapters.get(chapterId)
+  if (!chapter) return
+  const items = await outlineOf(chapter.projectId)
+  const at = items.findIndex((i) => i.id === chapterId)
+  if (at <= 0) return
+  items.splice(at, 1)
+  await applyOutline(items)
+  await remove('chapters', chapterId)
+}
