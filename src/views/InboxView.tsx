@@ -1,8 +1,7 @@
 import { useState } from 'react'
 import { uid, type Note, type NoteKind } from '../db/db'
-import { updateBeats } from '../components/SceneBrief'
+import { updateBeats } from '../components/ChapterContext'
 import { createMarker, createNote, patch, remove } from '../db/repo'
-import { ScenePicker } from '../components/ScenePicker'
 import { sceneLabel, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { NOTE_KINDS, noteKind, timeAgo } from '../lib/status'
@@ -16,7 +15,7 @@ export function InboxView({ data }: { data: ProjectData }) {
   const [kind, setKind] = useState<NoteKind>('idea')
 
   const lists: Record<Filter, Note[]> = {
-    inbox: data.notes.filter((n) => !n.archived && !n.sceneId),
+    inbox: data.notes.filter((n) => !n.archived && !n.sceneId && !n.used && !(n.characterIds ?? []).length),
     questions: data.notes.filter((n) => !n.archived && n.kind === 'question'),
     attached: data.notes.filter((n) => !n.archived && n.sceneId),
     archive: data.notes.filter((n) => n.archived),
@@ -133,12 +132,22 @@ function NoteRow({ note, data }: { note: Note; data: ProjectData }) {
         </div>
         {open && (
           <div className="stack" style={{ marginTop: 10, gap: 8 }}>
-            <ScenePicker
-              data={data}
-              value={note.sceneId}
-              emptyLabel="Привязать к сцене…"
-              onChange={(sceneId) => void patch<Note>('notes', note.id, { sceneId })}
-            />
+            <select
+              className="select"
+              value={note.sceneId ?? ''}
+              onChange={(e) => void patch<Note>('notes', note.id, { sceneId: e.target.value || undefined })}
+            >
+              <option value="">Привязать к сцене…</option>
+              {data.outline.map(({ chapter, scenes }) => (
+                <optgroup key={chapter.id} label={chapter.title}>
+                  {scenes.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.title}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
             <div className="row">
               {scene && (
                 <button className="btn sm" onClick={() => void toBeat()}>

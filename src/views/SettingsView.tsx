@@ -136,7 +136,7 @@ export function SettingsView({
       <section className="card settings-section stack">
         <h3>Импорт текста</h3>
         <div className="small muted">Главы добавятся в конец плана текущей истории.</div>
-        <ImportPanel projectId={data.project.id} onDone={() => go({ view: 'plan' })} />
+        <ImportPanel projectId={data.project.id} onDone={() => go({ view: 'board' })} />
       </section>
 
       <section className="card settings-section stack">

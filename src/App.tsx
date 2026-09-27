@@ -1,25 +1,22 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSyncStatus, onSyncStatus, startCloudSync, type SyncStatus } from './db/cloud'
-import { markerStatus, useProjectData, useProjects, type ProjectData } from './lib/hooks'
+import { useProjectData, useProjects, type ProjectData } from './lib/hooks'
 import { go, useRoute, type Route } from './lib/router'
 import { getCurrentProjectId, returnFocus, setCurrentProjectId } from './lib/session'
 import { Toaster } from './lib/ui'
 import { Icon } from './components/Icon'
 import { QuickCapture } from './components/QuickCapture'
-import { HomeView } from './views/HomeView'
-import { PlanView } from './views/PlanView'
-import { MarkersView } from './views/MarkersView'
+import { BoardView } from './views/BoardView'
+import { CharactersView } from './views/CharactersView'
 import { InboxView } from './views/InboxView'
 import { SettingsView } from './views/SettingsView'
 import { WriteView } from './views/WriteView'
 import { Welcome } from './views/Welcome'
 
-const NAV: { view: Exclude<Route['view'], 'write'>; label: string; ico: string }[] = [
-  { view: 'home', label: 'Сейчас', ico: 'now' },
-  { view: 'plan', label: 'План', ico: 'plan' },
-  { view: 'markers', label: 'Маячки', ico: 'markers' },
-  { view: 'inbox', label: 'Входящие', ico: 'inbox' },
-  { view: 'settings', label: 'Настройки', ico: 'settings' },
+const TABS: { view: Route['view']; label: string; ico: string }[] = [
+  { view: 'text', label: 'Текст', ico: 'pen' },
+  { view: 'board', label: 'Доска', ico: 'plan' },
+  { view: 'characters', label: 'Герои', ico: 'people' },
 ]
 
 export function App() {
@@ -33,7 +30,6 @@ export function App() {
   useEffect(() => {
     if (projects !== undefined) document.getElementById('root')?.setAttribute('data-ready', '1')
   }, [projects])
-
 
   useEffect(() => {
     startCloudSync()
@@ -54,7 +50,7 @@ export function App() {
   const selectProject = useCallback((id: string) => {
     setProjectId(id)
     setCurrentProjectId(id)
-    go({ view: 'home' })
+    go({ view: 'text' })
   }, [])
 
   useEffect(() => {
@@ -78,39 +74,52 @@ export function App() {
     returnFocus()
   }
 
+  // "Текст" opens where the author stopped; with no scenes yet, the board is the place to start.
+  const textScene =
+    route.view === 'text'
+      ? (route.sceneId && data.sceneById.has(route.sceneId) ? route.sceneId : undefined) ??
+        (data.project.lastSceneId && data.sceneById.has(data.project.lastSceneId) ? data.project.lastSceneId : undefined) ??
+        data.scenes[0]?.id
+      : undefined
+
   return (
-    <>
-      {route.view === 'write' ? (
-        <WriteView key={route.sceneId} data={data} sceneId={route.sceneId} onCapture={() => setCapture(true)} />
-      ) : (
-        <div className="shell">
-          <TopBar data={data} route={route} sync={sync} />
-          <main className="page">
-            {route.view === 'home' && <HomeView data={data} />}
-            {route.view === 'plan' && <PlanView data={data} />}
-            {route.view === 'markers' && <MarkersView data={data} />}
-            {route.view === 'inbox' && <InboxView data={data} />}
-            {route.view === 'settings' && (
-              <SettingsView data={data} projects={projects} onSelectProject={selectProject} sync={sync} />
-            )}
-          </main>
-          <button className="fab" title="Быстро записать мысль (Ctrl/⌘ + J)" onClick={() => setCapture(true)}>
-            <Icon name="pen" size={22} />
-          </button>
-        </div>
+    <div className={`app app-${route.view}`}>
+      <AppHeader data={data} route={route} sync={sync} />
+      {route.view === 'text' && textScene && (
+        <WriteView key={textScene} data={data} sceneId={textScene} onCapture={() => setCapture(true)} />
+      )}
+      {route.view === 'text' && !textScene && (
+        <main className="page">
+          <div className="empty card">
+            <h2>Пока нет ни одной сцены</h2>
+            <p>Набросай главы и сцены на доске — одной строкой, без текста. Потом открывай любую и пиши.</p>
+            <button className="btn primary" onClick={() => go({ view: 'board' })}>
+              Открыть доску
+            </button>
+          </div>
+        </main>
+      )}
+      {route.view !== 'text' && (
+        <main className={`page ${route.view === 'board' ? 'wide' : ''}`}>
+          {route.view === 'board' && <BoardView data={data} />}
+          {route.view === 'characters' && <CharactersView data={data} />}
+          {route.view === 'inbox' && <InboxView data={data} />}
+          {route.view === 'settings' && <SettingsView data={data} projects={projects} onSelectProject={selectProject} sync={sync} />}
+        </main>
+      )}
+      {route.view !== 'text' && (
+        <button className="fab" title="Быстро записать мысль, цитату, маячок (Ctrl/⌘ + J)" onClick={() => setCapture(true)}>
+          <Icon name="bolt" size={22} />
+        </button>
       )}
       {capture && <QuickCapture data={data} onClose={closeCapture} />}
       <Toaster />
-    </>
+    </div>
   )
 }
 
-function TopBar({ data, route, sync }: { data: ProjectData; route: Route; sync: SyncStatus }) {
-  const inbox = data.notes.filter((n) => !n.archived && !n.sceneId).length
-  const alarming = data.markers.filter((m) => {
-    const s = markerStatus(m, data)
-    return s === 'hanging' || s === 'late'
-  }).length
+function AppHeader({ data, route, sync }: { data: ProjectData; route: Route; sync: SyncStatus }) {
+  const inbox = data.notes.filter((n) => !n.archived && !n.sceneId && !n.used && !(n.characterIds ?? []).length).length
   const syncTitle =
     sync.state === 'ok'
       ? 'Синхронизировано'
@@ -120,29 +129,37 @@ function TopBar({ data, route, sync }: { data: ProjectData; route: Route; sync: 
           ? 'Нет интернета — всё сохраняется на устройстве'
           : sync.state === 'error'
             ? `Ошибка синхронизации: ${sync.message}`
-            : 'Сохраняется только на этом устройстве'
+            : 'Сохраняется на этом устройстве'
   return (
-    <header className="sidebar">
-      <div className="brand">
-        <div className="logo">Manuscript.</div>
-        <div className="tagline">The writer’s studio</div>
-      </div>
-      <div className="side-project" title={syncTitle}>
-        <span className="sync-dot" data-state={sync.state} />
+    <header className="app-header">
+      <div className="crumb">
+        <span className="logo">Manuscript.</span>
+        <span className="slash">/</span>
         <span className="project-name">{data.project.title}</span>
+        <span className="sync-dot" data-state={sync.state} title={syncTitle} />
       </div>
-      <div className="side-label">Menu</div>
-      <nav className="nav">
-        {NAV.map((n) => (
-          <button key={n.view} aria-current={route.view === n.view ? 'page' : undefined} onClick={() => go({ view: n.view })}>
-            <span className="ico">
-              <Icon name={n.ico} />
+      <nav className="tabs">
+        {TABS.map((t) => (
+          <button key={t.view} aria-current={route.view === t.view ? 'page' : undefined} onClick={() => go({ view: t.view } as Route)}>
+            <span className="tab-ico">
+              <Icon name={t.ico} />
             </span>
-            <span className="nav-label">{n.label}</span>
-            {n.view === 'inbox' && inbox > 0 && <span className="badge">{inbox}</span>}
-            {n.view === 'markers' && alarming > 0 && <span className="badge">{alarming}</span>}
+            <span className="tab-label">{t.label}</span>
           </button>
         ))}
+        <button className="tab-aux" aria-current={route.view === 'inbox' ? 'page' : undefined} title="Входящие: быстрые мысли" onClick={() => go({ view: 'inbox' })}>
+          <span className="tab-ico">
+            <Icon name="inbox" />
+          </span>
+          <span className="tab-label">Входящие</span>
+          {inbox > 0 && <span className="badge">{inbox}</span>}
+        </button>
+        <button className="tab-aux" aria-current={route.view === 'settings' ? 'page' : undefined} title="Настройки" onClick={() => go({ view: 'settings' })}>
+          <span className="tab-ico">
+            <Icon name="settings" />
+          </span>
+          <span className="tab-label">Ещё</span>
+        </button>
       </nav>
     </header>
   )

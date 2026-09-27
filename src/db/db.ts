@@ -48,6 +48,29 @@ export interface Scene extends Base {
   wordCount: number
   /** Cursor position when the author last left the scene (per record, good enough across devices). */
   lastPos?: number
+  /** Story lines (ветки) this scene belongs to. */
+  lineIds?: string[]
+  /** Characters present in the scene. */
+  characterIds?: string[]
+  /** While rewriting: the snapshot holding the text as it was before, shown next to the new draft. */
+  rewriteFrom?: string
+}
+
+/** A story line (ветка): the main plot or a character's micro-line running in parallel. */
+export interface Line extends Base {
+  projectId: string
+  name: string
+  color: string
+  order: number
+}
+
+export interface Character extends Base {
+  projectId: string
+  name: string
+  color: string
+  /** Free-form notes: who they are, what they want, what they hide. */
+  about: string
+  order: number
 }
 
 /**
@@ -60,11 +83,14 @@ export interface Marker extends Base {
   note: string
   setupSceneId?: string
   payoffSceneId?: string
+  /** Planned at chapter level on the board, before the exact scene is known. */
+  setupChapterId?: string
+  payoffChapterId?: string
   resolved: boolean
   createdAt: number
 }
 
-export type NoteKind = 'idea' | 'question' | 'note'
+export type NoteKind = 'idea' | 'question' | 'note' | 'quote' | 'dialogue'
 
 /** A quick capture. Lives in the inbox until the author attaches or archives it. */
 export interface Note extends Base {
@@ -74,6 +100,10 @@ export interface Note extends Base {
   kind: NoteKind
   archived: boolean
   createdAt: number
+  /** For quotes and dialogues: whose words these are. */
+  characterIds?: string[]
+  /** A quote or dialogue that has already made it into the text. */
+  used?: boolean
 }
 
 /** A scene's text, stored apart from its card so plan edits and writing never collide. id = scene id. */
@@ -94,7 +124,7 @@ export interface Snapshot extends Base {
   createdAt: number
 }
 
-export const SYNCED_TABLES = ['projects', 'chapters', 'scenes', 'texts', 'markers', 'notes', 'snapshots'] as const
+export const SYNCED_TABLES = ['projects', 'chapters', 'scenes', 'texts', 'markers', 'notes', 'snapshots', 'lines', 'characters'] as const
 export type SyncedTable = (typeof SYNCED_TABLES)[number]
 
 export interface OutboxEntry {
@@ -116,6 +146,8 @@ export class ManuscriptDB extends Dexie {
   markers!: Table<Marker, string>
   notes!: Table<Note, string>
   snapshots!: Table<Snapshot, string>
+  lines!: Table<Line, string>
+  characters!: Table<Character, string>
   outbox!: Table<OutboxEntry, string>
   meta!: Table<Meta, string>
 
@@ -131,6 +163,10 @@ export class ManuscriptDB extends Dexie {
       snapshots: 'id, sceneId, updatedAt',
       outbox: 'key',
       meta: 'key',
+    })
+    this.version(2).stores({
+      lines: 'id, projectId, updatedAt',
+      characters: 'id, projectId, updatedAt',
     })
   }
 }

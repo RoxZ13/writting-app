@@ -32,7 +32,7 @@ export function Welcome({ onCreated, sync }: { onCreated: (id: string) => void; 
     }
     setBusy(false)
     onCreated(project.id)
-    go({ view: file ? 'plan' : 'home' })
+    go({ view: file ? 'board' : 'text' })
   }
 
   return (
