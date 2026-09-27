@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Marker } from '../db/db'
-import { createCharacter, createLine, toggleSceneRef } from '../db/repo'
-import type { ProjectData } from '../lib/hooks'
+import { createLine, findOrCreateCharacter, toggleSceneRef } from '../db/repo'
+import { sceneName, type ProjectData } from '../lib/hooks'
 
 /** Toggleable chips for a scene's story lines (ветки) or characters, with inline "+ new". */
 export function RefChips({
@@ -23,8 +23,10 @@ export function RefChips({
     setAdding(false)
     setName('')
     if (!n) return
-    const created = field === 'lineIds' ? await createLine(data.project.id, n) : await createCharacter(data.project.id, n)
-    await toggleSceneRef(sceneId, field, created.id)
+    const existingLine = field === 'lineIds' ? data.lines.find((l) => l.name.trim().toLowerCase() === n.toLowerCase()) : undefined
+    const created =
+      field === 'lineIds' ? (existingLine ?? (await createLine(data.project.id, n))) : await findOrCreateCharacter(data.project.id, n)
+    if (!selected.includes(created.id)) await toggleSceneRef(sceneId, field, created.id)
   }
   return (
     <div className="chips">
@@ -120,7 +122,7 @@ export function PlacePicker({
           {scenes.map((s) => (
             <option key={s.id} value={`sc:${s.id}`}>
               {'   '}
-              {s.title}
+              {sceneName(data, s)}
             </option>
           ))}
         </optgroup>

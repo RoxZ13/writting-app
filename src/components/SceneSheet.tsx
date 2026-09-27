@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Scene } from '../db/db'
 import { createMarker, mergeSceneIntoPrevious, patch, remove } from '../db/repo'
 import { go } from '../lib/router'
-import type { ProjectData } from '../lib/hooks'
+import { sceneName, type ProjectData } from '../lib/hooks'
 import { STATUSES } from '../lib/status'
 import { toast } from '../lib/ui'
 import { MarkerCard } from './MarkerCard'
@@ -41,10 +41,12 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
         <input
           className="sheet-title"
           value={title}
-          placeholder="Название сцены"
+          placeholder={sceneName(data, scene)}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={() => title !== scene.title && set({ title })}
         />
+        {scene.epigraph && <div className="card-epigraph">♪ {scene.epigraph}</div>}
+        {scene.excerpt && <div className="card-excerpt">{scene.excerpt}</div>}
         <textarea
           className="textarea"
           rows={3}
@@ -111,7 +113,7 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
               className="btn ghost"
               style={{ color: 'var(--mk-hanging)' }}
               onClick={async () => {
-                if (!confirm(`Удалить сцену «${scene.title}» вместе с текстом?`)) return
+                if (!confirm(`Удалить «${sceneName(data, scene)}» вместе с текстом?`)) return
                 await remove('scenes', scene.id)
                 await remove('texts', scene.id)
                 onClose()

@@ -14,7 +14,8 @@ import {
   type Character,
   type SyncedTable,
 } from './db'
-import { emptyDoc } from '../lib/text'
+import { docParagraphs, emptyDoc } from '../lib/text'
+import { isEpigraph, makeExcerpt } from '../lib/importer'
 
 /** Write a record locally and queue it for sync. All app writes go through here. */
 export async function save<T extends Base>(table: SyncedTable, record: T): Promise<T> {
@@ -260,6 +261,13 @@ export async function createLine(projectId: string, name: string): Promise<Line>
   })
 }
 
+/** Find a character by name (case- and ё-insensitive) or create one — so typing a name twice never makes a twin. */
+export async function findOrCreateCharacter(projectId: string, name: string): Promise<Character> {
+  const norm = (s: string) => s.trim().toLowerCase().replace(/ё/g, 'е')
+  const existing = alive(await db.characters.where('projectId').equals(projectId).toArray())
+  return existing.find((c) => norm(c.name) === norm(name)) ?? createCharacter(projectId, name)
+}
+
 export async function createCharacter(projectId: string, name: string): Promise<Character> {
   const existing = alive(await db.characters.where('projectId').equals(projectId).toArray())
   return save<Character>('characters', {
@@ -328,4 +336,53 @@ export async function mergeSceneIntoPrevious(sceneId: string): Promise<string | 
   await remove('scenes', sceneId)
   await remove('texts', sceneId)
   return prev.id
+}
+
+/**
+ * Merge a duplicate character into another: scenes, quotes and notes move over, the notes about them
+ * are appended, and the duplicate is removed.
+ */
+export async function mergeCharacters(fromId: string, intoId: string) {
+  if (fromId === intoId) return
+  const [from, into] = await Promise.all([db.characters.get(fromId), db.characters.get(intoId)])
+  if (!from || !into) return
+  const swap = (ids?: string[]) => (ids?.includes(fromId) ? [...new Set(ids.map((x) => (x === fromId ? intoId : x)))] : ids)
+  for (const s of alive(await db.scenes.where('projectId').equals(from.projectId).toArray())) {
+    if (s.characterIds?.includes(fromId)) await save<Scene>('scenes', { ...s, characterIds: swap(s.characterIds) })
+  }
+  for (const n of alive(await db.notes.toArray())) {
+    if (n.characterIds?.includes(fromId)) await save<Note>('notes', { ...n, characterIds: swap(n.characterIds) })
+  }
+  const about = [into.about, from.about].map((x) => x.trim()).filter(Boolean).join('\n\n')
+  await save<Character>('characters', { ...into, about })
+  await remove('characters', fromId)
+}
+
+/**
+ * One-time tidy-up for books imported before scenes had excerpts: a title that is just the
+ * first words of the text is dropped (the card shows "Сцена N" + the excerpt instead), and a
+ * song line at the top becomes the epigraph.
+ */
+export async function tidyImportedScenes(projectId: string) {
+  const flag = `tidy.untitled.${projectId}`
+  if (await db.meta.get(flag)) return
+  const scenes = alive(await db.scenes.where('projectId').equals(projectId).toArray())
+  for (const s of scenes) {
+    if (s.excerpt !== undefined) continue
+    const t = await db.texts.get(s.id)
+    const paras = docParagraphs(t?.content).map((p) => p.trim()).filter(Boolean)
+    const first = paras[0] ?? ''
+    const epigraph = isEpigraph(first) ? first : undefined
+    const body = paras.slice(epigraph ? 1 : 0)
+    const stem = s.title.replace(/…$/, '').replace(/^Сцена \d+:\s*/, '').trim()
+    const bodyStart = (body[0] ?? '').replace(/^[—–-]\s*/, '')
+    const auto = !!stem && (first === s.title || bodyStart.startsWith(stem) || first.replace(/^[—–-]\s*/, '').startsWith(stem))
+    await save<Scene>('scenes', {
+      ...s,
+      title: auto ? '' : s.title,
+      epigraph: s.epigraph ?? epigraph,
+      excerpt: makeExcerpt(body),
+    })
+  }
+  await db.meta.put({ key: flag, value: true })
 }

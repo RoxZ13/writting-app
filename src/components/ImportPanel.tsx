@@ -27,7 +27,7 @@ export async function importChapters(projectId: string, chapters: ImportedBook['
   for (const ch of chapters) {
     const chapter = await createChapter(projectId, ch.title, order++)
     for (const sc of ch.scenes) {
-      const scene = await createScene(projectId, chapter.id, sc.title, { status: 'written' }, sc.doc, sc.wordCount)
+      const scene = await createScene(projectId, chapter.id, sc.title, { status: 'written', excerpt: sc.excerpt, epigraph: sc.epigraph }, sc.doc, sc.wordCount)
       firstScene ??= scene.id
     }
   }

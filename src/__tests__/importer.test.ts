@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { blocksToChapters, isChapterTitle, parseBook, parseTaggedRuns, textToBlocks } from '../lib/importer'
+import { blocksToChapters, isChapterTitle, isEpigraph, parseBook, parseTaggedRuns, textToBlocks } from '../lib/importer'
 import { chapterToFicbook } from '../lib/exporter'
 import type { Chapter, Scene } from '../db/db'
 
@@ -33,7 +33,7 @@ describe('import', () => {
 
   it('treats long separator lines as scene breaks', () => {
     const chapters = blocksToChapters(textToBlocks('Глава 1\nРаз.\n**********************************\nДва.'))
-    expect(chapters[0].scenes.map((s) => s.title)).toEqual(['Раз', 'Два'])
+    expect(chapters[0].scenes.map((s) => s.excerpt)).toEqual(['Раз.', 'Два.'])
   })
 
   it('reads Ficbook .txt part markers', () => {
@@ -59,6 +59,16 @@ describe('import', () => {
     expect(book.title).toBe('Геката Сотейра')
     expect(book.preface).toContain('Направленность: Гет')
     expect(book.chapters.map((c) => c.title)).toEqual(['Часть 1'])
+  })
+
+  it('takes a song line as the epigraph, not as the scene title', () => {
+    const [ch] = blocksToChapters(textToBlocks('Часть 1\nAC/DC — Wild Reputation\nГрейнджер готовилась к трансфигурации.'))
+    expect(ch.scenes[0].title).toBe('')
+    expect(ch.scenes[0].epigraph).toBe('AC/DC — Wild Reputation')
+    expect(ch.scenes[0].excerpt).toBe('Грейнджер готовилась к трансфигурации.')
+    expect(isEpigraph('— Грейнджер, объясни мне кое-что')).toBe(false)
+    expect(isEpigraph('Slaves — The Hunter')).toBe(true)
+    expect(isEpigraph('Она сказала — нет, и ушла.')).toBe(false)
   })
 
   it('keeps Ficbook italics', () => {

@@ -1,8 +1,5 @@
 import { useState } from 'react'
-import { db } from '../db/db'
-import { alive, createProject, remove, save } from '../db/repo'
-import { importBook } from '../components/ImportPanel'
-import { parseBook, readFileAsBlocks } from '../lib/importer'
+import { createStory } from '../lib/stories'
 import { go } from '../lib/router'
 import type { SyncStatus } from '../db/cloud'
 import { SyncSection } from './SettingsView'
@@ -14,24 +11,9 @@ export function Welcome({ onCreated, sync }: { onCreated: (id: string) => void; 
 
   const create = async (file?: File) => {
     setBusy(true)
-    const book = file ? parseBook(await readFileAsBlocks(file)) : undefined
-    const name = title.trim() || book?.title || file?.name.replace(/\.[^.]+$/, '') || 'Новая история'
-    const project = await createProject(name)
-    if (file && book) {
-      // Replace the starter chapter with the imported text.
-      const starter = alive(await db.chapters.where('projectId').equals(project.id).toArray())
-      for (const c of starter) {
-        for (const s of await db.scenes.where('chapterId').equals(c.id).toArray()) {
-          await remove('scenes', s.id)
-          await remove('texts', s.id)
-        }
-        await remove('chapters', c.id)
-      }
-      const first = await importBook(project.id, book)
-      await save('projects', { ...(await db.projects.get(project.id))!, lastSceneId: first })
-    }
+    const id = await createStory({ title, file })
     setBusy(false)
-    onCreated(project.id)
+    onCreated(id)
     go({ view: file ? 'board' : 'text' })
   }
 

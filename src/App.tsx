@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSyncStatus, onSyncStatus, startCloudSync, type SyncStatus } from './db/cloud'
 import { useProjectData, useProjects, type ProjectData } from './lib/hooks'
+import { tidyImportedScenes } from './db/repo'
 import { go, useRoute, type Route } from './lib/router'
 import { getCurrentProjectId, returnFocus, setCurrentProjectId } from './lib/session'
 import { Toaster } from './lib/ui'
@@ -12,6 +13,8 @@ import { InboxView } from './views/InboxView'
 import { SettingsView } from './views/SettingsView'
 import { WriteView } from './views/WriteView'
 import { Welcome } from './views/Welcome'
+import { LibraryView } from './views/LibraryView'
+import { deadlineText } from './lib/stories'
 
 const TABS: { view: Route['view']; label: string; ico: string }[] = [
   { view: 'text', label: 'Текст', ico: 'pen' },
@@ -46,6 +49,9 @@ export function App() {
   }, [projects, projectId])
 
   const data = useProjectData(projectId)
+  useEffect(() => {
+    if (projectId) void tidyImportedScenes(projectId)
+  }, [projectId])
 
   const selectProject = useCallback((id: string) => {
     setProjectId(id)
@@ -104,6 +110,7 @@ export function App() {
           {route.view === 'board' && <BoardView data={data} />}
           {route.view === 'characters' && <CharactersView data={data} />}
           {route.view === 'inbox' && <InboxView data={data} />}
+          {route.view === 'library' && <LibraryView projects={projects} currentId={data.project.id} onOpen={selectProject} />}
           {route.view === 'settings' && <SettingsView data={data} projects={projects} onSelectProject={selectProject} sync={sync} />}
         </main>
       )}
@@ -133,10 +140,17 @@ function AppHeader({ data, route, sync }: { data: ProjectData; route: Route; syn
   return (
     <header className="app-header">
       <div className="crumb">
-        <span className="logo">Manuscript.</span>
+        <button className="logo" title="Все истории" onClick={() => go({ view: 'library' })}>
+          Manuscript.
+        </button>
         <span className="slash">/</span>
-        <span className="project-name">{data.project.title}</span>
+        <button className="project-name" title="Все истории" onClick={() => go({ view: 'library' })}>
+          {data.project.title} <span className="caret">▾</span>
+        </button>
         <span className="sync-dot" data-state={sync.state} title={syncTitle} />
+        {deadlineText(data.project.deadline) && (
+          <span className={`deadline hide-sm ${deadlineText(data.project.deadline)!.late ? 'late' : ''}`}>⏳ {deadlineText(data.project.deadline)!.text}</span>
+        )}
       </div>
       <nav className="tabs">
         {TABS.map((t) => (

@@ -159,7 +159,7 @@ export function ChapterContext({ data, scene, editor }: { data: ProjectData; sce
             className="btn sm ghost"
             style={{ color: 'var(--mk-hanging)' }}
             onClick={async () => {
-              if (!confirm(`Удалить сцену «${scene.title}» вместе с текстом?`)) return
+              if (!confirm('Удалить эту сцену вместе с текстом?')) return
               await remove('scenes', scene.id)
               await remove('texts', scene.id)
               go({ view: 'board' })

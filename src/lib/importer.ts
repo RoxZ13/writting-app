@@ -14,6 +14,10 @@ export interface ImportedScene {
   title: string
   doc: PMNode
   wordCount: number
+  /** The opening of the text, shown on cards instead of a made-up title. */
+  excerpt: string
+  /** A song/quote line opening the scene, like "AC/DC — Wild Reputation". */
+  epigraph?: string
 }
 export interface ImportedChapter {
   title: string
@@ -202,14 +206,14 @@ export function blocksToChapters(blocks: Block[], fallbackTitle = 'Начало 
         return inline.length ? { type: 'paragraph', content: inline } : { type: 'paragraph' }
       }),
     }
-    const first = paras[0].map((r) => r.text).join('').trim().replace(/^[—–-]\s*/, '')
-    const sentence = first.split(/(?<=[.!?…])\s/)[0]
-    const title = sentence.length > 40 ? sentence.slice(0, 40).replace(/\s+\S*$/, '') + '…' : sentence.replace(/[.]$/, '')
+    const plain = paras.map((runs) => runs.map((r) => r.text).join('').trim())
+    const epigraph = isEpigraph(plain[0]) ? plain[0] : undefined
+    const excerpt = makeExcerpt(plain.slice(epigraph ? 1 : 0))
     const words = paras.reduce(
       (n, runs) => n + (runs.map((r) => r.text).join(' ').match(/[\p{L}\p{N}]+/gu)?.length ?? 0),
       0,
     )
-    chapter.scenes.push({ title: title || `Сцена ${chapter.scenes.length + 1}`, doc, wordCount: words })
+    chapter.scenes.push({ title: '', doc, wordCount: words, excerpt, epigraph })
     paras = []
   }
 
@@ -261,4 +265,23 @@ export function parseBook(blocks: Block[]): ImportedBook {
     .filter(Boolean)
   const title = head[0] && head[0].length <= 80 ? head[0] : undefined
   return { title, preface: head.join('\n'), chapters: blocksToChapters(blocks.slice(first)) }
+}
+
+/**
+ * "Artist — Song" style line: short, two sides around a dash, no sentence punctuation.
+ * Dialogue ("— Реплика") never matches because it starts with the dash.
+ */
+export function isEpigraph(line: string | undefined): boolean {
+  if (!line) return false
+  const t = line.trim()
+  if (t.length > 70 || /^[—–-]/.test(t) || /[.!?…,:;]$/.test(t)) return false
+  const m = t.match(/^(.{1,35}?)\s*[—–-]\s*(.{1,40})$/)
+  if (!m) return false
+  return m[1].split(/\s+/).length <= 5 && m[2].split(/\s+/).length <= 7
+}
+
+/** First ~140 characters of the scene, cut at a word boundary. */
+export function makeExcerpt(paragraphs: string[]): string {
+  const text = paragraphs.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim()
+  return text.length > 140 ? text.slice(0, 140).replace(/\s+\S*$/, '') + '…' : text
 }
