@@ -1,18 +1,26 @@
 import { useState } from 'react'
-import { db } from '../db/db'
-import { alive, createChapter, createScene } from '../db/repo'
+import { db, type Project } from '../db/db'
+import { alive, createChapter, createScene, save } from '../db/repo'
 import {
-  blocksToChapters,
+  parseBook,
   htmlToBlocks,
   readFileAsBlocks,
   textToBlocks,
   type Block,
-  type ImportedChapter,
+  type ImportedBook,
 } from '../lib/importer'
 import { formatWords } from '../lib/text'
 import { toast } from '../lib/ui'
 
-export async function importChapters(projectId: string, chapters: ImportedChapter[]) {
+export async function importBook(projectId: string, book: ImportedBook) {
+  const project = await db.projects.get(projectId)
+  if (project && book.preface && !project.description) {
+    await save<Project>('projects', { ...project, description: book.preface })
+  }
+  return importChapters(projectId, book.chapters)
+}
+
+export async function importChapters(projectId: string, chapters: ImportedBook['chapters']) {
   const existing = alive(await db.chapters.where('projectId').equals(projectId).toArray())
   let order = existing.length ? Math.max(...existing.map((c) => c.order)) + 1 : 0
   let firstScene: string | undefined
@@ -28,20 +36,22 @@ export async function importChapters(projectId: string, chapters: ImportedChapte
 
 /** Import from .docx / .txt / pasted text, with a preview before anything is written. */
 export function ImportPanel({ projectId, onDone }: { projectId: string; onDone?: (firstSceneId?: string) => void }) {
-  const [preview, setPreview] = useState<ImportedChapter[] | null>(null)
+  const [book, setBook] = useState<ImportedBook | null>(null)
+  const preview = book?.chapters ?? null
   const [pasted, setPasted] = useState('')
   const [pastedHtml, setPastedHtml] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const show = (blocks: Block[]) => {
-    const chapters = blocksToChapters(blocks)
+    const parsed = parseBook(blocks)
+    const chapters = parsed.chapters
     if (!chapters.length || !chapters.some((c) => c.scenes.length)) {
       setError('Не нашла текста. Попробуй другой файл или вставь текст вручную.')
       return
     }
     setError(null)
-    setPreview(chapters)
+    setBook(parsed)
   }
 
   const onFile = async (file: File | undefined) => {
@@ -57,12 +67,12 @@ export function ImportPanel({ projectId, onDone }: { projectId: string; onDone?:
   }
 
   const confirm = async () => {
-    if (!preview) return
+    if (!book) return
     setBusy(true)
-    const first = await importChapters(projectId, preview)
+    const first = await importBook(projectId, book)
     setBusy(false)
     toast('Текст импортирован')
-    setPreview(null)
+    setBook(null)
     setPasted('')
     setPastedHtml(null)
     onDone?.(first)
@@ -94,7 +104,7 @@ export function ImportPanel({ projectId, onDone }: { projectId: string; onDone?:
           <button className="btn primary" disabled={busy} onClick={() => void confirm()}>
             {busy ? 'Импортирую…' : 'Импортировать'}
           </button>
-          <button className="btn ghost" onClick={() => setPreview(null)}>
+          <button className="btn ghost" onClick={() => setBook(null)}>
             Назад
           </button>
         </div>

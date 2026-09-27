@@ -12,6 +12,8 @@ export interface Project extends Base {
   createdAt: number
   /** Where the author stopped last time — synced so "Continue" works on every device. */
   lastSceneId?: string
+  /** About the book: the header of an imported file (fandom, pairing, summary…) or the author's own words. */
+  description?: string
   /** "Note to future self", written when finishing a session. */
   nextStep?: string
 }

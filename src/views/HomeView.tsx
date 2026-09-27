@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../db/db'
-import { markerStatus, sceneLabel, type ProjectData } from '../lib/hooks'
+import { chapterLabel, markerStatus, sceneLabel, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { MARKER_STATES, STATUSES, statusOf, timeAgo } from '../lib/status'
 import { formatWords, lastParagraphs } from '../lib/text'
@@ -32,8 +32,6 @@ export function HomeView({ data }: { data: ProjectData }) {
     )
   }
 
-  const chapter = data.chapterById.get(scene.chapterId)
-  const chapterNo = (data.chapterIndex.get(scene.chapterId) ?? 0) + 1
   const st = statusOf(scene.status)
   const nextBeat = scene.beats.find((b) => !b.done)
   const toPayHere = data.markers.filter((m) => m.payoffSceneId === scene.id && !m.resolved)
@@ -47,8 +45,7 @@ export function HomeView({ data }: { data: ProjectData }) {
           Ты остановилась здесь{text?.updatedAt ? ` · ${timeAgo(text.updatedAt)}` : ''}
         </div>
         <div className="where" style={{ marginTop: 10 }}>
-          Глава {chapterNo}
-          {chapter?.title && chapter.title !== `Глава ${chapterNo}` ? ` · ${chapter.title}` : ''}
+          {chapterLabel(data, scene.chapterId)}
         </div>
         <h1>{scene.title}</h1>
         <div className="row" style={{ marginBottom: 16 }}>

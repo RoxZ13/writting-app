@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { blocksToChapters, isChapterTitle, parseTaggedRuns, textToBlocks } from '../lib/importer'
+import { blocksToChapters, isChapterTitle, parseBook, parseTaggedRuns, textToBlocks } from '../lib/importer'
 import { chapterToFicbook } from '../lib/exporter'
 import type { Chapter, Scene } from '../db/db'
 
@@ -50,6 +50,15 @@ describe('import', () => {
     const chapters = blocksToChapters(textToBlocks(text))
     expect(chapters.map((c) => c.title)).toEqual(['Начало (до первой главы)', 'Часть 1', 'Часть 2'])
     expect(chapters[2].scenes[0].wordCount).toBe(10)
+  })
+
+  it('keeps the file header out of the chapters', () => {
+    const book = parseBook(
+      textToBlocks('Геката Сотейра\nНаправленность: Гет\nОписание фика.\n===== Часть 1 =====\nТекст главы.'),
+    )
+    expect(book.title).toBe('Геката Сотейра')
+    expect(book.preface).toContain('Направленность: Гет')
+    expect(book.chapters.map((c) => c.title)).toEqual(['Часть 1'])
   })
 
   it('keeps Ficbook italics', () => {
