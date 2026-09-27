@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSyncStatus, onSyncStatus, startCloudSync, type SyncStatus } from './db/cloud'
-import { useProjectData, useProjects, type ProjectData } from './lib/hooks'
+import { markerStatus, useProjectData, useProjects, type ProjectData } from './lib/hooks'
 import { tidyImportedScenes } from './db/repo'
 import { go, useRoute, type Route } from './lib/router'
 import { getCurrentProjectId, returnFocus, setCurrentProjectId } from './lib/session'
@@ -148,6 +148,7 @@ function AppHeader({ data, route, sync }: { data: ProjectData; route: Route; syn
           {data.project.title} <span className="caret">▾</span>
         </button>
         <span className="sync-dot" data-state={sync.state} title={syncTitle} />
+        <MarkerStatus data={data} />
         {deadlineText(data.project.deadline) && (
           <span className={`deadline hide-sm ${deadlineText(data.project.deadline)!.late ? 'late' : ''}`}>⏳ {deadlineText(data.project.deadline)!.text}</span>
         )}
@@ -176,5 +177,23 @@ function AppHeader({ data, route, sync }: { data: ProjectData; route: Route; syn
         </button>
       </nav>
     </header>
+  )
+}
+
+/** Always visible: are all markers accounted for? One tap shows the ones waiting. */
+function MarkerStatus({ data }: { data: ProjectData }) {
+  if (!data.markers.length) return null
+  const waiting = data.markers.filter((m) => ['hanging', 'late'].includes(markerStatus(m, data))).length
+  return (
+    <button
+      className={`marker-status ${waiting ? 'due' : ''}`}
+      title={waiting ? 'Маячки без места раскрытия или пропущенные' : 'У каждого маячка есть место раскрытия'}
+      onClick={() => {
+        sessionStorage.setItem('manuscript.lens', 'markers')
+        go({ view: 'board' })
+      }}
+    >
+      ✦ {waiting ? `${waiting} ждут` : 'все на месте'}
+    </button>
   )
 }

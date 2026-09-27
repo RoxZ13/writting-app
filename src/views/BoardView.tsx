@@ -37,7 +37,12 @@ import { deadlineText } from '../lib/stories'
 type Lens = { kind: 'all' } | { kind: 'line'; id: string } | { kind: 'markers' }
 
 export function BoardView({ data }: { data: ProjectData }) {
-  const [lens, setLens] = useState<Lens>({ kind: 'all' })
+  const [lens, setLens] = useState<Lens>(() => {
+    const wanted = sessionStorage.getItem('manuscript.lens')
+    sessionStorage.removeItem('manuscript.lens')
+    return wanted === 'markers' ? { kind: 'markers' } : { kind: 'all' }
+  })
+  const [newLine, setNewLine] = useState<string | null>(null)
   const [openScene, setOpenScene] = useState<string | null>(null)
   const [openMarker, setOpenMarker] = useState<string | null>(null)
   const [dragging, setDragging] = useState<string | null>(null)
@@ -96,20 +101,28 @@ export function BoardView({ data }: { data: ProjectData }) {
               <span className="dot" style={{ background: l.color }} /> {l.name}
             </button>
           ))}
-          <button
-            className="lens-add"
-            title="Новая ветка — например, линия второстепенного героя"
-            onClick={async () => {
-              const name = prompt('Название ветки (например, «Линия Альфарда»):')
-              if (name?.trim()) {
-                const l = await createLine(data.project.id, name.trim())
+          {newLine === null ? (
+            <button className="lens-add" title="Новая ветка — например, линия второстепенного героя" onClick={() => setNewLine('')}>
+              + ветка
+            </button>
+          ) : (
+            <input
+              className="ref-input"
+              autoFocus
+              placeholder="Например, «Линия Альфарда»"
+              value={newLine}
+              onChange={(e) => setNewLine(e.target.value)}
+              onBlur={() => setNewLine(null)}
+              onKeyDown={async (e) => {
+                if (e.key === 'Escape') setNewLine(null)
+                if (e.key !== 'Enter' || !newLine.trim()) return
+                const l = await createLine(data.project.id, newLine.trim())
+                setNewLine(null)
                 setLens({ kind: 'line', id: l.id })
-                toast('Ветка создана. Отмечай её сцены: открой сцену → «Ветки»')
-              }
-            }}
-          >
-            + ветка
-          </button>
+                toast('Ветка создана. Отмечай её сцены: клик по сцене → «Ветки»')
+              }}
+            />
+          )}
         </div>
       </div>
 

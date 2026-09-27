@@ -45,3 +45,7 @@ export function applyTheme(t: Theme) {
   if (t === 'auto') delete document.documentElement.dataset.theme
   else document.documentElement.dataset.theme = t
 }
+
+/** Keyboard shortcut hints only make sense where there is a keyboard. */
+export const isTouch = () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches
+export const hotkey = (hint: string) => (isTouch() ? '' : hint)

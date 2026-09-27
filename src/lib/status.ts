@@ -19,11 +19,11 @@ export const MARKER_STATES: Record<MarkerState | 'late', { label: string; color:
 }
 
 export const NOTE_KINDS: { id: NoteKind; label: string; icon: string }[] = [
-  { id: 'idea', label: 'Идея', icon: '💡' },
-  { id: 'question', label: 'Вопрос', icon: '❓' },
-  { id: 'note', label: 'Заметка', icon: '📝' },
+  { id: 'idea', label: 'Мысль', icon: '◦' },
   { id: 'quote', label: 'Цитата', icon: '❝' },
-  { id: 'dialogue', label: 'Диалог', icon: '💬' },
+  { id: 'dialogue', label: 'Диалог', icon: '—' },
+  { id: 'question', label: 'Вопрос', icon: '?' },
+  { id: 'note', label: 'Заметка', icon: '≡' },
 ]
 export const noteKind = (id: NoteKind) => NOTE_KINDS.find((k) => k.id === id) ?? NOTE_KINDS[0]
 

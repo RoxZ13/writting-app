@@ -1,9 +1,9 @@
 import type { Editor } from '@tiptap/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useState } from 'react'
-import { db, type Beat, type Marker, type Project, type Scene, type SceneText } from '../db/db'
+import { db, type Marker, type Project, type Scene, type SceneText } from '../db/db'
 import { createMarker, patch, save, snapshotScene } from '../db/repo'
-import { ChapterContext, updateBeats } from '../components/ChapterContext'
+import { ScenePassport } from '../components/ScenePassport'
 import { Icon } from '../components/Icon'
 import { TypoControls } from '../components/TypoControls'
 import { MarkerCard } from '../components/MarkerCard'
@@ -11,7 +11,7 @@ import { PlacePicker } from '../components/Refs'
 import { SceneEditor, type SelectionAction } from '../components/SceneEditor'
 import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
-import { session } from '../lib/session'
+import { hotkey, session } from '../lib/session'
 import { MARKER_STATES, statusOf } from '../lib/status'
 import { docParagraphs, emptyDoc, formatWords } from '../lib/text'
 import { InlineEdit, Modal, toast } from '../lib/ui'
@@ -20,12 +20,12 @@ type Mode = 'write' | 'edit' | 'rewrite'
 const PANELS_KEY = 'manuscript.panels'
 const MODE_KEY = 'manuscript.mode'
 
-function loadPanels(): { nav: boolean; brief: boolean } {
+function loadPanels(): { nav: boolean } {
   const wide = typeof matchMedia !== 'undefined' && matchMedia('(min-width: 1101px)').matches
   try {
-    return { nav: wide, brief: false, ...JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}') }
+    return { nav: wide, ...JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}') }
   } catch {
-    return { nav: wide, brief: false }
+    return { nav: wide }
   }
 }
 function loadMode(): Mode {
@@ -72,6 +72,7 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
   const [askRewrite, setAskRewrite] = useState(false)
   const [finishing, setFinishing] = useState(false)
   const [typoOpen, setTypoOpen] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [bannerHidden, setBannerHidden] = useState(() => sessionStorage.getItem('manuscript.banner') === '1')
 
   // While typing, everything around the text fades out; moving the mouse or touching brings it back.
@@ -121,12 +122,8 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
       /* ignore */
     }
   }
-  const togglePanel = (k: 'nav' | 'brief') => {
-    const next = { ...panels, [k]: !panels[k] }
-    if (!matchMedia('(min-width: 1101px)').matches) next[k === 'nav' ? 'brief' : 'nav'] = false
-    persistPanels(next)
-  }
-  const closeOverlays = () => setPanels((p) => ({ ...p, nav: false, brief: false }))
+  const togglePanel = (k: 'nav') => persistPanels({ ...panels, [k]: !panels[k] })
+  const closeOverlays = () => setPanels((p) => ({ ...p, nav: false }))
 
   const setMode = (m: Mode) => {
     if (m === 'rewrite' && !scene?.rewriteFrom) {
@@ -139,7 +136,6 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
     } catch {
       /* ignore */
     }
-    if (m === 'edit' && !panels.brief && matchMedia('(min-width: 1101px)').matches) persistPanels({ ...panels, brief: true })
   }
 
   const onWords = useCallback((n: number) => setWords(n), [])
@@ -152,7 +148,6 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
     'write',
     `mode-${mode}`,
     panels.nav && 'nav-open',
-    panels.brief && 'brief-open',
     typing && 'typing',
     rewriting && 'rewriting',
   ]
@@ -170,35 +165,25 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
 
       <div className="write-center">
         <div className="write-top">
-          <button className="icon-btn" title={panels.nav ? 'Скрыть структуру' : 'Показать структуру'} onClick={() => togglePanel('nav')}>
-            <Icon name="panel" size={18} />
+          <button className={`tool ${panels.nav ? 'on' : ''}`} title={panels.nav ? 'Скрыть структуру книги' : 'Показать структуру книги'} onClick={() => togglePanel('nav')}>
+            <Icon name="panel" size={17} />
+            <span className="tool-label">Структура</span>
           </button>
           <div className="crumbs">
             <span className="hide-sm" style={{ whiteSpace: 'nowrap' }}>
               {chapter?.title} ›
             </span>
             <InlineEdit value={scene.title} placeholder={sceneName(data, scene)} onSave={(title) => void patch<Scene>('scenes', scene.id, { title })} />
-          </div>
-          <div className="modes" role="group" aria-label="Режим">
-            {(
-              [
-                ['write', 'Писать'],
-                ['edit', 'Править'],
-                ['rewrite', 'Переписывать'],
-              ] as [Mode, string][]
-            ).map(([m, label]) => (
-              <button key={m} aria-pressed={mode === m} onClick={() => setMode(m)}>
-                {label}
-              </button>
-            ))}
+            {mode !== 'write' && <span className="mode-chip">{mode === 'edit' ? 'правка' : 'переписываю'}</span>}
           </div>
           <span className="spacer" />
           <span className="small muted hide-sm" style={{ whiteSpace: 'nowrap' }}>
             {formatWords(words ?? scene.wordCount)}
           </span>
           <div className="typo-anchor">
-            <button className={`icon-btn aa ${typoOpen ? 'on' : ''}`} title="Шрифт, размер, ширина текста" onClick={() => setTypoOpen(!typoOpen)}>
-              Aa
+            <button className={`tool ${typoOpen ? 'on' : ''}`} title="Шрифт, размер, ширина текста" onClick={() => setTypoOpen(!typoOpen)}>
+              <span className="aa">Aa</span>
+              <span className="tool-label">Шрифт</span>
             </button>
             {typoOpen && (
               <>
@@ -209,16 +194,76 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
               </>
             )}
           </div>
-          <button className="icon-btn" title="Маячок здесь (⌘/Ctrl + M)" onClick={() => editor && setAction(selectionForMarker(editor))}>
-            <Icon name="spark" size={18} />
+          <button className="tool" title={`Маячок: что потом нужно раскрыть${hotkey(' (⌘/Ctrl + M)')}`} onClick={() => editor && setAction(selectionForMarker(editor))}>
+            <Icon name="spark" size={17} />
+            <span className="tool-label">Маячок</span>
           </button>
-          <button className="icon-btn" title="Быстрая запись: мысль, цитата, вопрос (⌘/Ctrl + J)" onClick={onCapture}>
-            <Icon name="bolt" size={18} />
-          </button>
-          <button className={`icon-btn ${panels.brief ? 'on' : ''}`} title="Всё к этой главе" onClick={() => togglePanel('brief')}>
-            <Icon name="sidebar" size={18} />
-          </button>
-          <button className="btn sm ghost hide-sm" onClick={() => setFinishing(true)}>
+          <div className="typo-anchor">
+            <button className={`tool ${menuOpen ? 'on' : ''}`} title="Режимы и прочее" aria-label="Ещё" onClick={() => setMenuOpen(!menuOpen)}>
+              ⋯
+            </button>
+            {menuOpen && (
+              <>
+                <div className="typo-back" onClick={() => setMenuOpen(false)} />
+                <div className="typo-pop card write-menu">
+                  <div className="menu-label">Режим</div>
+                  {(
+                    [
+                      ['write', 'Писать', 'Только текст. Ничего лишнего.'],
+                      ['edit', 'Править', 'Текст на странице, маячки подсвечены.'],
+                      ['rewrite', 'Переписывать', 'Прежний текст тихо сбоку, новый — рядом.'],
+                    ] as [Mode, string, string][]
+                  ).map(([m, label, hint]) => (
+                    <button
+                      key={m}
+                      className={`mode-item ${mode === m ? 'on' : ''}`}
+                      onClick={() => {
+                        setMenuOpen(false)
+                        setMode(m)
+                      }}
+                    >
+                      <span className="mode-dot">{mode === m ? '●' : '○'}</span>
+                      <span>
+                        <strong>{label}</strong>
+                        <span className="mode-hint">{hint}</span>
+                      </span>
+                    </button>
+                  ))}
+                  <div className="hr" />
+                  <button
+                    className="mode-item"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      onCapture()
+                    }}
+                  >
+                    <span className="mode-dot">⚡</span>
+                    <span>
+                      <strong>Быстрая запись</strong>
+                      <span className="mode-hint">Мысль, цитата, вопрос{hotkey(' · ⌘/Ctrl + J')}</span>
+                    </span>
+                  </button>
+                  <button
+                    className="mode-item show-sm-flex"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      setFinishing(true)
+                    }}
+                  >
+                    <span className="mode-dot">✓</span>
+                    <span>
+                      <strong>Закончить на сегодня</strong>
+                      <span className="mode-hint">Оставить записку себе на следующий раз</span>
+                    </span>
+                  </button>
+                  <div className="small muted" style={{ padding: '8px 10px 2px' }}>
+                    {formatWords(words ?? scene.wordCount)} в сцене
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <button className="btn sm hide-sm finish-btn" onClick={() => setFinishing(true)}>
             Закончить
           </button>
         </div>
@@ -238,7 +283,9 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
             </button>
           </div>
         )}
-        <Compass scene={scene} onOpenBrief={() => !panels.brief && togglePanel('brief')} />
+        <div className="passport-wrap">
+          <ScenePassport data={data} scene={scene} editor={editor} onOpenMarker={setOpenMarker} />
+        </div>
 
         <div className="editor-area">
           {rewriting && <RewriteOld scene={scene} editor={editor} onDone={() => setModeState('write')} />}
@@ -257,18 +304,6 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
         </div>
       </div>
 
-      <aside className="write-brief" aria-label="Всё к этой главе">
-        <div className="inner">
-          <div className="row" style={{ marginBottom: 4 }}>
-            <span className="eyebrow">Всё к этой главе</span>
-            <span className="spacer" />
-            <button className="icon-btn" onClick={() => togglePanel('brief')} aria-label="Скрыть">
-              ×
-            </button>
-          </div>
-          <ChapterContext data={data} scene={scene} editor={editor} />
-        </div>
-      </aside>
       <div className="write-backdrop" onClick={closeOverlays} />
 
       {action && editor && <MarkerFromSelection data={data} scene={scene} action={action} editor={editor} onClose={() => setAction(null)} />}
@@ -335,44 +370,6 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
         </div>
       ))}
     </>
-  )
-}
-
-/** Quiet line above the text: the current beat of the scene's plan. One tap ticks it off. */
-function Compass({ scene, onOpenBrief }: { scene: Scene; onOpenBrief: () => void }) {
-  const next = scene.beats.find((b) => !b.done)
-  const done = scene.beats.filter((b) => b.done).length
-  const tick = (b: Beat) => void updateBeats(scene.id, (all) => all.map((x) => (x.id === b.id ? { ...x, done: true } : x)))
-
-  if (!scene.beats.length) {
-    return (
-      <button className="compass" onClick={onOpenBrief}>
-        <span className="now muted">{scene.goal ? scene.goal : 'Что должно произойти в этой сцене? Набросай пару пунктов — не будешь кружить.'}</span>
-        <span className="prog">план →</span>
-      </button>
-    )
-  }
-  if (!next) {
-    return (
-      <button className="compass" onClick={onOpenBrief}>
-        <span className="now">Всё по плану сцены написано.</span>
-        <span className="prog">
-          {done}/{scene.beats.length}
-        </span>
-      </button>
-    )
-  }
-  return (
-    <div className="compass" role="group" aria-label="Сейчас в сцене">
-      <button className="compass-check" title="Готово — к следующему пункту" onClick={() => tick(next)} />
-      <span className="now" onClick={onOpenBrief}>
-        <span className="muted">Сейчас: </span>
-        {next.text}
-      </span>
-      <span className="prog">
-        {done}/{scene.beats.length}
-      </span>
-    </div>
   )
 }
 
