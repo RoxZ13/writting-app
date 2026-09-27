@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { db, type Project } from '../db/db'
+import { db } from '../db/db'
 import {
   currentEmail,
   getCloudConfig,
@@ -9,173 +9,33 @@ import {
   syncNow,
   type SyncStatus,
 } from '../db/cloud'
-import { createProject, patch, remove } from '../db/repo'
-import { ImportPanel } from '../components/ImportPanel'
-import { chapterToFicbook, download, exportDocx, type ExportChapter } from '../lib/exporter'
-import type { ProjectData } from '../lib/hooks'
-import { go } from '../lib/router'
+import { download } from '../lib/exporter'
 import { applyTheme, getTheme, type Theme } from '../lib/session'
 import { TypoControls } from '../components/TypoControls'
 import { timeAgo } from '../lib/status'
-import { InlineEdit, toast } from '../lib/ui'
 
-async function loadChapters(data: ProjectData, only?: string): Promise<ExportChapter[]> {
-  const out: ExportChapter[] = []
-  for (const { chapter, scenes } of data.outline) {
-    if (only && chapter.id !== only) continue
-    const texts = await db.texts.bulkGet(scenes.map((s) => s.id))
-    out.push({ chapter, scenes: scenes.map((s, i) => ({ ...s, content: texts[i]?.content })) })
-  }
-  return out
-}
-
-export function SettingsView({
-  data,
-  projects,
-  onSelectProject,
-  sync,
-}: {
-  data: ProjectData
-  projects: Project[]
-  onSelectProject: (id: string) => void
-  sync: SyncStatus
-}) {
+/** Settings of the app itself (not of a book): look, devices, installing, backup. */
+export function SettingsView({ sync }: { sync: SyncStatus }) {
   const [theme, setTheme] = useState<Theme>(getTheme)
-  const [ficChapter, setFicChapter] = useState(data.chapters[0]?.id ?? '')
-
-  const exportWord = async () => {
-    const blob = await exportDocx(data.project.title, await loadChapters(data))
-    download(blob, `${data.project.title}.docx`)
-  }
-  const copyFicbook = async () => {
-    const [ch] = await loadChapters(data, ficChapter)
-    if (!ch) return
-    const text = chapterToFicbook(ch)
-    try {
-      await navigator.clipboard.writeText(text)
-      toast('Глава скопирована — вставь её в редактор Фикбука')
-    } catch {
-      download(new Blob([text], { type: 'text/plain;charset=utf-8' }), `${ch.chapter.title}.txt`)
-    }
-  }
   const backup = async () => {
     const dump: Record<string, unknown[]> = {}
-    for (const t of ['projects', 'chapters', 'scenes', 'texts', 'markers', 'notes', 'snapshots'] as const) {
+    for (const t of ['projects', 'chapters', 'scenes', 'texts', 'markers', 'notes', 'snapshots', 'lines', 'characters'] as const) {
       dump[t] = await db.table(t).toArray()
     }
     download(new Blob([JSON.stringify(dump)], { type: 'application/json' }), `manuscript-backup-${new Date().toISOString().slice(0, 10)}.json`)
   }
 
   return (
-    <div style={{ maxWidth: 720 }}>
-      <h1 style={{ marginBottom: 20 }}>Ещё</h1>
+    <div className="lib-page">
+      <div className="lib-head">
+        <h1>Настройки</h1>
+        <div className="muted">Для всех историй на этом устройстве</div>
+      </div>
 
       <section className="card settings-section stack">
-        <h3>Истории</h3>
-        <label>
-          <span className="field-label">Название текущей</span>
-          <InlineEdit className="input" value={data.project.title} onSave={(title) => void patch<Project>('projects', data.project.id, { title })} />
-        </label>
-        <label>
-          <span className="field-label">Дедлайн истории</span>
-          <input
-            className="input"
-            type="date"
-            style={{ maxWidth: 220 }}
-            defaultValue={data.project.deadline ?? ''}
-            onChange={(e) => void patch<Project>('projects', data.project.id, { deadline: e.target.value || undefined })}
-          />
-        </label>
-        <label>
-          <span className="field-label">О книге</span>
-          <InlineEdit
-            className="input"
-            multiline
-            placeholder="Фандом, пэйринг, аннотация — что угодно"
-            value={data.project.description ?? ''}
-            onSave={(description) => void patch<Project>('projects', data.project.id, { description })}
-          />
-        </label>
-        {projects.length > 1 && (
-          <div className="stack" style={{ gap: 4 }}>
-            <span className="field-label">Переключиться</span>
-            {projects
-              .filter((p) => p.id !== data.project.id)
-              .map((p) => (
-                <button key={p.id} className="btn ghost" style={{ justifyContent: 'flex-start' }} onClick={() => onSelectProject(p.id)}>
-                  {p.title}
-                </button>
-              ))}
-          </div>
-        )}
-        <div className="row">
-          <button
-            className="btn"
-            onClick={async () => {
-              const title = prompt('Название новой истории')
-              if (title?.trim()) onSelectProject((await createProject(title.trim())).id)
-            }}
-          >
-            + Новая история
-          </button>
-          <span className="spacer" />
-          <button
-            className="btn ghost sm"
-            style={{ color: 'var(--accent)' }}
-            onClick={() => {
-              if (confirm(`Удалить историю «${data.project.title}» со всеми главами и заметками?`)) {
-                void remove('projects', data.project.id)
-              }
-            }}
-          >
-            Удалить историю
-          </button>
-        </div>
-      </section>
-
-      <section className="card settings-section stack">
-        <h3>Импорт текста</h3>
-        <div className="small muted">Главы добавятся в конец плана текущей истории.</div>
-        <ImportPanel projectId={data.project.id} onDone={() => go({ view: 'board' })} />
-      </section>
-
-      <section className="card settings-section stack">
-        <h3>Экспорт</h3>
-        <div className="row">
-          <button className="btn" onClick={() => void exportWord()}>
-            Скачать всё в Word (.docx)
-          </button>
-        </div>
-        <div className="hr" />
-        <span className="field-label">Для Фикбука — по одной главе, с курсивом и разделителями сцен</span>
-        <div className="row" style={{ flexWrap: 'nowrap' }}>
-          <select className="select" value={ficChapter} onChange={(e) => setFicChapter(e.target.value)}>
-            {data.chapters.map((c, i) => (
-              <option key={c.id} value={c.id}>
-                {i + 1}. {c.title}
-              </option>
-            ))}
-          </select>
-          <button className="btn" onClick={() => void copyFicbook()}>
-            Скопировать
-          </button>
-        </div>
-        <div className="hr" />
-        <div className="row">
-          <button className="btn ghost sm" onClick={() => void backup()}>
-            Резервная копия всех данных (.json)
-          </button>
-        </div>
-      </section>
-
-      <SyncSection sync={sync} />
-
-      <section className="card settings-section stack">
-        <h3>Внешний вид</h3>
-        <div className="row">
-          <span className="field-label" style={{ margin: 0, minWidth: 90 }}>
-            Тема
-          </span>
+        <h3>Как выглядит</h3>
+        <div className="typo-row">
+          <span className="typo-label">Тема</span>
           <div className="seg">
             {(
               [
@@ -197,9 +57,10 @@ export function SettingsView({
             ))}
           </div>
         </div>
-        <span className="field-label">Текст рукописи</span>
         <TypoControls />
       </section>
+
+      <SyncSection sync={sync} />
 
       <section className="card settings-section stack">
         <h3>Установить как приложение</h3>
@@ -214,9 +75,15 @@ export function SettingsView({
             <strong>Windows:</strong> Chrome или Edge → значок установки в адресной строке.
           </p>
         </div>
-        <div className="small muted">
-          После установки Manuscript работает без интернета. Горячая клавиша быстрой записи — Ctrl/⌘ + J.
-        </div>
+        <div className="small muted">После установки Manuscript работает без интернета.</div>
+      </section>
+
+      <section className="card settings-section stack">
+        <h3>Резервная копия</h3>
+        <div className="small muted">Все истории, заметки и версии одним файлом — на всякий случай.</div>
+        <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void backup()}>
+          Скачать копию (.json)
+        </button>
       </section>
     </div>
   )
@@ -263,17 +130,17 @@ export function SyncSection({ sync }: { sync: SyncStatus }) {
 
   return (
     <section className="card settings-section stack">
-      <h3>Синхронизация между устройствами</h3>
+      <h3>Устройства</h3>
       <div className="row small">
         <span className="sync-dot" data-state={sync.state} />
         {statusText}
       </div>
 
       {!cfg ? (
-        <>
-          <div className="small muted">
-            Нужен бесплатный проект Supabase (облачная база). Инструкция — в README репозитория, это 5 минут. Затем
-            вставь сюда его адрес и публичный ключ.
+        <details className="pp-more">
+          <summary>Свой сервер синхронизации (для опытных)</summary>
+          <div className="small muted" style={{ margin: '8px 0' }}>
+            Адрес и публичный ключ проекта Supabase. Инструкция — в README.
           </div>
           <input className="input" placeholder="Project URL (https://….supabase.co)" value={url} onChange={(e) => setUrl(e.target.value)} />
           <input className="input" placeholder="anon public key" value={key} onChange={(e) => setKey(e.target.value)} />
@@ -289,7 +156,7 @@ export function SyncSection({ sync }: { sync: SyncStatus }) {
           >
             Подключить
           </button>
-        </>
+        </details>
       ) : me ? (
         <div className="row">
           <span>

@@ -13,7 +13,7 @@ import {
 } from '@dnd-kit/core'
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Chapter, Marker, Scene } from '../db/db'
 import {
   createChapter,
@@ -43,6 +43,14 @@ export function BoardView({ data }: { data: ProjectData }) {
     return wanted === 'markers' ? { kind: 'markers' } : { kind: 'all' }
   })
   const [newLine, setNewLine] = useState<string | null>(null)
+
+  // Open on "ты здесь", not wherever the previous screen was scrolled to.
+  useEffect(() => {
+    window.scrollTo(0, 0)
+    requestAnimationFrame(() =>
+      document.querySelector('.card-scene.current')?.scrollIntoView({ inline: 'center', block: 'nearest' }),
+    )
+  }, [])
   const [openScene, setOpenScene] = useState<string | null>(null)
   const [openMarker, setOpenMarker] = useState<string | null>(null)
   const [dragging, setDragging] = useState<string | null>(null)
@@ -72,6 +80,13 @@ export function BoardView({ data }: { data: ProjectData }) {
 
   const hanging = data.markers.filter((m) => ['hanging', 'late'].includes(markerStatus(m, data)))
   const lineName = lens.kind === 'line' ? data.lineById.get(lens.id)?.name : undefined
+
+  const addChapterAfter = async (i: number) => {
+    const c = await createChapter(data.project.id, `Глава ${i + 2}`)
+    const ids = data.chapters.map((x) => x.id)
+    ids.splice(i + 1, 0, c.id)
+    await reorderChapters(ids)
+  }
 
   const moveChapter = (i: number, dir: -1 | 1) => {
     const ids = data.chapters.map((c) => c.id)
@@ -162,6 +177,7 @@ export function BoardView({ data }: { data: ProjectData }) {
               lens={lens}
               isFirst={i === 0}
               onMove={(d) => moveChapter(i, d)}
+              onAddAfter={() => void addChapterAfter(i)}
               onOpenScene={setOpenScene}
               onOpenMarker={setOpenMarker}
             />
@@ -192,6 +208,7 @@ function Column({
   lens,
   isFirst,
   onMove,
+  onAddAfter,
   onOpenScene,
   onOpenMarker,
 }: {
@@ -201,6 +218,7 @@ function Column({
   lens: Lens
   isFirst: boolean
   onMove: (dir: -1 | 1) => void
+  onAddAfter: () => void
   onOpenScene: (id: string) => void
   onOpenMarker: (id: string) => void
 }) {
@@ -213,6 +231,9 @@ function Column({
   const pay = data.markers.filter((m) => markerPayoffChapter(m, data) === chapter.id)
   const people = chapterCharacters(data, chapter.id)
   const lineMissing = lens.kind === 'line' && !scenes.some((s) => s.lineIds?.includes(lens.id))
+  const hasCurrent = scenes.some((s) => s.id === data.project.lastSceneId)
+  // On phones chapters are a list; only the chapter you are in starts unfolded.
+  const [folded, setFolded] = useState(!hasCurrent && !isFirst)
 
   const addScene = async () => {
     const title = draft.trim()
@@ -228,9 +249,12 @@ function Column({
   }
 
   return (
-    <section ref={setNodeRef} className={`column ${isOver ? 'over' : ''}`}>
+    <section ref={setNodeRef} className={`column ${isOver ? 'over' : ''} ${folded ? 'folded' : ''}`}>
       <header className="column-head">
         <div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}>
+          <button className="fold-btn" aria-label={folded ? 'Развернуть главу' : 'Свернуть главу'} onClick={() => setFolded(!folded)}>
+            {folded ? '▸' : '▾'}
+          </button>
           <InlineEdit className="column-title" value={chapter.title} onSave={(title) => void patch<Chapter>('chapters', chapter.id, { title })} />
           <details className="menu">
             <summary className="icon-btn" aria-label="Действия с главой">
@@ -246,6 +270,7 @@ function Column({
                   onChange={(e) => void patch<Chapter>('chapters', chapter.id, { deadline: e.target.value || undefined })}
                 />
               </label>
+              <button onClick={onAddAfter}>+ Новая глава после этой</button>
               <button onClick={() => onMove(-1)}>← Сдвинуть левее</button>
               <button onClick={() => onMove(1)}>Сдвинуть правее →</button>
               {!isFirst && (
@@ -265,7 +290,7 @@ function Column({
         <InlineEdit
           className="column-goal"
           multiline
-          placeholder="О чём глава?"
+          placeholder="+ о чём глава"
           value={chapter.goal}
           onSave={(goal) => void patch<Chapter>('chapters', chapter.id, { goal })}
         />

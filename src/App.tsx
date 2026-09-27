@@ -14,6 +14,8 @@ import { SettingsView } from './views/SettingsView'
 import { WriteView } from './views/WriteView'
 import { Welcome } from './views/Welcome'
 import { LibraryView } from './views/LibraryView'
+import { BookView } from './views/BookView'
+import { HelpView } from './views/HelpView'
 import { deadlineText } from './lib/stories'
 
 const TABS: { view: Route['view']; label: string; ico: string }[] = [
@@ -88,6 +90,43 @@ export function App() {
         data.scenes[0]?.id
       : undefined
 
+  if (route.view === 'library' || route.view === 'settings' || route.view === 'help') {
+    return (
+      <div className="lib-shell">
+        <aside className="lib-side">
+          <div className="brand">
+            <div className="logo">Manuscript.</div>
+            <div className="tagline">The writer’s studio</div>
+          </div>
+          <div className="side-label">Menu</div>
+          <nav className="lib-nav">
+            {(
+              [
+                ['library', 'Истории', 'book'],
+                ['settings', 'Настройки', 'settings'],
+                ['help', 'Справка', 'help'],
+              ] as [Route['view'], string, string][]
+            ).map(([v, label, ico]) => (
+              <button key={v} aria-current={route.view === v ? 'page' : undefined} onClick={() => go({ view: v } as Route)}>
+                <Icon name={ico} />
+                {label}
+              </button>
+            ))}
+          </nav>
+          <button className="lib-back" onClick={() => go({ view: 'text' })}>
+            ← К «{data.project.title}»
+          </button>
+        </aside>
+        <main className="lib-main">
+          {route.view === 'library' && <LibraryView projects={projects} currentId={data.project.id} onOpen={selectProject} />}
+          {route.view === 'settings' && <SettingsView sync={sync} />}
+          {route.view === 'help' && <HelpView />}
+        </main>
+        <Toaster />
+      </div>
+    )
+  }
+
   return (
     <div className={`app app-${route.view}`}>
       <AppHeader data={data} route={route} sync={sync} />
@@ -110,8 +149,7 @@ export function App() {
           {route.view === 'board' && <BoardView data={data} />}
           {route.view === 'characters' && <CharactersView data={data} />}
           {route.view === 'inbox' && <InboxView data={data} />}
-          {route.view === 'library' && <LibraryView projects={projects} currentId={data.project.id} onOpen={selectProject} />}
-          {route.view === 'settings' && <SettingsView data={data} projects={projects} onSelectProject={selectProject} sync={sync} />}
+          {route.view === 'book' && <BookView data={data} />}
         </main>
       )}
       {route.view !== 'text' && (
@@ -169,11 +207,11 @@ function AppHeader({ data, route, sync }: { data: ProjectData; route: Route; syn
           <span className="tab-label">Входящие</span>
           {inbox > 0 && <span className="badge">{inbox}</span>}
         </button>
-        <button className="tab-aux" aria-current={route.view === 'settings' ? 'page' : undefined} title="Настройки" onClick={() => go({ view: 'settings' })}>
+        <button className="tab-aux" aria-current={route.view === 'book' ? 'page' : undefined} title="О книге: обложка, дедлайн, экспорт" onClick={() => go({ view: 'book' })}>
           <span className="tab-ico">
-            <Icon name="settings" />
+            <Icon name="book" />
           </span>
-          <span className="tab-label">Ещё</span>
+          <span className="tab-label">Книга</span>
         </button>
       </nav>
     </header>

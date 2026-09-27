@@ -6,6 +6,7 @@ import { COVERS, createStory, deadlineText } from '../lib/stories'
 import { timeAgo } from '../lib/status'
 import { formatWords } from '../lib/text'
 import { Modal, toast } from '../lib/ui'
+import { BookCover } from '../components/BookCover'
 
 /** All stories side by side — authors rarely write just one. */
 export function LibraryView({ projects, currentId, onOpen }: { projects: Project[]; currentId: string; onOpen: (id: string) => void }) {
@@ -21,13 +22,13 @@ export function LibraryView({ projects, currentId, onOpen }: { projects: Project
   }, [projects.map((p) => p.id).join()])
 
   return (
-    <div>
-      <div className="toolbar">
+    <div className="lib-page">
+      <div className="lib-head row">
         <div style={{ marginRight: 'auto' }}>
           <h1>Истории</h1>
-          <div className="muted">Рукописи и черновики</div>
+          <div className="muted">Твои рукописи и черновики</div>
         </div>
-        <button className="btn primary" onClick={() => setCreating(true)}>
+        <button className="btn primary big-pill" onClick={() => setCreating(true)}>
           + Новая история
         </button>
       </div>
@@ -62,9 +63,7 @@ function StoryCard({
   const color = p.color ?? '#0b0b0c'
   return (
     <article className={`story ${current ? 'current' : ''}`}>
-      <button className="cover" style={{ background: color }} onClick={onOpen}>
-        <span className="cover-title">{p.title}</span>
-      </button>
+      <BookCover project={p} onClick={onOpen} />
       <div className="story-body">
         <div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}>
           <strong className="story-title" onClick={onOpen}>
@@ -119,6 +118,7 @@ function StoryCard({
             </div>
           </details>
         </div>
+        {p.genre && <div className="story-meta">{p.genre}</div>}
         <div className="story-meta">
           {stats ? `${stats.chapters} гл. · ${formatWords(stats.words)}` : '…'}
           {' · '}
@@ -137,10 +137,11 @@ function NewStory({ onClose, onCreated }: { onClose: () => void; onCreated: (id:
   const [title, setTitle] = useState('')
   const [color, setColor] = useState(COVERS[0])
   const [deadline, setDeadline] = useState('')
+  const [genre, setGenre] = useState('')
   const [busy, setBusy] = useState(false)
   const create = async (file?: File) => {
     setBusy(true)
-    const id = await createStory({ title, file, color, deadline })
+    const id = await createStory({ title, file, color, deadline, genre })
     setBusy(false)
     onClose()
     onCreated(id)
@@ -152,6 +153,10 @@ function NewStory({ onClose, onCreated }: { onClose: () => void; onCreated: (id:
         <label>
           <span className="field-label">Название</span>
           <input className="input" autoFocus value={title} placeholder="Как она называется?" onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void create()} />
+        </label>
+        <label>
+          <span className="field-label">Жанр</span>
+          <input className="input" value={genre} placeholder="Например, «Фэнтези»" onChange={(e) => setGenre(e.target.value)} />
         </label>
         <div>
           <span className="field-label">Цвет обложки</span>
