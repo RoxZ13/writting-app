@@ -31,6 +31,11 @@ describe('import', () => {
     expect(chapters[1].scenes[0].wordCount).toBe(4)
   })
 
+  it('treats long separator lines as scene breaks', () => {
+    const chapters = blocksToChapters(textToBlocks('Глава 1\nРаз.\n**********************************\nДва.'))
+    expect(chapters[0].scenes.map((s) => s.title)).toEqual(['Раз', 'Два'])
+  })
+
   it('keeps Ficbook italics', () => {
     expect(parseTaggedRuns('Он сказал <i>тихо</i>.')).toEqual([
       { text: 'Он сказал ' },

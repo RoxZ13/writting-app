@@ -23,7 +23,7 @@ export interface ImportedChapter {
 const NUMBERED_RE =
   /^\s*(глава|часть|chapter|part)\s*[№#]?\s*(\d+|[IVXLCDM]+(?![a-z])|(перв|втор|трет|четв[её]рт|пят|шест|седьм|восьм|девят|десят|одиннадцат|двенадцат|one|two|three|four|five|six|seven|eight|nine|ten)[\p{L}]*)/iu
 const NAMED_RE = /^\s*(пролог|эпилог|интерлюдия|prologue|epilogue|interlude)(?![\p{L}])/iu
-const SCENE_BREAK_RE = /^\s*([*•·~#—–-]\s*){1,5}\s*$|^\s*(\*\s*){3}\s*$/
+const SCENE_BREAK_RE = /^[\s*•·~#—–_=-]+$/
 
 export const isChapterTitle = (s: string) =>
   s.trim().length > 0 && s.trim().length < 100 && (NUMBERED_RE.test(s) || NAMED_RE.test(s))
