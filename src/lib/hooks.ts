@@ -85,3 +85,12 @@ export function sceneLabel(data: ProjectData, sceneId: string | undefined): stri
   const ci = data.chapterIndex.get(s.chapterId)
   return `${ci !== undefined ? `Гл. ${ci + 1} · ` : ''}${s.title}`
 }
+
+/** How to name a chapter in breadcrumbs: its own title if it already says "Часть 2", otherwise "Глава N · title". */
+export function chapterLabel(data: ProjectData, chapterId: string, short = false): string {
+  const c = data.chapterById.get(chapterId)
+  const n = (data.chapterIndex.get(chapterId) ?? 0) + 1
+  if (!c) return short ? `Гл. ${n}` : `Глава ${n}`
+  if (/^\s*(глава|часть|пролог|эпилог|интерлюдия)/i.test(c.title)) return c.title
+  return short ? `Гл. ${n}` : `Глава ${n} · ${c.title}`
+}

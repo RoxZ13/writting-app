@@ -4,6 +4,7 @@ import { markerStatus, useProjectData, useProjects, type ProjectData } from './l
 import { go, useRoute, type Route } from './lib/router'
 import { getCurrentProjectId, returnFocus, setCurrentProjectId } from './lib/session'
 import { Toaster } from './lib/ui'
+import { Icon } from './components/Icon'
 import { QuickCapture } from './components/QuickCapture'
 import { HomeView } from './views/HomeView'
 import { PlanView } from './views/PlanView'
@@ -14,11 +15,11 @@ import { WriteView } from './views/WriteView'
 import { Welcome } from './views/Welcome'
 
 const NAV: { view: Exclude<Route['view'], 'write'>; label: string; ico: string }[] = [
-  { view: 'home', label: 'Сейчас', ico: '◎' },
-  { view: 'plan', label: 'План', ico: '▦' },
-  { view: 'markers', label: 'Маячки', ico: '✦' },
-  { view: 'inbox', label: 'Входящие', ico: '☰' },
-  { view: 'settings', label: 'Ещё', ico: '⚙' },
+  { view: 'home', label: 'Сейчас', ico: 'now' },
+  { view: 'plan', label: 'План', ico: 'plan' },
+  { view: 'markers', label: 'Маячки', ico: 'markers' },
+  { view: 'inbox', label: 'Входящие', ico: 'inbox' },
+  { view: 'settings', label: 'Настройки', ico: 'settings' },
 ]
 
 export function App() {
@@ -94,7 +95,7 @@ export function App() {
             )}
           </main>
           <button className="fab" title="Быстро записать мысль (Ctrl/⌘ + J)" onClick={() => setCapture(true)}>
-            ✎
+            <Icon name="pen" size={22} />
           </button>
         </div>
       )}
@@ -121,17 +122,23 @@ function TopBar({ data, route, sync }: { data: ProjectData; route: Route; sync: 
             ? `Ошибка синхронизации: ${sync.message}`
             : 'Сохраняется только на этом устройстве'
   return (
-    <header className="topbar">
-      <div className="logo">
-        Manuscript<span>.</span>
+    <header className="sidebar">
+      <div className="brand">
+        <div className="logo">Manuscript.</div>
+        <div className="tagline">The writer’s studio</div>
       </div>
-      <span className="sync-dot" data-state={sync.state} title={syncTitle} />
-      <div className="project-name">{data.project.title}</div>
+      <div className="side-project" title={syncTitle}>
+        <span className="sync-dot" data-state={sync.state} />
+        <span className="project-name">{data.project.title}</span>
+      </div>
+      <div className="side-label">Menu</div>
       <nav className="nav">
         {NAV.map((n) => (
           <button key={n.view} aria-current={route.view === n.view ? 'page' : undefined} onClick={() => go({ view: n.view })}>
-            <span className="ico">{n.ico}</span>
-            {n.label}
+            <span className="ico">
+              <Icon name={n.ico} />
+            </span>
+            <span className="nav-label">{n.label}</span>
             {n.view === 'inbox' && inbox > 0 && <span className="badge">{inbox}</span>}
             {n.view === 'markers' && alarming > 0 && <span className="badge">{alarming}</span>}
           </button>

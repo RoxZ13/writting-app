@@ -157,7 +157,7 @@ function ChapterHeader({
       </button>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
-          {!/^\s*глава\b/i.test(chapter.title) && <span className="chapter-num">Глава {number}</span>}
+          {!/^\s*(глава|часть|пролог|эпилог|интерлюдия)/i.test(chapter.title) && <span className="chapter-num">Глава {number}</span>}
           <InlineEdit className="chapter-title" value={chapter.title} onSave={(title) => void patch<Chapter>('chapters', chapter.id, { title })} />
         </div>
         <InlineEdit
@@ -304,7 +304,7 @@ function ArrangeChapter({ data, chapter }: { data: ProjectData; chapter: Chapter
   const { setNodeRef, transform, transition } = useSortable({ id: chapter.id, disabled: true })
   return (
     <div ref={setNodeRef} className="arrange-chapter" style={{ transform: CSS.Transform.toString(transform), transition }}>
-      {/^\s*глава\b/i.test(chapter.title) ? chapter.title : `Глава ${(data.chapterIndex.get(chapter.id) ?? 0) + 1} · ${chapter.title}`}
+      {/^\s*(глава|часть|пролог|эпилог|интерлюдия)/i.test(chapter.title) ? chapter.title : `Глава ${(data.chapterIndex.get(chapter.id) ?? 0) + 1} · ${chapter.title}`}
     </div>
   )
 }

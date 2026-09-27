@@ -86,6 +86,16 @@ export function SettingsView({
           <span className="field-label">Название текущей</span>
           <InlineEdit className="input" value={data.project.title} onSave={(title) => void patch<Project>('projects', data.project.id, { title })} />
         </label>
+        <label>
+          <span className="field-label">О книге</span>
+          <InlineEdit
+            className="input"
+            multiline
+            placeholder="Фандом, пэйринг, аннотация — что угодно"
+            value={data.project.description ?? ''}
+            onSave={(description) => void patch<Project>('projects', data.project.id, { description })}
+          />
+        </label>
         {projects.length > 1 && (
           <div className="stack" style={{ gap: 4 }}>
             <span className="field-label">Переключиться</span>
@@ -113,7 +123,7 @@ export function SettingsView({
             className="btn ghost sm"
             style={{ color: 'var(--accent)' }}
             onClick={() => {
-              if (prompt(`Чтобы удалить «${data.project.title}», напиши её название:`) === data.project.title) {
+              if (confirm(`Удалить историю «${data.project.title}» со всеми главами и заметками?`)) {
                 void remove('projects', data.project.id)
               }
             }}

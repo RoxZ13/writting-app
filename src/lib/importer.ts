@@ -238,3 +238,27 @@ export async function readFileAsBlocks(file: File): Promise<Block[]> {
   if (name.endsWith('.html') || name.endsWith('.htm')) return htmlToBlocks(await file.text())
   return textToBlocks(await file.text())
 }
+
+export interface ImportedBook {
+  /** Book title guessed from the file header, if there is one. */
+  title?: string
+  /** Everything before the first chapter heading (title, fandom, summary…), as plain text. */
+  preface: string
+  chapters: ImportedChapter[]
+}
+
+/**
+ * Like blocksToChapters, but text before the first chapter heading is treated as the book's
+ * header, not as a chapter — as long as the file has chapter headings at all.
+ */
+export function parseBook(blocks: Block[]): ImportedBook {
+  const first = blocks.findIndex((b) => b.kind === 'heading')
+  if (first <= 0) return { preface: '', chapters: blocksToChapters(blocks) }
+  const head = blocks
+    .slice(0, first)
+    .filter((b): b is Extract<Block, { kind: 'para' }> => b.kind === 'para')
+    .map((b) => b.runs.map((r) => r.text).join('').trim())
+    .filter(Boolean)
+  const title = head[0] && head[0].length <= 80 ? head[0] : undefined
+  return { title, preface: head.join('\n'), chapters: blocksToChapters(blocks.slice(first)) }
+}

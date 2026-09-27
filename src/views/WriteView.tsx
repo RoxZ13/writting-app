@@ -7,7 +7,7 @@ import { MarkerCard } from '../components/MarkerCard'
 import { ScenePicker } from '../components/ScenePicker'
 import { SceneBrief, updateBeats } from '../components/SceneBrief'
 import { SceneEditor, type SelectionAction } from '../components/SceneEditor'
-import { markerStatus, sceneLabel, type ProjectData } from '../lib/hooks'
+import { chapterLabel, markerStatus, sceneLabel, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { session } from '../lib/session'
 import { MARKER_STATES, statusOf } from '../lib/status'
@@ -87,7 +87,6 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
     )
   }
 
-  const chapterNo = (data.chapterIndex.get(scene.chapterId) ?? 0) + 1
   const st = statusOf(scene.status)
   const cls = ['write', panels.nav && 'nav-open', panels.brief && 'brief-open', focus && 'focus dim', typing && 'typing'].filter(Boolean).join(' ')
 
@@ -138,7 +137,7 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
             ☰
           </button>
           <div className="crumbs">
-            <span style={{ whiteSpace: 'nowrap' }}>Гл. {chapterNo} ›</span>
+            <span style={{ whiteSpace: 'nowrap' }}>{chapterLabel(data, scene.chapterId, true)} ›</span>
             <InlineEdit value={scene.title} onSave={(title) => void patch<Scene>('scenes', scene.id, { title })} />
           </div>
           <span className="chip hide-sm" style={{ flex: 'none' }}>
