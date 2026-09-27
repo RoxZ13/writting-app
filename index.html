@@ -14,6 +14,28 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // If the app fails to start, show why instead of a blank page.
+      window.__bootErrors = []
+      window.addEventListener('error', function (e) {
+        window.__bootErrors.push(e.message || (e.target && e.target.src ? 'Не загрузился файл: ' + e.target.src : 'ошибка'))
+      }, true)
+      window.addEventListener('unhandledrejection', function (e) {
+        window.__bootErrors.push(String(e.reason && e.reason.message || e.reason))
+      })
+      setTimeout(function () {
+        var root = document.getElementById('root')
+        if (root && root.getAttribute('data-ready')) return
+        root.innerHTML =
+          '<div style="font-family:system-ui,sans-serif;max-width:520px;margin:15vh auto;padding:0 16px;color:#1c1c1e">' +
+          '<h2 style="margin:0 0 8px">Manuscript не запустился</h2>' +
+          '<p style="color:#545458">Сделай скриншот этого экрана и отправь его — по нему видно, что сломалось.</p>' +
+          '<pre style="white-space:pre-wrap;background:#f2f2f4;padding:12px;border-radius:8px;font-size:13px">' +
+          (window.__bootErrors.join('\n') || 'Ошибок нет, но приложение не ответило за 10 секунд.') +
+          '\n\n' + navigator.userAgent + '</pre>' +
+          '<button onclick="location.reload()" style="padding:8px 14px;border-radius:8px;border:1px solid #ccc;background:#fff">Перезагрузить</button></div>'
+      }, 10000)
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

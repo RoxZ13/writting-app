@@ -28,6 +28,12 @@ export function App() {
   const [capture, setCapture] = useState(false)
   const [sync, setSync] = useState<SyncStatus>(getSyncStatus)
 
+  // Tell the boot watchdog in index.html that storage answered and the app is alive.
+  useEffect(() => {
+    if (projects !== undefined) document.getElementById('root')?.setAttribute('data-ready', '1')
+  }, [projects])
+
+
   useEffect(() => {
     startCloudSync()
     return onSyncStatus(setSync)
@@ -61,7 +67,9 @@ export function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  if (projects === undefined || (projects.length > 0 && data === undefined)) return null
+  if (projects === undefined || (projects.length > 0 && data === undefined)) {
+    return <div className="empty" style={{ paddingTop: '30vh' }}>Открываю…</div>
+  }
   if (!projects.length || !data) return <Welcome onCreated={selectProject} sync={sync} />
 
   const closeCapture = () => {
