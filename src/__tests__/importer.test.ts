@@ -26,7 +26,7 @@ describe('import', () => {
       'Текст второй главы.',
     ].join('\n')
     const chapters = blocksToChapters(textToBlocks(text))
-    expect(chapters.map((c) => c.title)).toEqual(['Глава 1', 'Глава 1', 'Глава 2'])
+    expect(chapters.map((c) => c.title)).toEqual(['Начало (до первой главы)', 'Глава 1', 'Глава 2'])
     expect(chapters[1].scenes).toHaveLength(2)
     expect(chapters[1].scenes[0].wordCount).toBe(4)
   })
@@ -34,6 +34,22 @@ describe('import', () => {
   it('treats long separator lines as scene breaks', () => {
     const chapters = blocksToChapters(textToBlocks('Глава 1\nРаз.\n**********************************\nДва.'))
     expect(chapters[0].scenes.map((s) => s.title)).toEqual(['Раз', 'Два'])
+  })
+
+  it('reads Ficbook .txt part markers', () => {
+    const text = [
+      'Геката Сотейра',
+      '========== Часть 1 ==========',
+      'Jimmy Eat World — Pain',
+      'Текст.',
+      '— Заткнись, Тео. Муффлиато!',
+      '========== Часть 2 ==========',
+      'Serj Tankian — Your Mom',
+      '— Часть 2 плана провалилась, — сказала она.',
+    ].join('\n')
+    const chapters = blocksToChapters(textToBlocks(text))
+    expect(chapters.map((c) => c.title)).toEqual(['Начало (до первой главы)', 'Часть 1', 'Часть 2'])
+    expect(chapters[2].scenes[0].wordCount).toBe(10)
   })
 
   it('keeps Ficbook italics', () => {

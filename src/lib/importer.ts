@@ -27,6 +27,21 @@ const SCENE_BREAK_RE = /^[\s*•·~#—–_=-]+$/
 
 export const isChapterTitle = (s: string) =>
   s.trim().length > 0 && s.trim().length < 100 && (NUMBERED_RE.test(s) || NAMED_RE.test(s))
+const DECOR = '[\\s=*#~_—–-]'
+const DECORATED_RE = new RegExp(`^${DECOR}{2,}(.+?)${DECOR}{2,}$`)
+
+/**
+ * A chapter heading, possibly framed by decoration like "===== Часть 2 =====" (Ficbook .txt export).
+ * Returns the clean title, or null. Unframed lines must look like a heading on their own,
+ * so a line of dialogue such as "— Часть 2 плана…" is never mistaken for one.
+ */
+export function chapterTitleOf(line: string): string | null {
+  const t = line.trim()
+  const framed = t.match(DECORATED_RE)?.[1]?.trim()
+  if (framed && isChapterTitle(framed)) return framed
+  return isChapterTitle(t) ? t : null
+}
+
 export const isSceneBreak = (s: string) => s.trim().length > 0 && SCENE_BREAK_RE.test(s)
 
 /** Plain text (txt / pasted from Google Docs or Ficbook) → blocks. */
@@ -38,7 +53,7 @@ export function textToBlocks(raw: string): Block[] {
     const t = line.trim()
     if (!t) continue
     if (isSceneBreak(t) || /^<center>\s*[*•—-]/i.test(t)) blocks.push({ kind: 'break' })
-    else if (isChapterTitle(t)) blocks.push({ kind: 'heading', text: t })
+    else if (chapterTitleOf(t)) blocks.push({ kind: 'heading', text: chapterTitleOf(t)! })
     else blocks.push({ kind: 'para', runs: parseTaggedRuns(t) })
   }
   return blocks
@@ -118,7 +133,7 @@ export function htmlToBlocks(html: string): Block[] {
       const text = runs.map((r) => r.text).join('').trim()
       if (!text) return
       if (isSceneBreak(text)) blocks.push({ kind: 'break' })
-      else if (isChapterTitle(text) && text.length < 80) blocks.push({ kind: 'heading', text })
+      else if (chapterTitleOf(text) && text.length < 80) blocks.push({ kind: 'heading', text: chapterTitleOf(text)! })
       else blocks.push({ kind: 'para', runs: mergeRuns(runs) })
       return
     }
@@ -169,7 +184,7 @@ function runsToInline(runs: Run[]): PMNode[] {
  * Split blocks into chapters (by chapter-like headings) and scenes (by `* * *` breaks).
  * Text before the first heading becomes its own chapter so nothing is lost.
  */
-export function blocksToChapters(blocks: Block[], fallbackTitle = 'Глава 1'): ImportedChapter[] {
+export function blocksToChapters(blocks: Block[], fallbackTitle = 'Начало (до первой главы)'): ImportedChapter[] {
   const chapters: ImportedChapter[] = []
   let chapter: ImportedChapter | null = null
   let paras: Run[][] = []
