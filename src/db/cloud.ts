@@ -140,17 +140,29 @@ export function startCloudSync() {
   void syncNow()
 }
 
-export async function signIn(email: string, password: string, createAccount: boolean) {
+/** Returns 'confirm' when the account was created but the email still has to be confirmed. */
+export async function signIn(email: string, password: string, createAccount: boolean): Promise<'ok' | 'confirm'> {
   const sb = await getClient()
   if (!sb) throw new Error('Облако не настроено')
-  const { error } = createAccount
-    ? await sb.auth.signUp({ email, password })
+  const { data, error } = createAccount
+    ? await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname } })
     : await sb.auth.signInWithPassword({ email, password })
-  if (error) throw error
+  if (error) throw new Error(humanAuthError(error.message))
+  if (!data.session) return 'confirm'
   // First sign-in on this device: upload everything written here, then download the rest.
   await resetSyncCursor()
   await queueEverything()
   await syncNow()
+  return 'ok'
+}
+
+function humanAuthError(msg: string): string {
+  if (/invalid login credentials/i.test(msg)) return 'Неверная почта или пароль'
+  if (/already registered/i.test(msg)) return 'Такая почта уже зарегистрирована — нажми «Войти»'
+  if (/email not confirmed/i.test(msg)) return 'Почта ещё не подтверждена — открой письмо и нажми ссылку'
+  if (/password should be at least/i.test(msg)) return 'Пароль — минимум 6 символов'
+  if (/failed to fetch|network/i.test(msg)) return 'Нет связи с сервером. Всё сохранено на устройстве — попробуй позже'
+  return msg
 }
 
 export async function signOut() {

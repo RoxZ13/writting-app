@@ -4,6 +4,8 @@ import type { Editor } from '@tiptap/react'
 export const session: {
   sceneId?: string
   editor?: Editor | null
+  /** Text to select once the next scene opens (from book search). */
+  find?: string
 } = {}
 
 export function returnFocus() {

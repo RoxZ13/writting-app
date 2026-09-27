@@ -3,10 +3,11 @@ import { getSyncStatus, onSyncStatus, startCloudSync, type SyncStatus } from './
 import { markerStatus, useProjectData, useProjects, type ProjectData } from './lib/hooks'
 import { tidyImportedScenes } from './db/repo'
 import { go, useRoute, type Route } from './lib/router'
-import { getCurrentProjectId, returnFocus, setCurrentProjectId } from './lib/session'
+import { getCurrentProjectId, hotkey, returnFocus, setCurrentProjectId } from './lib/session'
 import { Toaster } from './lib/ui'
 import { Icon } from './components/Icon'
 import { QuickCapture } from './components/QuickCapture'
+import { SearchModal } from './components/SearchModal'
 import { BoardView } from './views/BoardView'
 import { CharactersView } from './views/CharactersView'
 import { InboxView } from './views/InboxView'
@@ -29,6 +30,7 @@ export function App() {
   const projects = useProjects()
   const [projectId, setProjectId] = useState(getCurrentProjectId)
   const [capture, setCapture] = useState(false)
+  const [searching, setSearching] = useState(false)
   const [sync, setSync] = useState<SyncStatus>(getSyncStatus)
 
   // Tell the boot watchdog in index.html that storage answered and the app is alive.
@@ -66,6 +68,10 @@ export function App() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
         e.preventDefault()
         setCapture(true)
+      }
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+        e.preventDefault()
+        setSearching(true)
       }
     }
     window.addEventListener('keydown', onKey)
@@ -129,9 +135,9 @@ export function App() {
 
   return (
     <div className={`app app-${route.view}`}>
-      <AppHeader data={data} route={route} sync={sync} />
+      <AppHeader data={data} route={route} sync={sync} onSearch={() => setSearching(true)} />
       {route.view === 'text' && textScene && (
-        <WriteView key={textScene} data={data} sceneId={textScene} onCapture={() => setCapture(true)} />
+        <WriteView key={textScene} data={data} sceneId={textScene} onCapture={() => setCapture(true)} onSearch={() => setSearching(true)} />
       )}
       {route.view === 'text' && !textScene && (
         <main className="page">
@@ -158,12 +164,13 @@ export function App() {
         </button>
       )}
       {capture && <QuickCapture data={data} onClose={closeCapture} />}
+      {searching && <SearchModal data={data} onClose={() => setSearching(false)} />}
       <Toaster />
     </div>
   )
 }
 
-function AppHeader({ data, route, sync }: { data: ProjectData; route: Route; sync: SyncStatus }) {
+function AppHeader({ data, route, sync, onSearch }: { data: ProjectData; route: Route; sync: SyncStatus; onSearch: () => void }) {
   const inbox = data.notes.filter((n) => !n.archived && !n.sceneId && !n.used && !(n.characterIds ?? []).length).length
   const syncTitle =
     sync.state === 'ok'
@@ -200,6 +207,12 @@ function AppHeader({ data, route, sync }: { data: ProjectData; route: Route; syn
             <span className="tab-label">{t.label}</span>
           </button>
         ))}
+        <button className="tab-aux hide-on-phone" title={`Поиск по книге${hotkey(' (⌘/Ctrl + Shift + F)')}`} onClick={onSearch}>
+          <span className="tab-ico">
+            <Icon name="search" />
+          </span>
+          <span className="tab-label">Поиск</span>
+        </button>
         <button className="tab-aux" aria-current={route.view === 'inbox' ? 'page' : undefined} title="Входящие: быстрые мысли" onClick={() => go({ view: 'inbox' })}>
           <span className="tab-ico">
             <Icon name="inbox" />

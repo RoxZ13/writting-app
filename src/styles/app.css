@@ -3661,3 +3661,99 @@ main.page {
     bottom: calc(env(safe-area-inset-bottom) + 84px);
   }
 }
+
+/* ---------- step 3: search, margin notes, heroes ---------- */
+.search-input {
+  font-size: 18px;
+  padding: 14px 16px;
+}
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 55vh;
+  overflow-y: auto;
+}
+.search-hit {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border: 0;
+  background: none;
+  text-align: left;
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+.search-hit:hover {
+  background: var(--fill);
+}
+.hit-where {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink-3);
+}
+.hit-text {
+  font-family: var(--serif);
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+.hit-text mark {
+  background: color-mix(in srgb, #f5c542 45%, transparent);
+  color: var(--ink);
+  border-radius: 3px;
+  padding: 0 1px;
+}
+.cm {
+  background: color-mix(in srgb, #f5c542 30%, transparent);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.write.mode-write .cm {
+  background: none;
+  border-bottom: 1.5px dotted color-mix(in srgb, #d4a015 70%, transparent);
+}
+.write.typing .cm {
+  background: none;
+  border-bottom-color: transparent;
+}
+.pp-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+  border-radius: 10px;
+  background: color-mix(in srgb, #f5c542 16%, transparent);
+  font-size: 14px;
+}
+.pp-note-text {
+  flex: 1;
+  white-space: pre-wrap;
+}
+.pp-note .icon-btn {
+  width: 24px;
+  height: 24px;
+}
+.suggest {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  font-size: 14.5px;
+}
+.suggest > div {
+  flex: 1;
+  min-width: 240px;
+}
+.avatar.small {
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+}
+@media (max-width: 900px) {
+  .tabs .hide-on-phone {
+    display: none !important;
+  }
+}

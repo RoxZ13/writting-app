@@ -97,6 +97,7 @@ export function SyncSection({ sync }: { sync: SyncStatus }) {
   const [password, setPassword] = useState('')
   const [me, setMe] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [info, setInfo] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
@@ -182,10 +183,14 @@ export function SyncSection({ sync }: { sync: SyncStatus }) {
             onChange={(e) => setPassword(e.target.value)}
           />
           <div className="row">
-            <button className="btn primary" disabled={busy || !email || !password} onClick={() => void run(() => signIn(email, password, false))}>
+            <button className="btn primary" disabled={busy || !email || !password} onClick={() => void run(async () => void (await signIn(email, password, false)))}>
               Войти
             </button>
-            <button className="btn" disabled={busy || !email || password.length < 6} onClick={() => void run(() => signIn(email, password, true))}>
+            <button className="btn" disabled={busy || !email || password.length < 6} onClick={() =>
+                void run(async () => {
+                  if ((await signIn(email, password, true)) === 'confirm') setInfo('Готово! Открой письмо от Manuscript и нажми ссылку, потом вернись сюда и нажми «Войти».')
+                })
+              }>
               Создать аккаунт
             </button>
           </div>
@@ -194,7 +199,8 @@ export function SyncSection({ sync }: { sync: SyncStatus }) {
           </div>
         </>
       )}
-      {error && <div className="small" style={{ color: 'var(--accent)' }}>{error}</div>}
+      {info && <div className="small next-step">{info}</div>}
+      {error && <div className="small" style={{ color: 'var(--mk-hanging)' }}>{error}</div>}
       {cfg && (
         <button
           className="btn ghost sm"

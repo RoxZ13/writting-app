@@ -10,9 +10,11 @@ import { docParagraphs, docWordCount } from '../lib/text'
 import { makeExcerpt } from '../lib/importer'
 import { session } from '../lib/session'
 import { MarkerMark } from './MarkerMark'
+import { CommentMark } from './CommentMark'
+import { findInEditor } from '../lib/search'
 
 export interface SelectionAction {
-  kind: 'setup' | 'payoff'
+  kind: 'setup' | 'payoff' | 'comment'
   from: number
   to: number
   text: string
@@ -29,6 +31,7 @@ export function SceneEditor({
   onWords,
   onSelectionAction,
   onMarkerClick,
+  onCommentClick,
 }: {
   scene: Scene
   initial: SceneText
@@ -36,6 +39,7 @@ export function SceneEditor({
   onWords: (n: number) => void
   onSelectionAction: (a: SelectionAction) => void
   onMarkerClick: (markerId: string) => void
+  onCommentClick?: (noteId: string) => void
 }) {
   const pending = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const lastSavedAt = useRef(initial.updatedAt)
@@ -50,12 +54,19 @@ export function SceneEditor({
       Placeholder.configure({ placeholder: 'Начни с одной фразы. Остальное подтянется.' }),
       Focus.configure({ className: 'has-focus', mode: 'deepest' }),
       MarkerMark,
+      CommentMark,
     ],
     content: initial.content as object,
     editorProps: {
       attributes: { spellcheck: 'true', lang: 'ru', 'aria-label': 'Текст сцены' },
       handleClickOn: (_view, _pos, _node, _nodePos, event) => {
-        const el = (event.target as HTMLElement).closest('[data-marker]')
+        const target = event.target as HTMLElement
+        const note = target.closest('[data-comment]')
+        if (note) {
+          onCommentClick?.(note.getAttribute('data-comment')!)
+          return false
+        }
+        const el = target.closest('[data-marker]')
         if (el) onMarkerClick(el.getAttribute('data-marker')!)
         return false
       },
@@ -102,6 +113,11 @@ export function SceneEditor({
     const pos = Math.min(scene.lastPos ?? editor.state.doc.content.size, editor.state.doc.content.size - 1)
     editor.commands.setTextSelection(Math.max(1, pos))
     requestAnimationFrame(() => {
+      if (session.find) {
+        const q = session.find
+        session.find = undefined
+        if (findInEditor(editor, q)) return
+      }
       if (matchMedia('(pointer: fine)').matches) editor.commands.focus(undefined, { scrollIntoView: true })
       else editor.commands.scrollIntoView()
     })
@@ -162,6 +178,9 @@ export function SceneEditor({
           </button>
           <button onClick={() => act('payoff')} title="Отметить, что здесь раскрывается маячок">
             ◎ Раскрытие
+          </button>
+          <button onClick={() => act('comment')} title="Заметка на полях к этому месту">
+            ✎ Заметка
           </button>
         </div>
       </BubbleMenu>

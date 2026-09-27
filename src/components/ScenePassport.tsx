@@ -70,7 +70,8 @@ export function ScenePassport({
   const quotes = unusedLines(data, people)
   const done = scene.beats.filter((b) => b.done).length
   const next = scene.beats.find((b) => !b.done)
-  const empty = !scene.goal && !scene.beats.length && !markerCount && !people.length
+  const notes = data.notes.filter((n) => n.sceneId === scene.id && !n.archived && n.kind !== 'quote' && n.kind !== 'dialogue')
+  const empty = !scene.goal && !scene.beats.length && !markerCount && !people.length && !notes.length
 
   // Opening an empty passport lands in the first field, so typing never goes into the manuscript.
   useEffect(() => {
@@ -103,6 +104,7 @@ export function ScenePassport({
                 ✦ {markerCount}
               </span>
             )}
+            {notes.length > 0 && <span title="Заметки на полях">✎ {notes.length}</span>}
             <Faces data={data} ids={people} max={3} />
           </span>
         </button>
@@ -147,6 +149,20 @@ export function ScenePassport({
             <RefChips data={data} sceneId={scene.id} field="characterIds" selected={people} />
             {quotes.length > 0 && <Quotes data={data} scene={scene} editor={editor} quotes={quotes} />}
           </div>
+
+          {notes.length > 0 && (
+            <div className="pp-section">
+              <h4>Заметки на полях</h4>
+              {notes.map((n) => (
+                <div key={n.id} className="pp-note">
+                  <span className="pp-note-text">{n.text}</span>
+                  <button className="icon-btn" title="Сделано" onClick={() => void patch<Note>('notes', n.id, { archived: true })}>
+                    ✓
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <More data={data} scene={scene} editor={editor} />
         </div>
@@ -234,10 +250,9 @@ function Quotes({ data, scene, editor, quotes }: { data: ProjectData; scene: Sce
 
 function More({ data, scene, editor }: { data: ProjectData; scene: Scene; editor: Editor | null }) {
   const chapter = data.chapterById.get(scene.chapterId)
-  const notes = data.notes.filter((n) => n.sceneId === scene.id && !n.archived && n.kind !== 'quote' && n.kind !== 'dialogue')
   return (
     <details className="pp-more">
-      <summary>Ещё: ветки, глава, заметки, версии</summary>
+      <summary>Ещё: ветки, глава, версии</summary>
       <div className="stack" style={{ gap: 16, marginTop: 12 }}>
         <div>
           <h4>Ветки</h4>
@@ -247,20 +262,6 @@ function More({ data, scene, editor }: { data: ProjectData; scene: Scene; editor
           <div>
             <h4>{chapter.title}</h4>
             <div className="small muted">{chapter.goal || 'Цель главы не записана — её можно задать на доске.'}</div>
-          </div>
-        )}
-        {notes.length > 0 && (
-          <div>
-            <h4>Заметки к сцене</h4>
-            {notes.map((n) => (
-              <div key={n.id} className="row small" style={{ alignItems: 'flex-start', flexWrap: 'nowrap', padding: '4px 0' }}>
-                <span className="muted">{noteKind(n.kind).label}</span>
-                <span style={{ flex: 1, whiteSpace: 'pre-wrap' }}>{n.text}</span>
-                <button className="icon-btn" title="Разобрано" onClick={() => void patch<Note>('notes', n.id, { archived: true })}>
-                  ✓
-                </button>
-              </div>
-            ))}
           </div>
         )}
         <label>
