@@ -5,10 +5,11 @@ import './styles/app.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
-import { applyTextSize, applyTheme, getTextSize, getTheme } from './lib/session'
+import { applyTextFont, applyTextSize, applyTheme, getTextFont, getTextSize, getTheme } from './lib/session'
 
 applyTheme(getTheme())
 applyTextSize(getTextSize())
+applyTextFont(getTextFont())
 navigator.storage?.persist?.().catch(() => {})
 
 createRoot(document.getElementById('root')!).render(

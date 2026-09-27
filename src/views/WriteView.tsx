@@ -17,8 +17,7 @@ import { InlineEdit, Modal, toast } from '../lib/ui'
 const PANELS_KEY = 'manuscript.panels'
 function loadPanels(): { nav: boolean; brief: boolean } {
   try {
-    const wide = matchMedia('(min-width: 1001px)').matches
-    return { nav: false, brief: wide, ...JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}') }
+    return { nav: false, brief: false, ...JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}') }
   } catch {
     return { nav: false, brief: false }
   }
@@ -33,6 +32,24 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
   const [editor, setEditor] = useState<Editor | null>(null)
   const [action, setAction] = useState<SelectionAction | null>(null)
   const [openMarker, setOpenMarker] = useState<string | null>(null)
+  const [typing, setTyping] = useState(false)
+
+  // While typing, everything around the text fades out; moving the mouse or touching brings it back.
+  useEffect(() => {
+    const wake = () => setTyping(false)
+    const onKey = (e: KeyboardEvent) => {
+      const inEditor = (e.target as HTMLElement | null)?.closest?.('.ProseMirror')
+      if (inEditor && !e.metaKey && !e.ctrlKey && e.key.length === 1) setTyping(true)
+    }
+    window.addEventListener('keydown', onKey)
+    window.addEventListener('mousemove', wake)
+    window.addEventListener('touchstart', wake)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('mousemove', wake)
+      window.removeEventListener('touchstart', wake)
+    }
+  }, [])
 
   // Remember where the author is — this powers "Continue" on every device.
   useEffect(() => {
@@ -72,7 +89,7 @@ export function WriteView({ data, sceneId, onCapture }: { data: ProjectData; sce
 
   const chapterNo = (data.chapterIndex.get(scene.chapterId) ?? 0) + 1
   const st = statusOf(scene.status)
-  const cls = ['write', panels.nav && 'nav-open', panels.brief && 'brief-open', focus && 'focus dim'].filter(Boolean).join(' ')
+  const cls = ['write', panels.nav && 'nav-open', panels.brief && 'brief-open', focus && 'focus dim', typing && 'typing'].filter(Boolean).join(' ')
 
   const finishSession = () => {
     go({ view: 'home' })

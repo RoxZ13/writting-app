@@ -14,8 +14,8 @@ export default defineConfig({
         short_name: 'Manuscript',
         description: 'Рабочий стол автора: сюжет, сцены и маячки в одном месте.',
         lang: 'ru',
-        theme_color: '#f6f1e7',
-        background_color: '#f6f1e7',
+        theme_color: '#ffffff',
+        background_color: '#ffffff',
         display: 'standalone',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },

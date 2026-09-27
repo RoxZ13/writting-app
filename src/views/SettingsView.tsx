@@ -14,7 +14,16 @@ import { ImportPanel } from '../components/ImportPanel'
 import { chapterToFicbook, download, exportDocx, type ExportChapter } from '../lib/exporter'
 import type { ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
-import { applyTextSize, applyTheme, getTextSize, getTheme, type Theme } from '../lib/session'
+import {
+  applyTextFont,
+  applyTextSize,
+  applyTheme,
+  getTextFont,
+  getTextSize,
+  getTheme,
+  type TextFont,
+  type Theme,
+} from '../lib/session'
 import { timeAgo } from '../lib/status'
 import { InlineEdit, toast } from '../lib/ui'
 
@@ -41,6 +50,7 @@ export function SettingsView({
 }) {
   const [theme, setTheme] = useState<Theme>(getTheme)
   const [size, setSize] = useState(getTextSize)
+  const [font, setFont] = useState<TextFont>(getTextFont)
   const [ficChapter, setFicChapter] = useState(data.chapters[0]?.id ?? '')
 
   const exportWord = async () => {
@@ -170,6 +180,30 @@ export function SettingsView({
                 onClick={() => {
                   setTheme(t)
                   applyTheme(t)
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="row">
+          <span className="field-label" style={{ margin: 0, minWidth: 90 }}>
+            Шрифт текста
+          </span>
+          <div className="seg">
+            {(
+              [
+                ['serif', 'С засечками'],
+                ['sans', 'Без засечек'],
+              ] as [TextFont, string][]
+            ).map(([f, label]) => (
+              <button
+                key={f}
+                aria-pressed={font === f}
+                onClick={() => {
+                  setFont(f)
+                  applyTextFont(f)
                 }}
               >
                 {label}

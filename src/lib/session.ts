@@ -62,3 +62,22 @@ export function applyTextSize(px: number) {
   }
   document.documentElement.style.setProperty('--text-size', `${px}px`)
 }
+
+const FONT_KEY = 'manuscript.textFont'
+export type TextFont = 'serif' | 'sans'
+export function getTextFont(): TextFont {
+  try {
+    return localStorage.getItem(FONT_KEY) === 'sans' ? 'sans' : 'serif'
+  } catch {
+    return 'serif'
+  }
+}
+export function applyTextFont(f: TextFont) {
+  try {
+    localStorage.setItem(FONT_KEY, f)
+  } catch {
+    /* ignore */
+  }
+  if (f === 'sans') document.documentElement.dataset.font = 'sans'
+  else delete document.documentElement.dataset.font
+}
