@@ -35,6 +35,8 @@ export interface Project extends Base {
   dailyGoal?: number
   /** Planned length of the whole book, in words. */
   targetWords?: number
+  /** How many chapters the book will have — a landmark besides the deadline. */
+  targetChapters?: number
   /** Ficbook: a new chapter every N days. */
   publishEvery?: number
   /** The work's page on Ficbook; when empty, taken from the imported header. */

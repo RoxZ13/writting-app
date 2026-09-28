@@ -5,9 +5,11 @@ export interface Typo {
   width: 'narrow' | 'medium' | 'wide'
   leading: 'tight' | 'normal' | 'loose'
   para: 'gap' | 'indent'
+  /** «По центру»: the line being written stays in the middle of the screen, like a typewriter. */
+  typewriter: 'off' | 'on'
 }
 
-export const DEFAULT_TYPO: Typo = { font: 'serif', size: 18, width: 'medium', leading: 'normal', para: 'gap' }
+export const DEFAULT_TYPO: Typo = { font: 'serif', size: 18, width: 'medium', leading: 'normal', para: 'gap', typewriter: 'off' }
 
 const KEY = 'manuscript.typo'
 const WIDTH = { narrow: '560px', medium: '660px', wide: '800px' }
@@ -29,6 +31,7 @@ export function applyTypo(t: Typo) {
   root.setProperty('--measure', WIDTH[t.width])
   root.setProperty('--leading', LEADING[t.leading])
   document.documentElement.dataset.para = t.para
+  document.documentElement.dataset.typewriter = t.typewriter
   try {
     localStorage.setItem(KEY, JSON.stringify(t))
   } catch {

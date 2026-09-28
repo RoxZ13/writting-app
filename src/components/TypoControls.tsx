@@ -83,6 +83,16 @@ export function TypoControls() {
           ['indent', 'Красная строка'],
         ]}
       />
+      <Choice
+        label="Строка"
+        k="typewriter"
+        t={t}
+        set={set}
+        options={[
+          ['off', 'Как обычно'],
+          ['on', 'По центру экрана'],
+        ]}
+      />
       <button className="link small" style={{ alignSelf: 'flex-start' }} onClick={() => set(DEFAULT_TYPO)}>
         Сбросить
       </button>

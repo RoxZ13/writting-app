@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Project } from '../db/db'
-import { dayKey, pace } from '../lib/pace'
+import { chapterProgress, dayKey, pace } from '../lib/pace'
 
 const DAY = 86400000
 const now = new Date('2026-10-01T15:00:00').getTime()
@@ -25,5 +25,24 @@ describe('pace', () => {
     const r = pace(project({}), 1000, now)
     expect(r.perDay).toBe(0)
     expect(r.remaining).toBeUndefined()
+  })
+})
+
+describe('chapter landmark', () => {
+  const chapters = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'pool', pool: true }]
+  const scenes = [
+    { chapterId: 'a', wordCount: 900 },
+    { chapterId: 'b', wordCount: 400 },
+    { chapterId: 'b', wordCount: 0 },
+    { chapterId: 'pool', wordCount: 50 },
+  ]
+  it('counts chapters where every scene has text, out of the planned total', () => {
+    const r = chapterProgress(project({ targetChapters: 20, deadline: '2026-10-31' }), chapters, scenes, now)
+    expect([r.written, r.total, r.left]).toEqual([1, 20, 19])
+    expect(r.daysPerChapter).toBe(1) // 31 days for 19 chapters
+  })
+  it('falls back to the chapters that exist, never counting the pool', () => {
+    const r = chapterProgress(project({}), chapters, scenes, now)
+    expect([r.written, r.total, r.left, r.daysPerChapter]).toEqual([1, 3, 2, undefined])
   })
 })

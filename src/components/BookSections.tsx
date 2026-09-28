@@ -8,7 +8,7 @@ const date = (d: Date | string) =>
   (typeof d === 'string' ? new Date(d + 'T12:00:00') : d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
 const num = (n: number) => n.toLocaleString('ru-RU')
 
-function NumberField({ value, placeholder, onSave }: { value?: number; placeholder: string; onSave: (v?: number) => void }) {
+export function NumberField({ value, placeholder, onSave }: { value?: number; placeholder: string; onSave: (v?: number) => void }) {
   return (
     <input
       className="input num-input"

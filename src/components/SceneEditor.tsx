@@ -76,9 +76,11 @@ export function SceneEditor({
     },
     onSelectionUpdate: ({ editor }) => {
       latest.current = editor.state
+      keepLineCentered(editor)
     },
     onUpdate: ({ editor }) => {
       latest.current = editor.state
+      keepLineCentered(editor)
       dirty.current = true
       clearTimeout(pending.current)
       pending.current = setTimeout(() => void flush(editor), 800)
@@ -191,4 +193,12 @@ export function SceneEditor({
       <EditorContent editor={editor} />
     </>
   )
+}
+
+/** Typewriter mode: keep the line being written a little above the middle of the screen. */
+function keepLineCentered(editor: Editor) {
+  if (document.documentElement.dataset.typewriter !== 'on' || !editor.view.hasFocus()) return
+  const { top } = editor.view.coordsAtPos(editor.state.selection.head)
+  const delta = top - window.innerHeight * 0.42
+  if (Math.abs(delta) > 6) window.scrollBy({ top: delta })
 }

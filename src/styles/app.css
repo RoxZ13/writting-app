@@ -4581,3 +4581,15 @@ main.page {
   opacity: 0;
   pointer-events: none;
 }
+
+/* Typewriter mode: room below the last line so it can reach the middle of the screen. */
+[data-typewriter='on'] .editor-area .editor-wrap {
+  padding-bottom: 55vh;
+}
+button.deadline {
+  border: 0;
+  cursor: pointer;
+}
+.chapters-landmark {
+  font-size: 15px;
+}

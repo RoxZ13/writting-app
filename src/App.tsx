@@ -20,6 +20,7 @@ import { BookView } from './views/BookView'
 import { HelpView } from './views/HelpView'
 import { LoreView } from './views/LoreView'
 import { deadlineText } from './lib/stories'
+import { chapterProgress } from './lib/pace'
 import { backupDue, downloadBackup, snoozeBackup } from './lib/backup'
 
 const TABS: { view: Route['view']; label: string; ico: string }[] = [
@@ -200,9 +201,7 @@ function AppHeader({ data, route, sync, onSearch }: { data: ProjectData; route: 
         </button>
         <span className="sync-dot" data-state={sync.state} title={syncTitle} />
         <MarkerStatus data={data} />
-        {deadlineText(data.project.deadline) && (
-          <span className={`deadline hide-sm ${deadlineText(data.project.deadline)!.late ? 'late' : ''}`}>⏳ {deadlineText(data.project.deadline)!.text}</span>
-        )}
+        <Landmark data={data} />
       </div>
       <nav className="tabs">
         {TABS.map((t) => (
@@ -287,5 +286,24 @@ function BackupReminder() {
         Позже
       </button>
     </div>
+  )
+}
+
+/** The quiet landmark in the header: the deadline, and how many chapters are left. */
+function Landmark({ data }: { data: ProjectData }) {
+  const due = deadlineText(data.project.deadline)
+  const cp = chapterProgress(data.project, data.chapters, data.scenes)
+  const chapters = (data.project.targetChapters || due) && cp.left > 0 ? `ещё ${cp.left} гл.` : ''
+  if (!due && !chapters) return null
+  return (
+    <button
+      className={`deadline hide-sm ${due?.late ? 'late' : ''}`}
+      title={`Написано ${cp.written} из ${cp.total} глав${cp.daysPerChapter ? ` · к дедлайну ≈ глава в ${cp.daysPerChapter} дн.` : ''}`}
+      onClick={() => go({ view: 'book' })}
+    >
+      {due ? `⏳ ${due.text}` : ''}
+      {due && chapters ? ' · ' : ''}
+      {chapters}
+    </button>
   )
 }

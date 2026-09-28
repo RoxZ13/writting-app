@@ -1,4 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks'
+import { chapterProgress } from '../lib/pace'
 import { useState } from 'react'
 import { db, type Project } from '../db/db'
 import { alive, patch, remove } from '../db/repo'
@@ -14,10 +15,14 @@ export function LibraryView({ projects, currentId, onOpen }: { projects: Project
   const stats = useLiveQuery(async () => {
     const scenes = alive(await db.scenes.toArray())
     const chapters = alive(await db.chapters.toArray())
-    const by: Record<string, { words: number; scenes: number; chapters: number }> = {}
-    for (const p of projects) by[p.id] = { words: 0, scenes: 0, chapters: 0 }
+    const by: Record<string, { words: number; scenes: number; chapters: number; written: number; total: number }> = {}
+    for (const p of projects) {
+      const own = chapters.filter((c) => c.projectId === p.id)
+      const ownScenes = scenes.filter((s) => s.projectId === p.id)
+      const cp = chapterProgress(p, own, ownScenes)
+      by[p.id] = { words: 0, scenes: 0, chapters: own.filter((c) => !c.pool).length, written: cp.written, total: cp.total }
+    }
     for (const s of scenes) if (by[s.projectId]) (by[s.projectId].words += s.wordCount), by[s.projectId].scenes++
-    for (const c of chapters) if (by[c.projectId]) by[c.projectId].chapters++
     return by
   }, [projects.map((p) => p.id).join()])
 
@@ -56,7 +61,7 @@ function StoryCard({
 }: {
   p: Project
   current: boolean
-  stats?: { words: number; scenes: number; chapters: number }
+  stats?: { words: number; scenes: number; chapters: number; written: number; total: number }
   onOpen: () => void
 }) {
   const dl = deadlineText(p.deadline)
@@ -120,7 +125,7 @@ function StoryCard({
         </div>
         {p.genre && <div className="story-meta">{p.genre}</div>}
         <div className="story-meta">
-          {stats ? `${stats.chapters} гл. · ${formatWords(stats.words)}` : '…'}
+          {stats ? `${stats.written} из ${stats.total} гл. · ${formatWords(stats.words)}` : '…'}
           {' · '}
           {timeAgo(p.updatedAt)}
         </div>

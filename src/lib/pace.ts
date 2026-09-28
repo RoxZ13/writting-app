@@ -87,3 +87,28 @@ export function pace(project: Project, totalWords: number, now = Date.now()): Pa
 }
 
 export const totalWords = (scenes: { wordCount: number }[]) => scenes.reduce((n, s) => n + (s.wordCount || 0), 0)
+
+/**
+ * Chapters as a landmark: a chapter counts as written when every scene in it has text.
+ * The total is the author's planned number, or the chapters that exist so far.
+ */
+export function chapterProgress(
+  project: Project,
+  chapters: { id: string; pool?: boolean }[],
+  scenes: { chapterId: string; wordCount: number }[],
+  now = Date.now(),
+) {
+  const real = chapters.filter((c) => !c.pool)
+  const written = real.filter((c) => {
+    const own = scenes.filter((s) => s.chapterId === c.id)
+    return own.length > 0 && own.every((s) => s.wordCount > 0)
+  }).length
+  const total = Math.max(project.targetChapters ?? real.length, written)
+  const left = total - written
+  let daysPerChapter: number | undefined
+  if (project.deadline && left > 0) {
+    const days = Math.ceil((new Date(project.deadline + 'T23:59:59').getTime() - now) / 86400000)
+    if (days > 0) daysPerChapter = Math.max(1, Math.floor(days / left))
+  }
+  return { written, total, left, planned: !!project.targetChapters, daysPerChapter }
+}

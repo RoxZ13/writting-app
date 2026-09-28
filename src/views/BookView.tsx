@@ -4,7 +4,8 @@ import { ImportPanel } from '../components/ImportPanel'
 import { BookCover } from '../components/BookCover'
 import { DateChip } from '../components/DateChip'
 import { coverFromClipboard, coverFromUrl, imageToCover, setCover, useCover } from '../lib/cover'
-import { PaceSection, PublishSection } from '../components/BookSections'
+import { NumberField, PaceSection, PublishSection } from '../components/BookSections'
+import { chapterProgress } from '../lib/pace'
 import { chapterToFicbook, download, exportDocx, type ExportChapter } from '../lib/exporter'
 import type { ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
@@ -27,6 +28,7 @@ export function BookView({ data }: { data: ProjectData }) {
   const set = (changes: Partial<Project>) => void patch<Project>('projects', p.id, changes)
   const words = data.scenes.reduce((n, s) => n + s.wordCount, 0)
   const cover = useCover(p.id)
+  const cp = chapterProgress(p, data.chapters, data.scenes)
 
   const exportWord = async () => download(await exportDocx(p.title, await loadChapters(data)), `${p.title}.docx`)
   const copyFicbook = async (chapterId: string) => {
@@ -74,6 +76,20 @@ export function BookView({ data }: { data: ProjectData }) {
             <div>
               <span className="field-label">Дедлайн</span>
               <DateChip value={p.deadline} empty="+ поставить дату" onChange={(deadline) => set({ deadline })} />
+            </div>
+            <div>
+              <span className="field-label">Главы</span>
+              <div className="chapters-landmark">
+                <strong>
+                  {cp.written} из {cp.total}
+                </strong>{' '}
+                написано{cp.left > 0 ? ` · осталось ${cp.left}` : ' · все'}
+                {cp.daysPerChapter && <span className="muted"> · к дедлайну ≈ глава в {cp.daysPerChapter} дн.</span>}
+              </div>
+              <label className="row small muted" style={{ gap: 8, marginTop: 6 }}>
+                всего будет
+                <NumberField value={p.targetChapters} placeholder={String(data.chapters.length)} onSave={(targetChapters) => set({ targetChapters })} />
+              </label>
             </div>
           </div>
         </div>
