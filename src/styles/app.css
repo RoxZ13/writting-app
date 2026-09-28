@@ -4511,3 +4511,9 @@ main.page {
   padding-left: 20px;
   line-height: 1.5;
 }
+.empty-hint {
+  padding: 10px 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+}
