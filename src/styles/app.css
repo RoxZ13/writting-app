@@ -3981,3 +3981,254 @@ main.page {
 .write.mode-edit .passport-wrap::after {
   background: linear-gradient(var(--bg), transparent);
 }
+
+/* =====================================================================
+   Planning on the board: essence, "Пока без места", key points, arc.
+   ===================================================================== */
+.essence-bar {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  width: 100%;
+  margin: 0 0 16px;
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  text-align: left;
+  font-size: 14px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.essence-bar.empty {
+  background: none;
+  box-shadow: none;
+  border: 1.5px dashed var(--line-2);
+  color: var(--ink-3);
+}
+.essence-k {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.essence-v {
+  margin-right: 14px;
+  max-width: 46ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.essence {
+  margin: 0 0 16px;
+  padding: 14px 18px 16px;
+}
+.essence-head {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.essence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.essence-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.essence-grid textarea {
+  font-size: 15px;
+  line-height: 1.45;
+  width: 100%;
+}
+@media (max-width: 760px) {
+  .essence-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+.column.pool {
+  flex-basis: 260px;
+  background: none;
+  border: 1.5px dashed var(--line-2);
+}
+.column.pool.over {
+  background: var(--fill);
+}
+.pool-title {
+  color: var(--ink-2);
+}
+.column.pool .column-meta {
+  line-height: 1.4;
+}
+
+.card-scene.node {
+  background: var(--ink);
+  color: var(--bg);
+}
+.card-scene.node .card-title,
+.card-scene.node .card-goal,
+.card-scene.node .card-excerpt,
+.card-scene.node .card-epigraph,
+.card-scene.node .card-foot {
+  color: color-mix(in srgb, var(--bg) 78%, transparent);
+}
+.card-scene.node .card-title {
+  color: var(--bg);
+}
+.card-scene.node .here {
+  background: var(--bg);
+  color: var(--ink);
+}
+.node-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+  opacity: 0.7;
+}
+
+.heat {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.heat button {
+  width: 12px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  position: relative;
+}
+.heat button::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.2;
+}
+.heat button.on::after {
+  opacity: 1;
+  background: var(--heat, #e5484d);
+}
+.card-scene .heat.unset {
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.card-scene:hover .heat.unset {
+  opacity: 1;
+}
+.heat.large button {
+  width: 22px;
+  height: 26px;
+}
+.heat.large button::after {
+  left: 5px;
+  top: 7px;
+  width: 12px;
+  height: 12px;
+}
+.heat-label {
+  margin-left: 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+@media (hover: none) {
+  .card-scene .heat.unset {
+    opacity: 0.6;
+  }
+}
+
+.arc {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 32px;
+  margin-top: 8px;
+}
+.arc-bar {
+  flex: 1;
+  max-width: 14px;
+  border-radius: 3px;
+  background: color-mix(in srgb, #e5484d 55%, transparent);
+}
+.arc-bar.node {
+  background: var(--ink);
+}
+.arc-bar.unset {
+  background: var(--line-2);
+}
+
+.sheet-plot {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+}
+.chip-toggle {
+  border: 1.5px solid var(--line-2);
+  background: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.chip-toggle.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+.sheet-heat {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sheet-where {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.sheet-where .select {
+  flex: 1;
+}
+
+.tl-chapter.pool {
+  background: none;
+  border: 1.5px dashed var(--line-2);
+}
+.tl-node {
+  width: 10px;
+  flex: none;
+  font-size: 12px;
+}
+.tl-scene.node .tl-name {
+  font-weight: 800;
+}
+.tl-heat {
+  flex: none;
+  font-size: 7px;
+  letter-spacing: 1px;
+  color: #e5484d;
+}
+.essence-bar {
+  width: fit-content;
+  max-width: min(100%, 1100px);
+}
+.essence {
+  max-width: 1100px;
+}

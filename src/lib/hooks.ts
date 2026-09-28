@@ -9,6 +9,8 @@ export interface ProjectData {
   scenes: Scene[]
   /** Scenes grouped by chapter, both in order. */
   outline: { chapter: Chapter; scenes: Scene[] }[]
+  /** "Пока без места": scenes without a chapter yet. Not in chapters / scenes / outline. */
+  pool: { chapter?: Chapter; scenes: Scene[] }
   markers: Marker[]
   notes: Note[]
   lines: Line[]
@@ -52,8 +54,10 @@ export function useProjectData(projectId: string | undefined): ProjectData | und
 
   return useMemo(() => {
     if (raw === undefined || raw === null) return raw
-    const chapters = [...raw.chapters].sort((a, b) => a.order - b.order)
-    const chapterById = new Map(chapters.map((c) => [c.id, c]))
+    const poolChapter = raw.chapters.find((c) => c.pool)
+    const chapters = raw.chapters.filter((c) => !c.pool).sort((a, b) => a.order - b.order)
+    const chapterById = new Map([...chapters, ...(poolChapter ? [poolChapter] : [])].map((c) => [c.id, c]))
+    const poolScenes = poolChapter ? raw.scenes.filter((s) => s.chapterId === poolChapter.id).sort((a, b) => a.order - b.order) : []
     const outline = chapters.map((chapter) => ({
       chapter,
       scenes: raw.scenes.filter((s) => s.chapterId === chapter.id).sort((a, b) => a.order - b.order),
@@ -66,7 +70,8 @@ export function useProjectData(projectId: string | undefined): ProjectData | und
       chapters,
       scenes,
       outline,
-      sceneById: new Map(scenes.map((s) => [s.id, s])),
+      pool: { chapter: poolChapter, scenes: poolScenes },
+      sceneById: new Map([...scenes, ...poolScenes].map((s) => [s.id, s])),
       chapterById,
       sceneIndex,
       chapterIndex,
@@ -136,6 +141,7 @@ export function chapterLabel(data: ProjectData, chapterId: string, short = false
 /** A scene's name: its own title, or "Сцена N" by position in its chapter. */
 export function sceneName(data: ProjectData, scene: Scene): string {
   if (scene.title.trim()) return scene.title
-  const n = data.scenes.filter((s) => s.chapterId === scene.chapterId).indexOf(scene) + 1
+  const siblings = scene.chapterId === data.pool.chapter?.id ? data.pool.scenes : data.scenes.filter((s) => s.chapterId === scene.chapterId)
+  const n = siblings.indexOf(scene) + 1
   return `Сцена ${n || ''}`.trim()
 }

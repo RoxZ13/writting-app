@@ -25,6 +25,10 @@ export interface Project extends Base {
   stage?: StoryStage
   /** Target date, YYYY-MM-DD. */
   deadline?: string
+  /** The essence of the story, kept in sight while planning: what it is about, how it ends, what drives it. */
+  premise?: string
+  ending?: string
+  drive?: string
 }
 
 export interface Chapter extends Base {
@@ -35,6 +39,8 @@ export interface Chapter extends Base {
   goal: string
   /** Target date, YYYY-MM-DD. */
   deadline?: string
+  /** "Пока без места": scenes jotted down before they have a chapter. Not part of the book's reading order. */
+  pool?: boolean
 }
 
 export type SceneStatus = 'idea' | 'draft' | 'written' | 'logic' | 'style' | 'done'
@@ -67,6 +73,10 @@ export interface Scene extends Base {
   lineIds?: string[]
   /** Characters present in the scene. */
   characterIds?: string[]
+  /** A key point of the plot (узловая точка) — the scenes in between are placed around these. */
+  node?: boolean
+  /** Emotional intensity, 1–5: the board draws the story's arc from it. */
+  heat?: number
   /** While rewriting: the snapshot holding the text as it was before, shown next to the new draft. */
   rewriteFrom?: string
 }

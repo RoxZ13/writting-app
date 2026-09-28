@@ -21,12 +21,14 @@ import {
   createMarker,
   createScene,
   deleteChapter,
+  ensurePool,
   mergeIntoPrevious,
   moveScene,
   patch,
   reorderChapters,
 } from '../db/repo'
 import { MarkerCard } from '../components/MarkerCard'
+import { Arc, Essence, Heat } from '../components/Plot'
 import { Faces } from '../components/Refs'
 import { SceneSheet } from '../components/SceneSheet'
 import { chapterCharacters, markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
@@ -69,18 +71,24 @@ export function BoardView({ data }: { data: ProjectData }) {
     const over = e.over?.id ? String(e.over.id) : null
     if (!over || over === e.active.id) return
     const sceneId = String(e.active.id)
+    const scenesOf = (chapterId: string) =>
+      chapterId === data.pool.chapter?.id ? data.pool.scenes : data.scenes.filter((s) => s.chapterId === chapterId)
+    if (over === 'col:pool') {
+      void ensurePool(data.project.id).then((pool) => moveScene(sceneId, pool.id, data.pool.scenes.length))
+      return
+    }
     if (over.startsWith('col:')) {
       const chapterId = over.slice(4)
-      const count = data.scenes.filter((s) => s.chapterId === chapterId && s.id !== sceneId).length
+      const count = scenesOf(chapterId).filter((s) => s.id !== sceneId).length
       void moveScene(sceneId, chapterId, count)
       return
     }
     const target = data.sceneById.get(over)
     if (!target) return
-    const list = data.scenes.filter((s) => s.chapterId === target.chapterId)
-    void moveScene(sceneId, target.chapterId, list.indexOf(target))
+    void moveScene(sceneId, target.chapterId, scenesOf(target.chapterId).indexOf(target))
   }
 
+  const showArc = [...data.scenes, ...data.pool.scenes].some((s) => s.heat)
   const hanging = data.markers.filter((m) => ['hanging', 'late'].includes(markerStatus(m, data)))
   const lineName = lens.kind === 'line' ? data.lineById.get(lens.id)?.name : undefined
 
@@ -145,6 +153,8 @@ export function BoardView({ data }: { data: ProjectData }) {
         </div>
       </div>
 
+      <Essence project={data.project} />
+
       {lens.kind === 'markers' && (
         <div className="lens-note">
           {hanging.length === 0 ? (
@@ -175,6 +185,7 @@ export function BoardView({ data }: { data: ProjectData }) {
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <div className="board">
+            <PoolColumn data={data} lens={lens} onOpenScene={setOpenScene} />
             {data.outline.map(({ chapter, scenes }, i) => (
               <Column
                 key={chapter.id}
@@ -183,6 +194,7 @@ export function BoardView({ data }: { data: ProjectData }) {
                 scenes={scenes}
                 lens={lens}
                 isFirst={i === 0}
+                showArc={showArc}
                 onMove={(d) => moveChapter(i, d)}
                 onAddAfter={() => void addChapterAfter(i)}
                 onOpenScene={setOpenScene}
@@ -215,6 +227,7 @@ function Column({
   scenes,
   lens,
   isFirst,
+  showArc,
   onMove,
   onAddAfter,
   onOpenScene,
@@ -225,6 +238,7 @@ function Column({
   scenes: Scene[]
   lens: Lens
   isFirst: boolean
+  showArc: boolean
   onMove: (dir: -1 | 1) => void
   onAddAfter: () => void
   onOpenScene: (id: string) => void
@@ -312,6 +326,7 @@ function Column({
           {scenes.length} сц. · {words.toLocaleString('ru-RU')} сл.
           <Faces data={data} ids={people} max={5} />
         </div>
+        {showArc && <Arc scenes={scenes} />}
       </header>
 
       <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
@@ -362,6 +377,43 @@ function Column({
   )
 }
 
+/** "Пока без места": scenes from the author's head, jotted down before they have a chapter. */
+function PoolColumn({ data, lens, onOpenScene }: { data: ProjectData; lens: Lens; onOpenScene: (id: string) => void }) {
+  const { setNodeRef, isOver } = useDroppable({ id: 'col:pool' })
+  const [draft, setDraft] = useState('')
+  const scenes = data.pool.scenes
+  const add = async () => {
+    const title = draft.trim()
+    if (!title) return
+    setDraft('')
+    const pool = await ensurePool(data.project.id)
+    await createScene(data.project.id, pool.id, title, { status: 'idea' })
+  }
+  return (
+    <section ref={setNodeRef} className={`column pool ${isOver ? 'over' : ''}`}>
+      <header className="column-head">
+        <div className="column-title pool-title">Пока без места</div>
+        <div className="column-meta">{scenes.length ? `${scenes.length} сц. — перетащи в главу` : 'Выпиши сцены, которые уже есть в голове. Место найдёшь потом.'}</div>
+      </header>
+      <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+        <div className="cards">
+          {scenes.map((s) => (
+            <SortableCard key={s.id} data={data} scene={s} lens={lens} onOpen={() => onOpenScene(s.id)} />
+          ))}
+        </div>
+      </SortableContext>
+      <input
+        className="quick-add"
+        placeholder="+ сцена из головы"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => e.key === 'Enter' && void add()}
+        onBlur={() => void add()}
+      />
+    </section>
+  )
+}
+
 function MarkerPill({ data, marker, side, onOpen }: { data: ProjectData; marker: Marker; side: 'setup' | 'payoff'; onOpen: () => void }) {
   const st = MARKER_STATES[markerStatus(marker, data)]
   return (
@@ -395,7 +447,8 @@ function Card({ data, scene, lens, overlay }: { data: ProjectData; scene: Scene;
   const st = statusOf(scene.status)
   const current = data.project.lastSceneId === scene.id
   return (
-    <article className={`card-scene ${dim ? 'dim' : ''} ${overlay ? 'overlay' : ''} ${current ? 'current' : ''}`}>
+    <article className={`card-scene ${dim ? 'dim' : ''} ${overlay ? 'overlay' : ''} ${current ? 'current' : ''} ${scene.node ? 'node' : ''}`}>
+      {scene.node && <div className="node-label">◆ узловая точка</div>}
       {lines.length > 0 && (
         <div className="line-strip">
           {lines.map((l) => (
@@ -413,6 +466,7 @@ function Card({ data, scene, lens, overlay }: { data: ProjectData; scene: Scene;
         {current && <span className="here">ты здесь</span>}
         <span className="spacer" />
         <Faces data={data} ids={scene.characterIds ?? []} max={3} />
+        <Heat scene={scene} />
       </div>
     </article>
   )
@@ -451,8 +505,25 @@ function Timeline({
       else next.add(id)
       return next
     })
+  const poolOpen = open.has('pool')
   return (
     <div className="timeline">
+      <section className={`tl-chapter pool ${poolOpen ? 'open' : ''}`}>
+        <button className="tl-head" aria-expanded={poolOpen} onClick={() => toggle('pool')}>
+          <span className="tl-caret">{poolOpen ? '▾' : '▸'}</span>
+          <span className="tl-title">Пока без места</span>
+          <span className="spacer" />
+          <span className="tl-meta">{data.pool.scenes.length ? `${data.pool.scenes.length} сц.` : 'сцены из головы'}</span>
+        </button>
+        {poolOpen && (
+          <div className="tl-body">
+            {data.pool.scenes.map((s) => (
+              <TimelineScene key={s.id} data={data} scene={s} lens={lens} onOpen={() => onOpenScene(s.id)} />
+            ))}
+            <TimelineAdd data={data} lens={lens} />
+          </div>
+        )}
+      </section>
       {data.outline.map(({ chapter, scenes }) => {
         const pay = data.markers.filter((m) => !m.resolved && markerPayoffChapter(m, data) === chapter.id)
         const plant = data.markers.filter((m) => !m.resolved && markerSetupChapter(m, data) === chapter.id)
@@ -505,30 +576,33 @@ function TimelineScene({ data, scene, lens, onOpen }: { data: ProjectData; scene
   const current = data.project.lastSceneId === scene.id
   const sub = scene.goal || scene.excerpt
   return (
-    <button className={`tl-scene ${dim ? 'dim' : ''} ${current ? 'current' : ''}`} onClick={onOpen}>
-      <span className="status-dot" style={{ background: statusOf(scene.status).color }} />
+    <button className={`tl-scene ${dim ? 'dim' : ''} ${current ? 'current' : ''} ${scene.node ? 'node' : ''}`} onClick={onOpen}>
+      {scene.node ? <span className="tl-node">◆</span> : <span className="status-dot" style={{ background: statusOf(scene.status).color }} />}
       <span className="tl-text">
         <span className={`tl-name ${scene.title.trim() ? '' : 'untitled'}`}>{sceneName(data, scene)}</span>
         {sub && <span className="tl-sub">{sub}</span>}
       </span>
       {markers.length > 0 && <span className="tl-mk">✦ {markers.length}</span>}
       {current && <span className="here">ты здесь</span>}
+      {scene.heat ? <span className="tl-heat" title={`Накал ${scene.heat} из 5`}>{'●'.repeat(scene.heat)}</span> : null}
     </button>
   )
 }
 
-function TimelineAdd({ data, chapter, lens }: { data: ProjectData; chapter: Chapter; lens: Lens }) {
+/** Without a chapter, the scene goes to "Пока без места". */
+function TimelineAdd({ data, chapter, lens }: { data: ProjectData; chapter?: Chapter; lens: Lens }) {
   const [draft, setDraft] = useState('')
   const add = async () => {
     const title = draft.trim()
     if (!title) return
     setDraft('')
-    await createScene(data.project.id, chapter.id, title, { status: 'idea', lineIds: lens.kind === 'line' ? [lens.id] : [] })
+    const to = chapter ?? (await ensurePool(data.project.id))
+    await createScene(data.project.id, to.id, title, { status: 'idea', lineIds: lens.kind === 'line' ? [lens.id] : [] })
   }
   return (
     <input
       className="quick-add small"
-      placeholder="+ сцена: кратко, что происходит"
+      placeholder={chapter ? '+ сцена: кратко, что происходит' : '+ сцена из головы'}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onKeyDown={(e) => e.key === 'Enter' && void add()}

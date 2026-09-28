@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import type { Scene } from '../db/db'
-import { createMarker, mergeSceneIntoPrevious, patch, remove } from '../db/repo'
+import { createMarker, ensurePool, mergeSceneIntoPrevious, moveScene, patch, remove, splitChapterAt } from '../db/repo'
 import { go } from '../lib/router'
 import { sceneName, type ProjectData } from '../lib/hooks'
 import { STATUSES } from '../lib/status'
 import { toast } from '../lib/ui'
 import { MarkerCard } from './MarkerCard'
 import { RefChips } from './Refs'
+import { Heat } from './Plot'
 
 /** Quick edit of a scene from the board: what happens, lines, people, markers. No editor needed. */
 export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene: Scene; onClose: () => void }) {
@@ -24,8 +25,19 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
 
   const set = (changes: Partial<Scene>) => void patch<Scene>('scenes', scene.id, changes)
   const markers = data.markers.filter((m) => m.setupSceneId === scene.id || m.payoffSceneId === scene.id)
-  const siblings = data.scenes.filter((s) => s.chapterId === scene.chapterId)
-  const canMerge = siblings.indexOf(scene) > 0
+  const inPool = scene.chapterId === data.pool.chapter?.id
+  const siblings = inPool ? data.pool.scenes : data.scenes.filter((s) => s.chapterId === scene.chapterId)
+  const canMerge = !inPool && siblings.indexOf(scene) > 0
+  const place = async (to: string) => {
+    if (to === 'pool') {
+      const pool = await ensurePool(data.project.id)
+      await moveScene(scene.id, pool.id, data.pool.scenes.length)
+      toast('Сцена в «Пока без места»')
+    } else {
+      await moveScene(scene.id, to, data.scenes.filter((s) => s.chapterId === to && s.id !== scene.id).length)
+      toast(`Сцена перенесена в «${data.chapterById.get(to)?.title}»`)
+    }
+  }
 
   return (
     <>
@@ -55,6 +67,40 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
           onChange={(e) => setGoal(e.target.value)}
           onBlur={() => goal !== scene.goal && set({ goal })}
         />
+        <div className="sheet-plot">
+          <button className={`chip-toggle ${scene.node ? 'on' : ''}`} onClick={() => set({ node: !scene.node })} title="Крупная веха сюжета — остальные сцены встают между такими">
+            ◆ Узловая точка
+          </button>
+          <span className="sheet-heat">
+            <span className="muted small">Накал</span>
+            <Heat scene={scene} large />
+          </span>
+        </div>
+        <label className="sheet-where">
+          <span className="muted small">Где</span>
+          <select className="select" value={inPool ? 'pool' : scene.chapterId} onChange={(e) => void place(e.target.value)}>
+            <option value="pool">Пока без места</option>
+            {data.chapters.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.title}
+              </option>
+            ))}
+          </select>
+        </label>
+        {canMerge && (
+          <button
+            className="btn sm"
+            style={{ alignSelf: 'flex-start' }}
+            title="Эта сцена и все после неё в главе уходят в новую главу"
+            onClick={async () => {
+              const at = data.chapters.findIndex((c) => c.id === scene.chapterId)
+              await splitChapterAt(scene.id, `Глава ${at + 2}`)
+              toast('Новая глава начинается с этой сцены. Название можно поменять на доске')
+            }}
+          >
+            ✂ Новая глава отсюда
+          </button>
+        )}
         <button className="btn primary" onClick={() => go({ view: 'write', sceneId: scene.id })}>
           Писать эту сцену →
         </button>
