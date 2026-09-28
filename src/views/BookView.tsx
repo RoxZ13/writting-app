@@ -2,6 +2,7 @@ import { db, type Project } from '../db/db'
 import { patch, remove } from '../db/repo'
 import { ImportPanel } from '../components/ImportPanel'
 import { BookCover } from '../components/BookCover'
+import { coverFromClipboard, coverFromUrl, imageToCover, setCover, useCover } from '../lib/cover'
 import { PaceSection, PublishSection } from '../components/BookSections'
 import { chapterToFicbook, download, exportDocx, type ExportChapter } from '../lib/exporter'
 import type { ProjectData } from '../lib/hooks'
@@ -24,6 +25,7 @@ export function BookView({ data }: { data: ProjectData }) {
   const p = data.project
   const set = (changes: Partial<Project>) => void patch<Project>('projects', p.id, changes)
   const words = data.scenes.reduce((n, s) => n + s.wordCount, 0)
+  const cover = useCover(p.id)
 
   const exportWord = async () => download(await exportDocx(p.title, await loadChapters(data)), `${p.title}.docx`)
   const copyFicbook = async (chapterId: string) => {
@@ -59,11 +61,14 @@ export function BookView({ data }: { data: ProjectData }) {
           <div className="row" style={{ gap: 20, alignItems: 'flex-start' }}>
             <div>
               <span className="field-label">Обложка</span>
-              <div className="covers">
-                {COVERS.map((c) => (
-                  <button key={c} className={`swatch ${c === (p.color ?? COVERS[0]) ? 'on' : ''}`} style={{ background: c }} aria-label="Цвет обложки" onClick={() => set({ color: c })} />
-                ))}
-              </div>
+              <CoverPicker projectId={p.id} />
+              {!cover && (
+                <div className="covers" style={{ marginTop: 8 }}>
+                  {COVERS.map((c) => (
+                    <button key={c} className={`swatch ${c === (p.color ?? COVERS[0]) ? 'on' : ''}`} style={{ background: c }} aria-label="Цвет обложки" onClick={() => set({ color: c })} />
+                  ))}
+                </div>
+              )}
             </div>
             <label>
               <span className="field-label">Дедлайн</span>
@@ -106,6 +111,53 @@ export function BookView({ data }: { data: ProjectData }) {
       >
         Удалить эту историю
       </button>
+    </div>
+  )
+}
+
+/** The author's own cover: from a file, a copied picture, or a link — the usual story with a Ficbook cover. */
+function CoverPicker({ projectId }: { projectId: string }) {
+  const cover = useCover(projectId)
+  const run = async (fn: () => Promise<string>, done = 'Обложка на месте') => {
+    try {
+      await setCover(projectId, await fn())
+      toast(done)
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не получилось')
+    }
+  }
+  return (
+    <div className="cover-actions">
+      <label className="btn sm">
+        {cover ? 'Другая картинка' : 'Загрузить картинку'}
+        <input type="file" hidden accept="image/*" onChange={(e) => e.target.files?.[0] && void run(() => imageToCover(e.target.files![0]))} />
+      </label>
+      <button className="btn sm" onClick={() => void run(coverFromClipboard)} title="Скопируй обложку (на телефоне — долгое нажатие → «Скопировать») и нажми сюда">
+        Вставить скопированную
+      </button>
+      <button
+        className="btn sm"
+        onClick={() => {
+          const url = prompt('Ссылка на картинку обложки (на Фикбуке: правый клик по обложке → «Копировать адрес изображения»)')
+          if (!url) return
+          void (async () => {
+            try {
+              const { src, offline } = await coverFromUrl(url)
+              await setCover(projectId, src)
+              toast(offline ? 'Обложка на месте' : 'Обложка на месте. Сайт не дал её сохранить — без интернета она не покажется, лучше загрузить файлом')
+            } catch (e) {
+              toast(e instanceof Error ? e.message : 'Не получилось')
+            }
+          })()
+        }}
+      >
+        По ссылке
+      </button>
+      {cover && (
+        <button className="btn sm ghost" onClick={() => void setCover(projectId, undefined)}>
+          Убрать
+        </button>
+      )}
     </div>
   )
 }

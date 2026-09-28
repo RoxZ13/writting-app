@@ -7,6 +7,8 @@ export interface Sprint {
   endsAt: number
   /** Words in the whole book when the sprint began. */
   startWords: number
+  /** «Не беспокоить» was switched on through Shortcuts and should be switched off after. */
+  dnd?: boolean
 }
 
 const KEY = 'manuscript.sprint'
@@ -29,8 +31,8 @@ function setSprint(s: Sprint | null) {
   listeners.forEach((fn) => fn())
 }
 
-export function startSprint(projectId: string, minutes: number, startWords: number) {
-  setSprint({ projectId, minutes, startWords, endsAt: Date.now() + minutes * 60000 })
+export function startSprint(projectId: string, minutes: number, startWords: number, dnd?: boolean) {
+  setSprint({ projectId, minutes, startWords, dnd, endsAt: Date.now() + minutes * 60000 })
 }
 export const stopSprint = () => setSprint(null)
 

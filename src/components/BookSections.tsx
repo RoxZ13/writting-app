@@ -82,6 +82,11 @@ function forecastText(p: Project, pc: ReturnType<typeof pace>): string {
   return s
 }
 
+/** The work's page on Ficbook: typed by the author, or the link in the imported header. */
+export function ficbookLink(p: Project): string | undefined {
+  return p.ficbookUrl || p.description?.match(/https?:\/\/ficbook\.net\/readfic\/[\w-]+/)?.[0]
+}
+
 /** Where the book stands on Ficbook: what is up, what is next and how ready it is. */
 export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (chapterId: string) => void }) {
   const p = data.project
@@ -98,6 +103,7 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
       ? new Date(new Date(lastUp.chapter.publishedAt + 'T12:00:00').getTime() + p.publishEvery * DAY)
       : undefined
   const daysLeft = due ? Math.ceil((due.getTime() - Date.now()) / DAY) : undefined
+  const link = ficbookLink(p)
 
   return (
     <section className="card settings-section stack">
@@ -117,6 +123,11 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
             <button className="btn primary sm" onClick={() => onCopy(next.chapter.id)}>
               Скопировать для Фикбука
             </button>
+            {link && (
+              <a className="btn sm" href={link} target="_blank" rel="noreferrer">
+                Открыть на Фикбуке ↗
+              </a>
+            )}
             <button className="btn sm" onClick={() => setCh(next.chapter, { publishedAt: dayKey() })}>
               ✓ Выложила сегодня
             </button>
@@ -129,6 +140,15 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
         <span className="small">Новая глава каждые</span>
         <NumberField value={p.publishEvery} placeholder="7" onSave={(publishEvery) => void patch<Project>('projects', p.id, { publishEvery })} />
         <span className="small">дн.</span>
+      </label>
+      <label className="stack" style={{ gap: 4 }}>
+        <span className="field-label">Работа на Фикбуке</span>
+        <input
+          className="input"
+          placeholder="https://ficbook.net/readfic/…"
+          defaultValue={p.ficbookUrl ?? link ?? ''}
+          onBlur={(e) => void patch<Project>('projects', p.id, { ficbookUrl: e.target.value.trim() || undefined })}
+        />
       </label>
       <details>
         <summary className="small">Все главы</summary>

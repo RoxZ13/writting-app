@@ -4,9 +4,10 @@ import { markerStatus, useProjectData, useProjects, type ProjectData } from './l
 import { recountWords, tidyImportedScenes } from './db/repo'
 import { go, useRoute, type Route } from './lib/router'
 import { getCurrentProjectId, hotkey, returnFocus, setCurrentProjectId } from './lib/session'
-import { Modal, Toaster } from './lib/ui'
+import { Toaster } from './lib/ui'
 import { Icon } from './components/Icon'
 import { QuickCapture } from './components/QuickCapture'
+import { FocusDone } from './components/Focus'
 import { SearchModal } from './components/SearchModal'
 import { BoardView } from './views/BoardView'
 import { CharactersView } from './views/CharactersView'
@@ -20,8 +21,6 @@ import { HelpView } from './views/HelpView'
 import { LoreView } from './views/LoreView'
 import { deadlineText } from './lib/stories'
 import { backupDue, downloadBackup, snoozeBackup } from './lib/backup'
-import { startSprint, stopSprint, useSprint } from './lib/sprint'
-import { totalWords } from './lib/pace'
 
 const TABS: { view: Route['view']; label: string; ico: string }[] = [
   { view: 'text', label: 'Текст', ico: 'pen' },
@@ -169,7 +168,7 @@ export function App() {
           <Icon name="bolt" size={22} />
         </button>
       )}
-      <SprintDone data={data} />
+      <FocusDone data={data} />
       {capture && <QuickCapture data={data} onClose={closeCapture} />}
       {searching && <SearchModal data={data} onClose={() => setSearching(false)} />}
       <Toaster />
@@ -288,29 +287,5 @@ function BackupReminder() {
         Позже
       </button>
     </div>
-  )
-}
-
-/** When the sprint timer runs out: how much got written, and one tap for another round. */
-function SprintDone({ data }: { data: ProjectData }) {
-  const { sprint, left } = useSprint()
-  if (!sprint || left > 0 || sprint.projectId !== data.project.id) return null
-  const now = totalWords([...data.scenes, ...data.pool.scenes])
-  const written = Math.max(0, now - sprint.startWords)
-  return (
-    <Modal onClose={stopSprint} label="Спринт закончился">
-      <div className="stack" style={{ textAlign: 'center' }}>
-        <div className="sprint-big">+{written.toLocaleString('ru-RU')}</div>
-        <div className="muted">{written ? `слов за ${sprint.minutes} минут. Отлично.` : `${sprint.minutes} минут прошли. Даже думать над сценой — работа.`}</div>
-        <div className="row" style={{ justifyContent: 'center' }}>
-          <button className="btn ghost" onClick={stopSprint}>
-            Хватит
-          </button>
-          <button className="btn primary" onClick={() => startSprint(data.project.id, sprint.minutes, now)}>
-            Ещё {sprint.minutes} минут
-          </button>
-        </div>
-      </div>
-    </Modal>
   )
 }

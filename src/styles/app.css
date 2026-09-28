@@ -4461,3 +4461,53 @@ main.page {
 .hints-legend .eh-long {
   padding: 0 4px;
 }
+
+/* Cover pictures. */
+.book-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.book.has-image .book-spine,
+.book.has-image .book-face {
+  position: relative;
+}
+.book.has-image .book-spine {
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.45), rgba(255, 255, 255, 0.15) 70%, rgba(0, 0, 0, 0.3));
+}
+.book.has-image .book-face {
+  background: linear-gradient(180deg, transparent 55%, rgba(0, 0, 0, 0.55));
+}
+.book.has-image .book-stage {
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.cover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+.check-row input {
+  margin-top: 3px;
+}
+.dnd-setup {
+  padding: 14px 16px;
+  background: var(--fill);
+  box-shadow: none;
+}
+.dnd-setup ol {
+  margin: 6px 0 10px;
+  padding-left: 20px;
+  line-height: 1.5;
+}

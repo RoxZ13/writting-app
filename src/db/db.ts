@@ -37,6 +37,8 @@ export interface Project extends Base {
   targetWords?: number
   /** Ficbook: a new chapter every N days. */
   publishEvery?: number
+  /** The work's page on Ficbook; when empty, taken from the imported header. */
+  ficbookUrl?: string
 }
 
 export interface Chapter extends Base {

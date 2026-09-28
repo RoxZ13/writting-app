@@ -14,8 +14,9 @@ import { countHints } from '../lib/editcheck'
 import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { hotkey, session } from '../lib/session'
-import { clock, startSprint, stopSprint, useSprint } from '../lib/sprint'
-import { dayKey, totalWords, wordsOn } from '../lib/pace'
+import { clock, useSprint } from '../lib/sprint'
+import { endFocus, FocusStart } from '../components/Focus'
+import { dayKey, wordsOn } from '../lib/pace'
 import { MARKER_STATES, statusOf } from '../lib/status'
 import { docParagraphs, emptyDoc, formatWords } from '../lib/text'
 import { InlineEdit, Modal, toast } from '../lib/ui'
@@ -83,6 +84,7 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
   const [typoOpen, setTypoOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const { sprint, left } = useSprint()
+  const [focusOpen, setFocusOpen] = useState(false)
   const [hintsOn, setHintsOn] = useState(() => {
     try {
       return localStorage.getItem(HINTS_KEY) !== '0'
@@ -247,7 +249,7 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
           )}
           <span className="spacer" />
           {sprint && sprint.projectId === data.project.id && left > 0 && (
-            <button className="tool sprint-pill" title="Спринт идёт. Нажми, чтобы остановить" onClick={() => confirm('Остановить спринт?') && stopSprint()}>
+            <button className="tool sprint-pill" title="Фокус идёт. Нажми, чтобы остановить" onClick={() => confirm('Остановить фокус?') && endFocus()}>
               ⏱ {clock(left)}
             </button>
           )}
@@ -329,15 +331,13 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
                     className="mode-item"
                     onClick={() => {
                       setMenuOpen(false)
-                      persistPanels({ nav: false, plan: false })
-                      startSprint(data.project.id, 15, totalWords([...data.scenes, ...data.pool.scenes]))
-                      editor?.commands.focus()
+                      setFocusOpen(true)
                     }}
                   >
                     <span className="mode-dot">⏱</span>
                     <span>
-                      <strong>Спринт 15 минут</strong>
-                      <span className="mode-hint">Только текст и таймер. В конце — сколько написала</span>
+                      <strong>Фокус</strong>
+                      <span className="mode-hint">Только текст и таймер, без уведомлений. В конце — сколько написала</span>
                     </span>
                   </button>
                   <button
@@ -454,6 +454,17 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
             } catch {
               /* ignore */
             }
+          }}
+        />
+      )}
+      {focusOpen && (
+        <FocusStart
+          data={data}
+          onClose={() => setFocusOpen(false)}
+          onStarted={() => {
+            setFocusOpen(false)
+            persistPanels({ nav: false, plan: false })
+            editor?.commands.focus()
           }}
         />
       )}
