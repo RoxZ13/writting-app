@@ -29,6 +29,14 @@ export interface Project extends Base {
   premise?: string
   ending?: string
   drive?: string
+  /** Words written per day, local date YYYY-MM-DD → words added (deletions are not subtracted). */
+  progress?: Record<string, number>
+  /** A gentle daily target in words. */
+  dailyGoal?: number
+  /** Planned length of the whole book, in words. */
+  targetWords?: number
+  /** Ficbook: a new chapter every N days. */
+  publishEvery?: number
 }
 
 export interface Chapter extends Base {
@@ -41,6 +49,8 @@ export interface Chapter extends Base {
   deadline?: string
   /** "Пока без места": scenes jotted down before they have a chapter. Not part of the book's reading order. */
   pool?: boolean
+  /** Date the chapter went up on Ficbook, YYYY-MM-DD. */
+  publishedAt?: string
 }
 
 export type SceneStatus = 'idea' | 'draft' | 'written' | 'logic' | 'style' | 'done'

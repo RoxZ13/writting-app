@@ -1,8 +1,8 @@
-import { useState } from 'react'
 import { db, type Project } from '../db/db'
 import { patch, remove } from '../db/repo'
 import { ImportPanel } from '../components/ImportPanel'
 import { BookCover } from '../components/BookCover'
+import { PaceSection, PublishSection } from '../components/BookSections'
 import { chapterToFicbook, download, exportDocx, type ExportChapter } from '../lib/exporter'
 import type { ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
@@ -23,17 +23,16 @@ async function loadChapters(data: ProjectData, only?: string): Promise<ExportCha
 export function BookView({ data }: { data: ProjectData }) {
   const p = data.project
   const set = (changes: Partial<Project>) => void patch<Project>('projects', p.id, changes)
-  const [ficChapter, setFicChapter] = useState(data.chapters[0]?.id ?? '')
   const words = data.scenes.reduce((n, s) => n + s.wordCount, 0)
 
   const exportWord = async () => download(await exportDocx(p.title, await loadChapters(data)), `${p.title}.docx`)
-  const copyFicbook = async () => {
-    const [ch] = await loadChapters(data, ficChapter)
+  const copyFicbook = async (chapterId: string) => {
+    const [ch] = await loadChapters(data, chapterId)
     if (!ch) return
     const text = chapterToFicbook(ch)
     try {
       await navigator.clipboard.writeText(text)
-      toast('Глава скопирована — вставь её в редактор Фикбука')
+      toast(`«${ch.chapter.title}» скопирована — вставь её в редактор Фикбука`)
     } catch {
       download(new Blob([text], { type: 'text/plain;charset=utf-8' }), `${ch.chapter.title}.txt`)
     }
@@ -79,21 +78,12 @@ export function BookView({ data }: { data: ProjectData }) {
         <InlineEdit className="input" multiline placeholder="Фандом, пэйринг, аннотация — что угодно" value={p.description ?? ''} onSave={(description) => set({ description })} />
       </section>
 
+      <PaceSection data={data} />
+
+      <PublishSection data={data} onCopy={(id) => void copyFicbook(id)} />
+
       <section className="card settings-section stack">
-        <h3>Выложить и сохранить</h3>
-        <span className="field-label">Глава для Фикбука — с курсивом и разделителями сцен</span>
-        <div className="row" style={{ flexWrap: 'nowrap' }}>
-          <select className="select" value={ficChapter} onChange={(e) => setFicChapter(e.target.value)}>
-            {data.chapters.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title}
-              </option>
-            ))}
-          </select>
-          <button className="btn primary" onClick={() => void copyFicbook()}>
-            Скопировать
-          </button>
-        </div>
+        <h3>Сохранить</h3>
         <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void exportWord()}>
           Вся книга в Word (.docx)
         </button>

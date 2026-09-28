@@ -44,7 +44,7 @@ export function onLocalChange(fn: Listener) {
   listeners.add(fn)
   return () => listeners.delete(fn)
 }
-function notifyChange() {
+export function notifyChange() {
   listeners.forEach((fn) => fn())
 }
 

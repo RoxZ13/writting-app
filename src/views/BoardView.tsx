@@ -324,6 +324,11 @@ function Column({
         )}
         <div className="column-meta">
           {scenes.length} сц. · {words.toLocaleString('ru-RU')} сл.
+          {chapter.publishedAt && (
+            <span className="published" title="Выложена на Фикбук">
+              ✓ {new Date(chapter.publishedAt + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+            </span>
+          )}
           <Faces data={data} ids={people} max={5} />
         </div>
         {showArc && <Arc scenes={scenes} />}

@@ -1,4 +1,5 @@
 import { EditorContent, useEditor, type Editor } from '@tiptap/react'
+import { recordWords } from '../lib/pace'
 import { BubbleMenu } from '@tiptap/react/menus'
 import StarterKit from '@tiptap/starter-kit'
 import { Focus, Placeholder } from '@tiptap/extensions'
@@ -100,6 +101,7 @@ export function SceneEditor({
     const current = await db.scenes.get(scene.id)
     const paras = docParagraphs(content).map((p) => p.trim()).filter(Boolean)
     const excerpt = makeExcerpt(current?.epigraph && paras[0] === current.epigraph ? paras.slice(1) : paras)
+    if (current) recordWords(current.projectId, wordCount - current.wordCount)
     if (current && (current.wordCount !== wordCount || current.lastPos !== state.selection.from || current.excerpt !== excerpt)) {
       await patch<Scene>('scenes', scene.id, { wordCount, lastPos: state.selection.from, excerpt })
     }

@@ -31,7 +31,12 @@ export function Heat({ scene, large }: { scene: Scene; large?: boolean }) {
 export function Arc({ scenes }: { scenes: Scene[] }) {
   if (!scenes.length) return null
   return (
-    <div className="arc" aria-label="Эмоциональная арка главы">
+    <div
+      className="arc"
+      aria-label="Эмоциональная арка главы"
+      title="Накал сцен главы по порядку: чем выше столбик, тем сильнее сцена. Чёрный — узловая точка, серый — накал не отмечен"
+    >
+      <span className="arc-label">накал</span>
       {scenes.map((s) => (
         <span
           key={s.id}
