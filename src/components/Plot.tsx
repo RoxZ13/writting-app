@@ -36,7 +36,7 @@ export function Arc({ scenes }: { scenes: Scene[] }) {
       aria-label="Эмоциональная арка главы"
       title="Накал сцен главы по порядку: чем выше столбик, тем сильнее сцена. Чёрный — узловая точка, серый — накал не отмечен"
     >
-      <span className="arc-label">накал</span>
+      <span className="arc-label">накал сцен</span>
       {scenes.map((s) => (
         <span
           key={s.id}

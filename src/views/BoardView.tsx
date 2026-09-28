@@ -28,7 +28,7 @@ import {
   reorderChapters,
 } from '../db/repo'
 import { MarkerCard } from '../components/MarkerCard'
-import { Arc, Essence, Heat } from '../components/Plot'
+import { Arc, Essence } from '../components/Plot'
 import { Faces } from '../components/Refs'
 import { SceneSheet } from '../components/SceneSheet'
 import { chapterCharacters, markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
@@ -331,7 +331,7 @@ function Column({
           )}
           <Faces data={data} ids={people} max={5} />
         </div>
-        {showArc && <Arc scenes={scenes} />}
+        {showArc && scenes.some((s) => s.heat || s.node) && <Arc scenes={scenes} />}
       </header>
 
       <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
@@ -481,7 +481,6 @@ function Card({ data, scene, lens, overlay }: { data: ProjectData; scene: Scene;
         {current && <span className="here">ты здесь</span>}
         <span className="spacer" />
         <Faces data={data} ids={scene.characterIds ?? []} max={3} />
-        <Heat scene={scene} />
       </div>
     </article>
   )
@@ -523,7 +522,7 @@ function Timeline({
   const poolOpen = open.has('pool')
   return (
     <div className="timeline">
-      <section className={`tl-chapter pool ${poolOpen ? 'open' : ''}`}>
+      <section className={`tl-chapter pool ${poolOpen ? 'open' : ''} ${data.pool.scenes.length ? '' : 'is-empty'}`}>
         <button className="tl-head" aria-expanded={poolOpen} onClick={() => toggle('pool')}>
           <span className="tl-caret">{poolOpen ? '▾' : '▸'}</span>
           <span className="tl-title">Пока без места</span>
@@ -600,7 +599,6 @@ function TimelineScene({ data, scene, lens, onOpen }: { data: ProjectData; scene
       </span>
       {markers.length > 0 && <span className="tl-mk">✦ {markers.length}</span>}
       {current && <span className="here">ты здесь</span>}
-      {scene.heat ? <span className="tl-heat" title={`Накал ${scene.heat} из 5`}>{'●'.repeat(scene.heat)}</span> : null}
     </button>
   )
 }

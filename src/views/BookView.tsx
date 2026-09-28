@@ -2,6 +2,7 @@ import { db, type Project } from '../db/db'
 import { patch, remove } from '../db/repo'
 import { ImportPanel } from '../components/ImportPanel'
 import { BookCover } from '../components/BookCover'
+import { DateChip } from '../components/DateChip'
 import { coverFromClipboard, coverFromUrl, imageToCover, setCover, useCover } from '../lib/cover'
 import { PaceSection, PublishSection } from '../components/BookSections'
 import { chapterToFicbook, download, exportDocx, type ExportChapter } from '../lib/exporter'
@@ -70,47 +71,53 @@ export function BookView({ data }: { data: ProjectData }) {
                 </div>
               )}
             </div>
-            <label>
+            <div>
               <span className="field-label">Дедлайн</span>
-              <input className="input" type="date" defaultValue={p.deadline ?? ''} onChange={(e) => set({ deadline: e.target.value || undefined })} />
-            </label>
+              <DateChip value={p.deadline} empty="+ поставить дату" onChange={(deadline) => set({ deadline })} />
+            </div>
           </div>
         </div>
       </div>
 
-      <PaceSection data={data} />
-
       <PublishSection data={data} onCopy={(id) => void copyFicbook(id)} />
 
-      <section className="card settings-section stack">
-        <h3>Описание</h3>
-        <InlineEdit className="input" multiline placeholder="Фандом, пэйринг, аннотация — что угодно" value={p.description ?? ''} onSave={(description) => set({ description })} />
-      </section>
+      <PaceSection data={data} />
 
-      <section className="card settings-section stack">
-        <h3>Сохранить</h3>
-        <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void exportWord()}>
-          Вся книга в Word (.docx)
-        </button>
-      </section>
+      <details className="card settings-section book-fold">
+        <summary>
+          <span>Описание</span>
+          <span className="muted small book-fold-peek">{(p.description ?? '').split('\n').find((l) => l.trim()) ?? 'фандом, пэйринг, аннотация'}</span>
+        </summary>
+        <InlineEdit className="input book-desc" multiline placeholder="Фандом, пэйринг, аннотация — что угодно" value={p.description ?? ''} onSave={(description) => set({ description })} />
+      </details>
 
-      <section className="card settings-section stack">
-        <h3>Добавить текст</h3>
-        <div className="small muted">Главы из файла встанут в конец книги.</div>
-        <ImportPanel projectId={p.id} onDone={() => go({ view: 'board' })} />
-      </section>
-
-      <button
-        className="btn ghost"
-        style={{ color: 'var(--mk-hanging)' }}
-        onClick={async () => {
-          if (!confirm(`Удалить историю «${p.title}» со всеми главами и заметками?`)) return
-          await remove('projects', p.id)
-          go({ view: 'library' })
-        }}
-      >
-        Удалить эту историю
-      </button>
+      <details className="card settings-section book-fold">
+        <summary>
+          <span>Файлы и прочее</span>
+          <span className="muted small">Word, добавить текст, удалить</span>
+        </summary>
+        <div className="stack" style={{ marginTop: 14 }}>
+          <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void exportWord()}>
+            Вся книга в Word (.docx)
+          </button>
+          <div>
+            <span className="field-label">Добавить текст</span>
+            <div className="small muted">Главы из файла встанут в конец книги.</div>
+            <ImportPanel projectId={p.id} onDone={() => go({ view: 'board' })} />
+          </div>
+          <button
+            className="btn ghost"
+            style={{ color: 'var(--mk-hanging)', alignSelf: 'flex-start' }}
+            onClick={async () => {
+              if (!confirm(`Удалить историю «${p.title}» со всеми главами и заметками?`)) return
+              await remove('projects', p.id)
+              go({ view: 'library' })
+            }}
+          >
+            Удалить эту историю
+          </button>
+        </div>
+      </details>
     </div>
   )
 }
