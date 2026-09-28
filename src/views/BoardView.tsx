@@ -340,6 +340,7 @@ function Column({
             <SortableCard key={s.id} data={data} scene={s} lens={lens} onOpen={() => onOpenScene(s.id)} />
           ))}
           {lineMissing && <div className="gap-slot">нет сцен этой ветки</div>}
+          {!scenes.length && !lineMissing && <EmptyChapterHint />}
         </div>
       </SortableContext>
 
@@ -379,6 +380,15 @@ function Column({
         </button>
       </div>
     </section>
+  )
+}
+
+/** A quiet hint in an empty chapter, gone as soon as the first scene lands. Nothing pops up, nothing asks. */
+function EmptyChapterHint() {
+  return (
+    <div className="empty-hint">
+      о чём глава — строкой выше · чем зацепить в конце · перетащи сцены из «Пока без места» или добавь строкой ниже
+    </div>
   )
 }
 
@@ -549,6 +559,7 @@ function Timeline({
             {isOpen && (
               <div className="tl-body">
                 {chapter.goal && <div className="tl-goal">{chapter.goal}</div>}
+                {!scenes.length && <EmptyChapterHint />}
                 {scenes.map((s) => (
                   <TimelineScene key={s.id} data={data} scene={s} lens={lens} onOpen={() => onOpenScene(s.id)} />
                 ))}

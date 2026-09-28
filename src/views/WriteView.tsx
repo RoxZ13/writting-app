@@ -87,9 +87,10 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
   const [focusOpen, setFocusOpen] = useState(false)
   const [hintsOn, setHintsOn] = useState(() => {
     try {
-      return localStorage.getItem(HINTS_KEY) !== '0'
+      // Off until asked for: the text is the author's, hints come only on request.
+      return localStorage.getItem(HINTS_KEY) === '1'
     } catch {
-      return true
+      return false
     }
   })
   const [hintCounts, setHintCounts] = useState<ReturnType<typeof countHints> | null>(null)
