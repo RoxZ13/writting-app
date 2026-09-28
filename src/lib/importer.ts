@@ -1,4 +1,4 @@
-import type { PMNode } from './text'
+import { docWordCount, type PMNode } from './text'
 
 /** A styled run of text inside a paragraph. */
 export interface Run {
@@ -209,10 +209,8 @@ export function blocksToChapters(blocks: Block[], fallbackTitle = 'Начало 
     const plain = paras.map((runs) => runs.map((r) => r.text).join('').trim())
     const epigraph = isEpigraph(plain[0]) ? plain[0] : undefined
     const excerpt = makeExcerpt(plain.slice(epigraph ? 1 : 0))
-    const words = paras.reduce(
-      (n, runs) => n + (runs.map((r) => r.text).join(' ').match(/[\p{L}\p{N}]+/gu)?.length ?? 0),
-      0,
-    )
+    // The editor's own counter, so the first edit of an imported scene does not look like lost words.
+    const words = docWordCount(doc)
     chapter.scenes.push({ title: '', doc, wordCount: words, excerpt, epigraph })
     paras = []
   }

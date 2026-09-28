@@ -11,6 +11,7 @@ import { docParagraphs, docWordCount } from '../lib/text'
 import { makeExcerpt } from '../lib/importer'
 import { session } from '../lib/session'
 import { MarkerMark } from './MarkerMark'
+import { EditHints } from './EditHints'
 import { CommentMark } from './CommentMark'
 import { findInEditor } from '../lib/search'
 
@@ -55,6 +56,7 @@ export function SceneEditor({
       Placeholder.configure({ placeholder: 'Начни с одной фразы. Остальное подтянется.' }),
       Focus.configure({ className: 'has-focus', mode: 'deepest' }),
       MarkerMark,
+      EditHints,
       CommentMark,
     ],
     content: initial.content as object,

@@ -14,7 +14,7 @@ import {
   type Character,
   type SyncedTable,
 } from './db'
-import { docParagraphs, emptyDoc } from '../lib/text'
+import { docParagraphs, docWordCount, emptyDoc } from '../lib/text'
 import { isEpigraph, makeExcerpt } from '../lib/importer'
 
 /** Write a record locally and queue it for sync. All app writes go through here. */
@@ -393,6 +393,24 @@ export async function tidyImportedScenes(projectId: string) {
       epigraph: s.epigraph ?? epigraph,
       excerpt: makeExcerpt(body),
     })
+  }
+  await db.meta.put({ key: flag, value: true })
+}
+
+/**
+ * Early imports counted words their own way (a hyphenated word as two), so the first edit of such a
+ * scene looked like lost words. Recount once with the editor's counter.
+ */
+export async function recountWords(projectId: string) {
+  const flag = `recount.${projectId}`
+  if (await db.meta.get(flag)) return
+  const scenes = alive(await db.scenes.where('projectId').equals(projectId).toArray())
+  for (const s of scenes) {
+    const t = await db.texts.get(s.id)
+    if (!t) continue
+    const n = docWordCount(t.content)
+    if (t.wordCount !== n) await save<SceneText>('texts', { ...t, wordCount: n })
+    if (s.wordCount !== n) await save<Scene>('scenes', { ...s, wordCount: n })
   }
   await db.meta.put({ key: flag, value: true })
 }

@@ -125,7 +125,7 @@ export interface Marker extends Base {
   createdAt: number
 }
 
-export type NoteKind = 'idea' | 'question' | 'note' | 'quote' | 'dialogue'
+export type NoteKind = 'idea' | 'question' | 'note' | 'quote' | 'dialogue' | 'lore'
 
 /** A quick capture. Lives in the inbox until the author attaches or archives it. */
 export interface Note extends Base {
@@ -139,6 +139,9 @@ export interface Note extends Base {
   characterIds?: string[]
   /** A quote or dialogue that has already made it into the text. */
   used?: boolean
+  /** Матчасть (kind 'lore'): the entry's name — a place, a spell, an event — and its topic. */
+  title?: string
+  topic?: string
 }
 
 /** A scene's text, stored apart from its card so plan edits and writing never collide. id = scene id. */

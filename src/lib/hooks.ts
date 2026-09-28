@@ -13,6 +13,8 @@ export interface ProjectData {
   pool: { chapter?: Chapter; scenes: Scene[] }
   markers: Marker[]
   notes: Note[]
+  /** Матчасть: facts about the story's world, kept apart from quick notes. */
+  lore: Note[]
   lines: Line[]
   characters: Character[]
   lineById: Map<string, Line>
@@ -78,7 +80,10 @@ export function useProjectData(projectId: string | undefined): ProjectData | und
       markers: [...raw.markers].sort((a, b) => a.createdAt - b.createdAt),
       lineById: new Map(raw.lines.map((l) => [l.id, l])),
       characterById: new Map(raw.characters.map((c) => [c.id, c])),
-      notes: [...raw.notes].sort((a, b) => b.createdAt - a.createdAt),
+      notes: raw.notes.filter((n) => n.kind !== 'lore').sort((a, b) => b.createdAt - a.createdAt),
+      lore: raw.notes
+        .filter((n) => n.kind === 'lore' && n.projectId === raw.project.id)
+        .sort((a, b) => (a.title ?? '').localeCompare(b.title ?? '', 'ru')),
     }
   }, [raw])
 }

@@ -17,7 +17,7 @@ export async function makeBackup(): Promise<Backup> {
 
 export async function downloadBackup() {
   const dump = await makeBackup()
-  download(new Blob([JSON.stringify(dump)], { type: 'application/json' }), `manuscript-копия-${new Date().toISOString().slice(0, 10)}.json`)
+  download(new Blob([JSON.stringify(dump)], { type: 'application/json' }), `manuscript-backup-${new Date().toISOString().slice(0, 10)}.json`)
   try {
     localStorage.setItem(LAST_KEY, String(Date.now()))
   } catch {

@@ -9,6 +9,8 @@ import { TypoControls } from '../components/TypoControls'
 import { MarkerCard } from '../components/MarkerCard'
 import { PlacePicker } from '../components/Refs'
 import { SceneEditor, type SelectionAction } from '../components/SceneEditor'
+import { editHintsKey } from '../components/EditHints'
+import { countHints } from '../lib/editcheck'
 import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { hotkey, session } from '../lib/session'
@@ -21,6 +23,7 @@ import { InlineEdit, Modal, toast } from '../lib/ui'
 type Mode = 'write' | 'edit' | 'rewrite'
 const PANELS_KEY = 'manuscript.panels'
 const MODE_KEY = 'manuscript.mode'
+const HINTS_KEY = 'manuscript.hints'
 
 function loadPanels(): { nav: boolean; plan: boolean } {
   const wide = typeof matchMedia !== 'undefined' && matchMedia('(min-width: 1101px)').matches
@@ -80,6 +83,43 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
   const [typoOpen, setTypoOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const { sprint, left } = useSprint()
+  const [hintsOn, setHintsOn] = useState(() => {
+    try {
+      return localStorage.getItem(HINTS_KEY) !== '0'
+    } catch {
+      return true
+    }
+  })
+  const [hintCounts, setHintCounts] = useState<ReturnType<typeof countHints> | null>(null)
+
+  // «Править»: repeats, long sentences and filler words are underlined while the hints are on.
+  useEffect(() => {
+    if (!editor) return
+    editor.view.dispatch(editor.state.tr.setMeta(editHintsKey, mode === 'edit' && hintsOn))
+    let last = ''
+    const update = () => {
+      const st = editHintsKey.getState(editor.state)
+      const next = st?.on ? countHints(st.hints) : null
+      const key = JSON.stringify(next)
+      if (key !== last) {
+        last = key
+        setHintCounts(next)
+      }
+    }
+    update()
+    editor.on('transaction', update)
+    return () => {
+      editor.off('transaction', update)
+    }
+  }, [editor, mode, hintsOn])
+  const toggleHints = () => {
+    setHintsOn(!hintsOn)
+    try {
+      localStorage.setItem(HINTS_KEY, hintsOn ? '0' : '1')
+    } catch {
+      /* ignore */
+    }
+  }
   const [bannerHidden, setBannerHidden] = useState(() => sessionStorage.getItem('manuscript.banner') === '1')
 
   // While typing, everything around the text fades out; moving the mouse or touching brings it back.
@@ -191,6 +231,20 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
             <InlineEdit value={scene.title} placeholder={sceneName(data, scene)} onSave={(title) => void patch<Scene>('scenes', scene.id, { title })} />
             {mode !== 'write' && <span className="mode-chip">{mode === 'edit' ? 'правка' : 'переписываю'}</span>}
           </div>
+          {mode === 'edit' && (
+            <span className="hints-bar">
+              <button className={`chip-toggle sm ${hintsOn ? 'on' : ''}`} onClick={toggleHints} title="Подчёркивать повторы, длинные предложения и лишние слова">
+                Подсказки
+              </button>
+              {hintCounts && (
+                <span className="hints-legend hide-sm">
+                  <span className="eh-repeat">повторы {hintCounts.repeat}</span>
+                  <span className="eh-long">длинные {hintCounts.long}</span>
+                  <span className="eh-filler">лишние {hintCounts.filler}</span>
+                </span>
+              )}
+            </span>
+          )}
           <span className="spacer" />
           {sprint && sprint.projectId === data.project.id && left > 0 && (
             <button className="tool sprint-pill" title="Спринт идёт. Нажми, чтобы остановить" onClick={() => confirm('Остановить спринт?') && stopSprint()}>

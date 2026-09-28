@@ -73,14 +73,14 @@ export function BookView({ data }: { data: ProjectData }) {
         </div>
       </div>
 
+      <PaceSection data={data} />
+
+      <PublishSection data={data} onCopy={(id) => void copyFicbook(id)} />
+
       <section className="card settings-section stack">
         <h3>Описание</h3>
         <InlineEdit className="input" multiline placeholder="Фандом, пэйринг, аннотация — что угодно" value={p.description ?? ''} onSave={(description) => set({ description })} />
       </section>
-
-      <PaceSection data={data} />
-
-      <PublishSection data={data} onCopy={(id) => void copyFicbook(id)} />
 
       <section className="card settings-section stack">
         <h3>Сохранить</h3>

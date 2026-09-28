@@ -4,6 +4,7 @@ export type Route =
   | { view: 'text'; sceneId?: string }
   | { view: 'board' }
   | { view: 'characters' }
+  | { view: 'lore' }
   | { view: 'inbox' }
   | { view: 'settings' }
   | { view: 'library' }
@@ -13,7 +14,7 @@ export type Route =
 export function parseHash(hash: string): Route {
   const [, view, id] = hash.replace(/^#/, '').split('/')
   if (view === 'write' || view === 'text') return { view: 'text', sceneId: id || undefined }
-  if (view === 'board' || view === 'characters' || view === 'inbox' || view === 'settings' || view === 'library' || view === 'book' || view === 'help') return { view }
+  if (view === 'board' || view === 'characters' || view === 'lore' || view === 'inbox' || view === 'settings' || view === 'library' || view === 'book' || view === 'help') return { view }
   return { view: 'text' }
 }
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSyncStatus, onSyncStatus, startCloudSync, type SyncStatus } from './db/cloud'
 import { markerStatus, useProjectData, useProjects, type ProjectData } from './lib/hooks'
-import { tidyImportedScenes } from './db/repo'
+import { recountWords, tidyImportedScenes } from './db/repo'
 import { go, useRoute, type Route } from './lib/router'
 import { getCurrentProjectId, hotkey, returnFocus, setCurrentProjectId } from './lib/session'
 import { Modal, Toaster } from './lib/ui'
@@ -17,6 +17,7 @@ import { Welcome } from './views/Welcome'
 import { LibraryView } from './views/LibraryView'
 import { BookView } from './views/BookView'
 import { HelpView } from './views/HelpView'
+import { LoreView } from './views/LoreView'
 import { deadlineText } from './lib/stories'
 import { backupDue, downloadBackup, snoozeBackup } from './lib/backup'
 import { startSprint, stopSprint, useSprint } from './lib/sprint'
@@ -57,7 +58,7 @@ export function App() {
 
   const data = useProjectData(projectId)
   useEffect(() => {
-    if (projectId) void tidyImportedScenes(projectId)
+    if (projectId) void tidyImportedScenes(projectId).then(() => recountWords(projectId))
   }, [projectId])
 
   const selectProject = useCallback((id: string) => {
@@ -158,6 +159,7 @@ export function App() {
         <main className={`page ${route.view === 'board' ? 'wide' : ''}`}>
           {route.view === 'board' && <BoardView data={data} />}
           {route.view === 'characters' && <CharactersView data={data} />}
+          {route.view === 'lore' && <LoreView data={data} />}
           {route.view === 'inbox' && <InboxView data={data} />}
           {route.view === 'book' && <BookView data={data} />}
         </main>
@@ -205,7 +207,11 @@ function AppHeader({ data, route, sync, onSearch }: { data: ProjectData; route: 
       </div>
       <nav className="tabs">
         {TABS.map((t) => (
-          <button key={t.view} aria-current={route.view === t.view ? 'page' : undefined} onClick={() => go({ view: t.view } as Route)}>
+          <button
+            key={t.view}
+            aria-current={route.view === t.view || (t.view === 'characters' && route.view === 'lore') ? 'page' : undefined}
+            onClick={() => go({ view: t.view } as Route)}
+          >
             <span className="tab-ico">
               <Icon name={t.ico} />
             </span>

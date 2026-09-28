@@ -9,7 +9,7 @@ export function dayKey(t = Date.now()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
 
-// Words are counted as they are saved and written to the project a few seconds later, in one go.
+// Words are counted as they are saved and written to the project a couple of seconds later, in one go.
 const pending = new Map<string, number>()
 let timer: ReturnType<typeof setTimeout> | undefined
 
@@ -17,7 +17,7 @@ export function recordWords(projectId: string, added: number) {
   if (!(added > 0)) return
   pending.set(projectId, (pending.get(projectId) ?? 0) + added)
   clearTimeout(timer)
-  timer = setTimeout(() => void flushWords(), 5000)
+  timer = setTimeout(() => void flushWords(), 2000)
 }
 
 export async function flushWords() {
@@ -37,6 +37,7 @@ export async function flushWords() {
 }
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && void flushWords())
+  window.addEventListener('pagehide', () => void flushWords())
 }
 
 export function wordsOn(project: Project, key: string): number {
