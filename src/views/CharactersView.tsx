@@ -9,6 +9,7 @@ import { createLine, createNote, findOrCreateCharacter, mergeCharacters, patch, 
 import type { ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { InlineEdit, toast } from '../lib/ui'
+import { WorldNav } from './LoreView'
 
 /** People of the story: a few free lines about each, their own story line, their quotes. */
 export function CharactersView({ data }: { data: ProjectData }) {
@@ -26,7 +27,8 @@ export function CharactersView({ data }: { data: ProjectData }) {
   return (
     <div>
       <div className="toolbar">
-        <h1 style={{ marginRight: 'auto' }}>Герои</h1>
+        <WorldNav current="characters" />
+        <span className="spacer" />
         {data.characters.length > 0 && (
           <button className="btn" onClick={() => setTagging(true)}>
             Найти героев в сценах

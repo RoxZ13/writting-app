@@ -1,6 +1,6 @@
 import type { Editor } from '@tiptap/react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { db, uid, type Beat, type Marker, type Note, type Scene, type SceneText } from '../db/db'
 import { createMarker, mergeSceneIntoPrevious, patch, remove, save, snapshotScene } from '../db/repo'
 import { markerPayoffChapter, markerStatus, unusedLines, type ProjectData } from '../lib/hooks'
@@ -9,6 +9,8 @@ import { MARKER_STATES, noteKind, STATUSES, timeAgo } from '../lib/status'
 import { hotkey, isTouch } from '../lib/session'
 import { toast } from '../lib/ui'
 import { RefChips } from './Refs'
+import { loreInText } from '../lib/lore'
+import { docParagraphs } from '../lib/text'
 
 /** Update beats from the freshest stored copy, so quick successive edits never overwrite each other. */
 export async function updateBeats(sceneId: string, fn: (beats: Beat[]) => Beat[]) {
@@ -134,6 +136,8 @@ export function ScenePlan({
           {quotes.length > 0 && <Quotes data={data} scene={scene} editor={editor} quotes={quotes} />}
         </div>
 
+        <SceneLore data={data} scene={scene} />
+
         {notes.length > 0 && (
           <div className="pp-section">
             <h4>Заметки на полях</h4>
@@ -151,6 +155,30 @@ export function ScenePlan({
         <More data={data} scene={scene} editor={editor} />
       </div>
     </section>
+  )
+}
+
+/** Lore entries this scene's text mentions — the facts to keep straight while writing it. */
+function SceneLore({ data, scene }: { data: ProjectData; scene: Scene }) {
+  const text = useLiveQuery(() => (data.lore.length ? db.texts.get(scene.id) : undefined), [scene.id, data.lore.length])
+  const found = useMemo(
+    () => (text ? loreInText(data.lore, [scene.title, scene.goal, ...docParagraphs(text.content)].join('\n')) : []),
+    [text, data.lore, scene.title, scene.goal],
+  )
+  if (!found.length) return null
+  return (
+    <div className="pp-section">
+      <h4>Матчасть в сцене</h4>
+      {found.map((n) => (
+        <details key={n.id} className="pp-lore">
+          <summary>
+            {n.title}
+            {n.topic && <span className="muted small"> · {n.topic}</span>}
+          </summary>
+          <div className="pp-lore-text">{n.text || 'пока без описания'}</div>
+        </details>
+      ))}
+    </div>
   )
 }
 

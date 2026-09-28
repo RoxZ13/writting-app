@@ -9,9 +9,14 @@ import { TypoControls } from '../components/TypoControls'
 import { MarkerCard } from '../components/MarkerCard'
 import { PlacePicker } from '../components/Refs'
 import { SceneEditor, type SelectionAction } from '../components/SceneEditor'
+import { editHintsKey } from '../components/EditHints'
+import { countHints } from '../lib/editcheck'
 import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { hotkey, session } from '../lib/session'
+import { clock, useSprint } from '../lib/sprint'
+import { endFocus, FocusStart } from '../components/Focus'
+import { dayKey, wordsOn } from '../lib/pace'
 import { MARKER_STATES, statusOf } from '../lib/status'
 import { docParagraphs, emptyDoc, formatWords } from '../lib/text'
 import { InlineEdit, Modal, toast } from '../lib/ui'
@@ -19,6 +24,7 @@ import { InlineEdit, Modal, toast } from '../lib/ui'
 type Mode = 'write' | 'edit' | 'rewrite'
 const PANELS_KEY = 'manuscript.panels'
 const MODE_KEY = 'manuscript.mode'
+const HINTS_KEY = 'manuscript.hints'
 
 function loadPanels(): { nav: boolean; plan: boolean } {
   const wide = typeof matchMedia !== 'undefined' && matchMedia('(min-width: 1101px)').matches
@@ -77,6 +83,45 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
   const [finishing, setFinishing] = useState(false)
   const [typoOpen, setTypoOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const { sprint, left } = useSprint()
+  const [focusOpen, setFocusOpen] = useState(false)
+  const [hintsOn, setHintsOn] = useState(() => {
+    try {
+      return localStorage.getItem(HINTS_KEY) !== '0'
+    } catch {
+      return true
+    }
+  })
+  const [hintCounts, setHintCounts] = useState<ReturnType<typeof countHints> | null>(null)
+
+  // «Править»: repeats, long sentences and filler words are underlined while the hints are on.
+  useEffect(() => {
+    if (!editor) return
+    editor.view.dispatch(editor.state.tr.setMeta(editHintsKey, mode === 'edit' && hintsOn))
+    let last = ''
+    const update = () => {
+      const st = editHintsKey.getState(editor.state)
+      const next = st?.on ? countHints(st.hints) : null
+      const key = JSON.stringify(next)
+      if (key !== last) {
+        last = key
+        setHintCounts(next)
+      }
+    }
+    update()
+    editor.on('transaction', update)
+    return () => {
+      editor.off('transaction', update)
+    }
+  }, [editor, mode, hintsOn])
+  const toggleHints = () => {
+    setHintsOn(!hintsOn)
+    try {
+      localStorage.setItem(HINTS_KEY, hintsOn ? '0' : '1')
+    } catch {
+      /* ignore */
+    }
+  }
   const [bannerHidden, setBannerHidden] = useState(() => sessionStorage.getItem('manuscript.banner') === '1')
 
   // While typing, everything around the text fades out; moving the mouse or touching brings it back.
@@ -188,7 +233,26 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
             <InlineEdit value={scene.title} placeholder={sceneName(data, scene)} onSave={(title) => void patch<Scene>('scenes', scene.id, { title })} />
             {mode !== 'write' && <span className="mode-chip">{mode === 'edit' ? 'правка' : 'переписываю'}</span>}
           </div>
+          {mode === 'edit' && (
+            <span className="hints-bar">
+              <button className={`chip-toggle sm ${hintsOn ? 'on' : ''}`} onClick={toggleHints} title="Подчёркивать повторы, длинные предложения и лишние слова">
+                Подсказки
+              </button>
+              {hintCounts && (
+                <span className="hints-legend hide-sm">
+                  <span className="eh-repeat">повторы {hintCounts.repeat}</span>
+                  <span className="eh-long">длинные {hintCounts.long}</span>
+                  <span className="eh-filler">лишние {hintCounts.filler}</span>
+                </span>
+              )}
+            </span>
+          )}
           <span className="spacer" />
+          {sprint && sprint.projectId === data.project.id && left > 0 && (
+            <button className="tool sprint-pill" title="Фокус идёт. Нажми, чтобы остановить" onClick={() => confirm('Остановить фокус?') && endFocus()}>
+              ⏱ {clock(left)}
+            </button>
+          )}
           <button
             className={`tool ${panels.plan ? 'on' : ''}`}
             title={panels.plan ? 'Скрыть план сцены' : 'План сцены: зачем она, по пунктам, маячки, кто в ней'}
@@ -267,6 +331,19 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
                     className="mode-item"
                     onClick={() => {
                       setMenuOpen(false)
+                      setFocusOpen(true)
+                    }}
+                  >
+                    <span className="mode-dot">⏱</span>
+                    <span>
+                      <strong>Фокус</strong>
+                      <span className="mode-hint">Только текст и таймер, без уведомлений. В конце — сколько написала</span>
+                    </span>
+                  </button>
+                  <button
+                    className="mode-item"
+                    onClick={() => {
+                      setMenuOpen(false)
                       onCapture()
                     }}
                   >
@@ -303,7 +380,7 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
                     </span>
                   </button>
                   <div className="small muted" style={{ padding: '8px 10px 2px' }}>
-                    {formatWords(words ?? scene.wordCount)} в сцене
+                    {formatWords(words ?? scene.wordCount)} в сцене · сегодня +{wordsOn(data.project, dayKey()).toLocaleString('ru-RU')}
                   </div>
                 </div>
               </>
@@ -380,6 +457,17 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
           }}
         />
       )}
+      {focusOpen && (
+        <FocusStart
+          data={data}
+          onClose={() => setFocusOpen(false)}
+          onStarted={() => {
+            setFocusOpen(false)
+            persistPanels({ nav: false, plan: false })
+            editor?.commands.focus()
+          }}
+        />
+      )}
       {finishing && <FinishSession project={data.project} onClose={() => setFinishing(false)} />}
     </div>
   )
@@ -403,8 +491,8 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
       <div className="eyebrow" style={{ margin: '4px 8px 10px' }}>
         Структура
       </div>
-      {data.outline.map(({ chapter, scenes }) => (
-        <div key={chapter.id}>
+      {[...data.outline, ...(data.pool.scenes.length && data.pool.chapter ? [{ chapter: data.pool.chapter, scenes: data.pool.scenes }] : [])].map(({ chapter, scenes }) => (
+        <div key={chapter.id} className={chapter.pool ? 'nav-pool' : undefined}>
           <button className="nav-chapter" onClick={() => toggle(chapter.id)}>
             <span className="caret">{closed.has(chapter.id) ? '▸' : '▾'}</span>
             {chapter.title}
@@ -510,6 +598,8 @@ function StartRewrite({ scene, editor, onClose, onStarted }: { scene: Scene; edi
 
 function FinishSession({ project, onClose }: { project: Project; onClose: () => void }) {
   const [v, setV] = useState(project.nextStep ?? '')
+  const today = wordsOn(project, dayKey())
+  const goal = project.dailyGoal
   const done = async () => {
     await patch<Project>('projects', project.id, { nextStep: v.trim() })
     sessionStorage.removeItem('manuscript.banner')
@@ -520,6 +610,12 @@ function FinishSession({ project, onClose }: { project: Project; onClose: () => 
     <Modal onClose={onClose} label="Закончить на сегодня">
       <div className="stack">
         <h2>На сегодня всё?</h2>
+        {today > 0 && (
+          <div className="day-total">
+            Сегодня <strong>+{today.toLocaleString('ru-RU')}</strong> {goal ? `из ${goal.toLocaleString('ru-RU')} ` : ''}слов
+            {goal && today >= goal ? ' — цель дня есть' : ''}
+          </div>
+        )}
         <label>
           <span className="field-label">Записка себе на следующий раз</span>
           <textarea

@@ -14,7 +14,7 @@ import {
   type Character,
   type SyncedTable,
 } from './db'
-import { docParagraphs, emptyDoc } from '../lib/text'
+import { docParagraphs, docWordCount, emptyDoc } from '../lib/text'
 import { isEpigraph, makeExcerpt } from '../lib/importer'
 
 /** Write a record locally and queue it for sync. All app writes go through here. */
@@ -44,7 +44,7 @@ export function onLocalChange(fn: Listener) {
   listeners.add(fn)
   return () => listeners.delete(fn)
 }
-function notifyChange() {
+export function notifyChange() {
   listeners.forEach((fn) => fn())
 }
 
@@ -55,7 +55,7 @@ export const alive = <T extends Base>(rows: T[]) => rows.filter((r) => !r.delete
 export async function createProject(title: string): Promise<Project> {
   const now = Date.now()
   const project = await save<Project>('projects', { id: uid(), title, createdAt: now, updatedAt: now })
-  const chapter = await createChapter(project.id, 'Глава 1')
+  const chapter = await createChapter(project.id, 'Вся история')
   const scene = await createScene(project.id, chapter.id, 'Первая сцена')
   await patch<Project>('projects', project.id, { lastSceneId: scene.id })
   return project
@@ -69,6 +69,13 @@ export async function createChapter(projectId: string, title: string, order?: nu
     order = existing.length ? Math.max(...existing.map((c) => c.order)) + 1 : 0
   }
   return save<Chapter>('chapters', { id: uid(), projectId, title, order, goal: '', updatedAt: 0 })
+}
+
+/** The "Пока без места" chapter of a project, created on first use. */
+export async function ensurePool(projectId: string): Promise<Chapter> {
+  const existing = alive(await db.chapters.where('projectId').equals(projectId).toArray()).find((c) => c.pool)
+  if (existing) return existing
+  return save<Chapter>('chapters', { id: uid(), projectId, title: 'Пока без места', order: -1, goal: '', pool: true, updatedAt: 0 })
 }
 
 export async function deleteChapter(id: string) {
@@ -210,7 +217,10 @@ export async function applyOutline(items: OutlineItem[]) {
 }
 
 async function outlineOf(projectId: string): Promise<OutlineItem[]> {
-  const chapters = alive(await db.chapters.where('projectId').equals(projectId).toArray()).sort((a, b) => a.order - b.order)
+  // The pool is not part of the reading order: splitting or merging chapters never touches it.
+  const chapters = alive(await db.chapters.where('projectId').equals(projectId).toArray())
+    .filter((c) => !c.pool)
+    .sort((a, b) => a.order - b.order)
   const scenes = alive(await db.scenes.where('projectId').equals(projectId).toArray())
   return chapters.flatMap((c) => [
     { type: 'chapter' as const, id: c.id },
@@ -383,6 +393,24 @@ export async function tidyImportedScenes(projectId: string) {
       epigraph: s.epigraph ?? epigraph,
       excerpt: makeExcerpt(body),
     })
+  }
+  await db.meta.put({ key: flag, value: true })
+}
+
+/**
+ * Early imports counted words their own way (a hyphenated word as two), so the first edit of such a
+ * scene looked like lost words. Recount once with the editor's counter.
+ */
+export async function recountWords(projectId: string) {
+  const flag = `recount.${projectId}`
+  if (await db.meta.get(flag)) return
+  const scenes = alive(await db.scenes.where('projectId').equals(projectId).toArray())
+  for (const s of scenes) {
+    const t = await db.texts.get(s.id)
+    if (!t) continue
+    const n = docWordCount(t.content)
+    if (t.wordCount !== n) await save<SceneText>('texts', { ...t, wordCount: n })
+    if (s.wordCount !== n) await save<Scene>('scenes', { ...s, wordCount: n })
   }
   await db.meta.put({ key: flag, value: true })
 }

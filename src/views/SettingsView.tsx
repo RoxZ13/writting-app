@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { db } from '../db/db'
 import {
   currentEmail,
   getCloudConfig,
@@ -9,7 +8,8 @@ import {
   syncNow,
   type SyncStatus,
 } from '../db/cloud'
-import { download } from '../lib/exporter'
+import { downloadBackup, readBackupFile, restoreBackup } from '../lib/backup'
+import { toast } from '../lib/ui'
 import { applyTheme, getTheme, type Theme } from '../lib/session'
 import { TypoControls } from '../components/TypoControls'
 import { timeAgo } from '../lib/status'
@@ -17,12 +17,15 @@ import { timeAgo } from '../lib/status'
 /** Settings of the app itself (not of a book): look, devices, installing, backup. */
 export function SettingsView({ sync }: { sync: SyncStatus }) {
   const [theme, setTheme] = useState<Theme>(getTheme)
-  const backup = async () => {
-    const dump: Record<string, unknown[]> = {}
-    for (const t of ['projects', 'chapters', 'scenes', 'texts', 'markers', 'notes', 'snapshots', 'lines', 'characters'] as const) {
-      dump[t] = await db.table(t).toArray()
+  const restore = async (file: File) => {
+    try {
+      const dump = await readBackupFile(file)
+      if (!confirm('Вернуть из копии? Добавится всё, чего нет на этом устройстве, и обновится то, что в копии новее. Ничего не удаляется.')) return
+      const { added, updated } = await restoreBackup(dump)
+      toast(added + updated ? `Готово: добавлено ${added}, обновлено ${updated}` : 'На устройстве уже всё есть — ничего не поменялось')
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не получилось прочитать файл')
     }
-    download(new Blob([JSON.stringify(dump)], { type: 'application/json' }), `manuscript-backup-${new Date().toISOString().slice(0, 10)}.json`)
   }
 
   return (
@@ -80,10 +83,19 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
 
       <section className="card settings-section stack">
         <h3>Резервная копия</h3>
-        <div className="small muted">Все истории, заметки и версии одним файлом — на всякий случай.</div>
-        <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void backup()}>
-          Скачать копию (.json)
-        </button>
+        <div className="small muted">
+          Все истории, заметки и версии одним файлом — на всякий случай. Раз в неделю приложение само напомнит. Храни файл где-нибудь ещё: в «Файлах», на
+          Яндекс Диске, в почте.
+        </div>
+        <div className="row">
+          <button className="btn primary" onClick={() => void downloadBackup()}>
+            Скачать копию
+          </button>
+          <label className="btn">
+            Вернуть из копии…
+            <input type="file" hidden accept=".json,application/json" onChange={(e) => e.target.files?.[0] && void restore(e.target.files[0])} />
+          </label>
+        </div>
       </section>
     </div>
   )

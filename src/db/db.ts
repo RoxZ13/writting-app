@@ -25,6 +25,20 @@ export interface Project extends Base {
   stage?: StoryStage
   /** Target date, YYYY-MM-DD. */
   deadline?: string
+  /** The essence of the story, kept in sight while planning: what it is about, how it ends, what drives it. */
+  premise?: string
+  ending?: string
+  drive?: string
+  /** Words written per day, local date YYYY-MM-DD → words added (deletions are not subtracted). */
+  progress?: Record<string, number>
+  /** A gentle daily target in words. */
+  dailyGoal?: number
+  /** Planned length of the whole book, in words. */
+  targetWords?: number
+  /** Ficbook: a new chapter every N days. */
+  publishEvery?: number
+  /** The work's page on Ficbook; when empty, taken from the imported header. */
+  ficbookUrl?: string
 }
 
 export interface Chapter extends Base {
@@ -35,6 +49,10 @@ export interface Chapter extends Base {
   goal: string
   /** Target date, YYYY-MM-DD. */
   deadline?: string
+  /** "Пока без места": scenes jotted down before they have a chapter. Not part of the book's reading order. */
+  pool?: boolean
+  /** Date the chapter went up on Ficbook, YYYY-MM-DD. */
+  publishedAt?: string
 }
 
 export type SceneStatus = 'idea' | 'draft' | 'written' | 'logic' | 'style' | 'done'
@@ -67,6 +85,10 @@ export interface Scene extends Base {
   lineIds?: string[]
   /** Characters present in the scene. */
   characterIds?: string[]
+  /** A key point of the plot (узловая точка) — the scenes in between are placed around these. */
+  node?: boolean
+  /** Emotional intensity, 1–5: the board draws the story's arc from it. */
+  heat?: number
   /** While rewriting: the snapshot holding the text as it was before, shown next to the new draft. */
   rewriteFrom?: string
 }
@@ -105,7 +127,7 @@ export interface Marker extends Base {
   createdAt: number
 }
 
-export type NoteKind = 'idea' | 'question' | 'note' | 'quote' | 'dialogue'
+export type NoteKind = 'idea' | 'question' | 'note' | 'quote' | 'dialogue' | 'lore'
 
 /** A quick capture. Lives in the inbox until the author attaches or archives it. */
 export interface Note extends Base {
@@ -119,6 +141,9 @@ export interface Note extends Base {
   characterIds?: string[]
   /** A quote or dialogue that has already made it into the text. */
   used?: boolean
+  /** Матчасть (kind 'lore'): the entry's name — a place, a spell, an event — and its topic. */
+  title?: string
+  topic?: string
 }
 
 /** A scene's text, stored apart from its card so plan edits and writing never collide. id = scene id. */
