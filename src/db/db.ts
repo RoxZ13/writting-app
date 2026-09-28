@@ -35,6 +35,8 @@ export interface Project extends Base {
   dailyGoal?: number
   /** Planned length of the whole book, in words. */
   targetWords?: number
+  /** How many chapters the book will have — a landmark besides the deadline. */
+  targetChapters?: number
   /** Ficbook: a new chapter every N days. */
   publishEvery?: number
   /** The work's page on Ficbook; when empty, taken from the imported header. */
@@ -144,6 +146,9 @@ export interface Note extends Base {
   /** Матчасть (kind 'lore'): the entry's name — a place, a spell, an event — and its topic. */
   title?: string
   topic?: string
+  /** Матчасть pinned to places in the book; heroes go in characterIds. */
+  sceneIds?: string[]
+  chapterIds?: string[]
 }
 
 /** A scene's text, stored apart from its card so plan edits and writing never collide. id = scene id. */

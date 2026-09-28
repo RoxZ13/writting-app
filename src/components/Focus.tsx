@@ -127,22 +127,13 @@ export function FocusStart({ data, onStarted, onClose }: { data: ProjectData; on
 function DndSetup({ onDone }: { onDone: () => void }) {
   return (
     <div className="dnd-setup card">
-      <strong>Один раз настроить (2 минуты)</strong>
-      <p className="small" style={{ margin: '6px 0' }}>
-        Сайт не может сам выключить уведомления — это умеет только iPhone, iPad или Mac. Сделай две маленькие команды, и дальше всё будет одной галочкой.
-      </p>
+      <strong>Один раз, 2 минуты</strong>
       <ol className="small">
         <li>
-          Открой приложение <strong>«Команды»</strong> → «+» (новая команда).
+          «Команды» → «+» → действие <strong>«Настроить фокусирование»</strong>: «Не беспокоить», «Включить». Имя: <strong>{ON_SHORTCUT}</strong>
         </li>
         <li>
-          «Добавить действие» → найди <strong>«Настроить фокусирование»</strong> → выбери «Не беспокоить», «Включить», «До выключения».
-        </li>
-        <li>
-          Назови команду точно так: <strong>{ON_SHORTCUT}</strong>.
-        </li>
-        <li>
-          Сделай вторую так же, но «Выключить», и назови <strong>{OFF_SHORTCUT}</strong>.
+          Ещё одна такая же, но «Выключить». Имя: <strong>{OFF_SHORTCUT}</strong>
         </li>
       </ol>
       <button

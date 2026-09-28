@@ -8,7 +8,7 @@ const date = (d: Date | string) =>
   (typeof d === 'string' ? new Date(d + 'T12:00:00') : d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
 const num = (n: number) => n.toLocaleString('ru-RU')
 
-function NumberField({ value, placeholder, onSave }: { value?: number; placeholder: string; onSave: (v?: number) => void }) {
+export function NumberField({ value, placeholder, onSave }: { value?: number; placeholder: string; onSave: (v?: number) => void }) {
   return (
     <input
       className="input num-input"
@@ -23,50 +23,54 @@ function NumberField({ value, placeholder, onSave }: { value?: number; placehold
   )
 }
 
-/** A calm forecast: how much gets written, and when the book is done at this pace. No streaks, no guilt. */
+/**
+ * A calm forecast: how much gets written, and when the book is done at this pace. No streaks, no guilt:
+ * folded into one line, and with no written days yet it shows no zeros at all.
+ */
 export function PaceSection({ data }: { data: ProjectData }) {
   const p = data.project
   const set = (changes: Partial<Project>) => void patch<Project>('projects', p.id, changes)
   const total = totalWords([...data.scenes, ...data.pool.scenes])
   const pc = pace(p, total)
+  const written = pc.last14.some((d) => d.words > 0)
   const max = Math.max(1, ...pc.last14.map((d) => d.words), p.dailyGoal ?? 0)
+  const summary = written
+    ? `Темп · сегодня +${num(pc.today)}${p.dailyGoal ? ` из ${num(p.dailyGoal)}` : ''} · ${num(pc.perDay)} в день`
+    : 'Темп и цели'
   return (
-    <section className="card settings-section stack">
-      <h3>Темп</h3>
-      <div className="pace-row">
-        <div>
-          <div className="pace-big">+{num(pc.today)}</div>
-          <div className="small muted">сегодня{p.dailyGoal ? ` из ${num(p.dailyGoal)}` : ''}</div>
-        </div>
-        <div>
-          <div className="pace-big">{num(pc.perDay)}</div>
-          <div className="small muted">слов в день за 2 недели</div>
-        </div>
-        <div>
-          <div className="pace-big">{num(total)}</div>
-          <div className="small muted">{p.targetWords ? `из ${num(p.targetWords)} в книге` : 'слов в книге'}</div>
+    <details className="card settings-section book-fold">
+      <summary>
+        <span>{summary}</span>
+        <span className="muted small">{num(total)} сл.</span>
+      </summary>
+      <div className="stack" style={{ marginTop: 14 }}>
+        {written ? (
+          <>
+            <div className="pace-bars" aria-label="Слова по дням за две недели">
+              {pc.last14.map((d) => (
+                <span key={d.key} title={`${date(d.key)}: ${num(d.words)} сл.`} className={d.key === dayKey() ? 'today' : ''}>
+                  <i style={{ height: `${Math.round((d.words / max) * 100)}%` }} />
+                </span>
+              ))}
+              {p.dailyGoal ? <b className="pace-goal" style={{ bottom: `${Math.round((p.dailyGoal / max) * 100)}%` }} /> : null}
+            </div>
+            <div className="pace-forecast">{forecastText(p, pc)}</div>
+          </>
+        ) : (
+          <div className="muted small">Начнёшь писать — здесь появится, сколько слов в день выходит и когда допишешь. Цели ниже — по желанию.</div>
+        )}
+        <div className="row" style={{ gap: 20 }}>
+          <label>
+            <span className="field-label">Цель на день, слов</span>
+            <NumberField value={p.dailyGoal} placeholder="необязательно" onSave={(dailyGoal) => set({ dailyGoal })} />
+          </label>
+          <label>
+            <span className="field-label">Сколько слов в книге будет</span>
+            <NumberField value={p.targetWords} placeholder="необязательно" onSave={(targetWords) => set({ targetWords })} />
+          </label>
         </div>
       </div>
-      <div className="pace-bars" aria-label="Слова по дням за две недели">
-        {pc.last14.map((d) => (
-          <span key={d.key} title={`${date(d.key)}: ${num(d.words)} сл.`} className={d.key === dayKey() ? 'today' : ''}>
-            <i style={{ height: `${Math.round((d.words / max) * 100)}%` }} />
-          </span>
-        ))}
-        {p.dailyGoal ? <b className="pace-goal" style={{ bottom: `${Math.round((p.dailyGoal / max) * 100)}%` }} /> : null}
-      </div>
-      <div className="pace-forecast">{forecastText(p, pc)}</div>
-      <div className="row" style={{ gap: 20 }}>
-        <label>
-          <span className="field-label">Цель на день, слов</span>
-          <NumberField value={p.dailyGoal} placeholder="например, 500" onSave={(dailyGoal) => set({ dailyGoal })} />
-        </label>
-        <label>
-          <span className="field-label">Сколько слов в книге будет</span>
-          <NumberField value={p.targetWords} placeholder="например, 150 000" onSave={(targetWords) => set({ targetWords })} />
-        </label>
-      </div>
-    </section>
+    </details>
   )
 }
 
@@ -136,22 +140,24 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
       ) : (
         <div className="muted">Все главы выложены.</div>
       )}
-      <label className="row" style={{ gap: 10 }}>
-        <span className="small">Новая глава каждые</span>
-        <NumberField value={p.publishEvery} placeholder="7" onSave={(publishEvery) => void patch<Project>('projects', p.id, { publishEvery })} />
-        <span className="small">дн.</span>
-      </label>
-      <label className="stack" style={{ gap: 4 }}>
-        <span className="field-label">Работа на Фикбуке</span>
-        <input
-          className="input"
-          placeholder="https://ficbook.net/readfic/…"
-          defaultValue={p.ficbookUrl ?? link ?? ''}
-          onBlur={(e) => void patch<Project>('projects', p.id, { ficbookUrl: e.target.value.trim() || undefined })}
-        />
-      </label>
       <details>
-        <summary className="small">Все главы</summary>
+        <summary className="small">Все главы и план выкладки</summary>
+        <div className="stack" style={{ gap: 12, marginTop: 10 }}>
+          <label className="row" style={{ gap: 10 }}>
+            <span className="small">Новая глава каждые</span>
+            <NumberField value={p.publishEvery} placeholder="7" onSave={(publishEvery) => void patch<Project>('projects', p.id, { publishEvery })} />
+            <span className="small">дн.</span>
+          </label>
+          <label className="stack" style={{ gap: 4 }}>
+            <span className="field-label">Работа на Фикбуке</span>
+            <input
+              className="input"
+              placeholder="https://ficbook.net/readfic/…"
+              defaultValue={p.ficbookUrl ?? link ?? ''}
+              onBlur={(e) => void patch<Project>('projects', p.id, { ficbookUrl: e.target.value.trim() || undefined })}
+            />
+          </label>
+        </div>
         <div className="publish-list">
           {rows.map(({ chapter, ready, written }) => (
             <div key={chapter.id} className="publish-row">

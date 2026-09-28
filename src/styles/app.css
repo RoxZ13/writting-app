@@ -4517,3 +4517,195 @@ main.page {
   line-height: 1.5;
   color: var(--ink-3);
 }
+
+/* Book page: everyday things open, the rest folded. */
+.book-fold summary {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 16px;
+  font-weight: 700;
+}
+.book-fold summary::-webkit-details-marker {
+  display: none;
+}
+.book-fold summary::after {
+  content: '▾';
+  margin-left: auto;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.book-fold[open] summary::after {
+  content: '▴';
+}
+.book-fold-peek {
+  font-weight: 400;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.book-desc {
+  margin-top: 12px;
+  width: 100%;
+  font-family: var(--sans);
+}
+.toast {
+  pointer-events: none;
+}
+.tl-chapter.pool.is-empty .tl-head {
+  padding: 9px 16px;
+  font-size: 14px;
+  color: var(--ink-3);
+}
+.tl-chapter.pool.is-empty .tl-title {
+  font-weight: 600;
+}
+.date-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.date-chip .btn.late {
+  color: var(--mk-hanging);
+}
+.date-chip-input {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Typewriter mode: room below the last line so it can reach the middle of the screen. */
+[data-typewriter='on'] .editor-area .editor-wrap {
+  padding-bottom: 55vh;
+}
+button.deadline {
+  border: 0;
+  cursor: pointer;
+}
+.chapters-landmark {
+  font-size: 15px;
+}
+.lore-pins {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.lore-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  background: var(--fill);
+  border-radius: 999px;
+  padding: 2px 4px 2px 10px;
+}
+.lore-pin button {
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  padding: 0 4px;
+}
+.lore-pin-add {
+  font-size: 12px;
+  border: 1px dashed var(--line-2);
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-3);
+  padding: 2px 8px;
+  max-width: 160px;
+}
+.pp-lore-add {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--ink-3);
+}
+
+/* =====================================================================
+   «Тихий вид» — as in Calmly Writer: nothing but the page until the
+   mouse goes to the top. Mouse only; phones keep their bars.
+   ===================================================================== */
+.calm-count {
+  display: none;
+}
+@media (pointer: fine) {
+  [data-calm='on'] .app-text {
+    --header-h: 0px;
+  }
+  [data-calm='on'] .app-text .app-header {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 64px;
+    opacity: 0;
+    transform: translateY(-100%);
+    pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s;
+  }
+  [data-calm='on'] .app-text.reveal .app-header {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+  [data-calm='on'] .app-text .write-top {
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s, transform 0.25s;
+  }
+  [data-calm='on'] .app-text.reveal .write-top,
+  [data-calm='on'] .app-text .write-top:has(.typo-pop) {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(64px);
+  }
+  [data-calm='on'] .app-text .passport-wrap {
+    top: 0;
+  }
+  [data-calm='on'] .app-text .editor-area {
+    padding-top: 40px;
+  }
+  [data-calm='on'] .app-text .calm-count {
+    display: block;
+    position: fixed;
+    right: 20px;
+    bottom: 14px;
+    z-index: 5;
+    font-size: 12px;
+    color: var(--ink-3);
+    opacity: 0.5;
+    transition: opacity 0.3s;
+  }
+  [data-calm='on'] .app-text .write.typing .calm-count {
+    opacity: 0.25;
+  }
+}
+
+/* Paragraph in focus: the one being written stays bright. */
+[data-focuspara='on'] .write .ProseMirror > * {
+  transition: opacity 0.3s;
+}
+[data-focuspara='on'] .write .ProseMirror.ProseMirror-focused > *:not(.has-focus) {
+  opacity: 0.28;
+}
+.typo-pop {
+  max-height: calc(100dvh - 150px);
+  overflow-y: auto;
+}
+@media (pointer: fine) {
+  /* Side panels start below where the header appears, so it never covers their tops. */
+  [data-calm='on'] .app-text .write-side,
+  [data-calm='on'] .app-text .write-brief {
+    top: 64px;
+    height: calc(100dvh - 64px);
+  }
+}

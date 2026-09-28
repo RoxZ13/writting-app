@@ -20,6 +20,7 @@ import { BookView } from './views/BookView'
 import { HelpView } from './views/HelpView'
 import { LoreView } from './views/LoreView'
 import { deadlineText } from './lib/stories'
+import { chapterProgress } from './lib/pace'
 import { backupDue, downloadBackup, snoozeBackup } from './lib/backup'
 
 const TABS: { view: Route['view']; label: string; ico: string }[] = [
@@ -35,6 +36,7 @@ export function App() {
   const [capture, setCapture] = useState(false)
   const [searching, setSearching] = useState(false)
   const [sync, setSync] = useState<SyncStatus>(getSyncStatus)
+  const reveal = useReveal(route.view === 'text')
 
   // Tell the boot watchdog in index.html that storage answered and the app is alive.
   useEffect(() => {
@@ -137,7 +139,7 @@ export function App() {
   }
 
   return (
-    <div className={`app app-${route.view}`}>
+    <div className={`app app-${route.view} ${reveal ? 'reveal' : ''}`}>
       <AppHeader data={data} route={route} sync={sync} onSearch={() => setSearching(true)} />
       {sync.state !== 'ok' && <BackupReminder />}
       {route.view === 'text' && textScene && (
@@ -200,9 +202,7 @@ function AppHeader({ data, route, sync, onSearch }: { data: ProjectData; route: 
         </button>
         <span className="sync-dot" data-state={sync.state} title={syncTitle} />
         <MarkerStatus data={data} />
-        {deadlineText(data.project.deadline) && (
-          <span className={`deadline hide-sm ${deadlineText(data.project.deadline)!.late ? 'late' : ''}`}>⏳ {deadlineText(data.project.deadline)!.text}</span>
-        )}
+        <Landmark data={data} />
       </div>
       <nav className="tabs">
         {TABS.map((t) => (
@@ -288,4 +288,52 @@ function BackupReminder() {
       </button>
     </div>
   )
+}
+
+/** The quiet landmark in the header: the deadline, and how many chapters are left. */
+function Landmark({ data }: { data: ProjectData }) {
+  const due = deadlineText(data.project.deadline)
+  const cp = chapterProgress(data.project, data.chapters, data.scenes)
+  const chapters = (data.project.targetChapters || due) && cp.left > 0 ? `ещё ${cp.left} гл.` : ''
+  if (!due && !chapters) return null
+  return (
+    <button
+      className={`deadline hide-sm ${due?.late ? 'late' : ''}`}
+      title={`Написано ${cp.written} из ${cp.total} глав${cp.daysPerChapter ? ` · к дедлайну ≈ глава в ${cp.daysPerChapter} дн.` : ''}`}
+      onClick={() => go({ view: 'book' })}
+    >
+      {due ? `⏳ ${due.text}` : ''}
+      {due && chapters ? ' · ' : ''}
+      {chapters}
+    </button>
+  )
+}
+
+/**
+ * «Тихий вид» (as in Calmly Writer): while writing, the header and toolbar stay hidden and come back when
+ * the mouse goes to the top of the screen, or on Esc. Only with a mouse; phones keep their bars.
+ */
+function useReveal(active: boolean) {
+  const [reveal, setReveal] = useState(false)
+  useEffect(() => {
+    if (!active || !matchMedia('(pointer: fine)').matches) return
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const onMove = (e: MouseEvent) => {
+      const near = e.clientY < 100 || !!(e.target as HTMLElement | null)?.closest?.('.app-header, .write-top')
+      clearTimeout(timer)
+      if (near) setReveal(true)
+      else timer = setTimeout(() => setReveal(false), 700)
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !document.querySelector('.modal, .sheet, .typo-pop')) setReveal((r) => !r)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('keydown', onKey)
+    return () => {
+      clearTimeout(timer)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('keydown', onKey)
+    }
+  }, [active])
+  return active && reveal
 }

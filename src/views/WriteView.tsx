@@ -31,7 +31,9 @@ function loadPanels(): { nav: boolean; plan: boolean } {
   try {
     const saved = JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}')
     // Side panels only stay open between visits on a wide screen; on a phone they cover the text.
-    return wide ? { nav: true, plan: false, ...saved } : { nav: false, plan: false }
+    // In the quiet view (as in Calmly) the page starts alone; the structure opens on request.
+    const calm = document.documentElement.dataset.calm === 'on'
+    return wide ? { nav: !calm, plan: false, ...(calm ? {} : saved) } : { nav: false, plan: false }
   } catch {
     return { nav: wide, plan: false }
   }
@@ -424,6 +426,10 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
             )}
           </div>
         </div>
+      </div>
+
+      <div className="calm-count" aria-hidden="true">
+        {formatWords(words ?? scene.wordCount)}
       </div>
 
       <aside className="write-brief" aria-label="План сцены">
