@@ -3,6 +3,8 @@ import { createStory } from '../lib/stories'
 import { go } from '../lib/router'
 import type { SyncStatus } from '../db/cloud'
 import { SyncSection } from './SettingsView'
+import { readBackupFile, restoreBackup } from '../lib/backup'
+import { toast } from '../lib/ui'
 
 export function Welcome({ onCreated, sync }: { onCreated: (id: string) => void; sync: SyncStatus }) {
   const [title, setTitle] = useState('')
@@ -50,6 +52,25 @@ export function Welcome({ onCreated, sync }: { onCreated: (id: string) => void; 
             </label>
           </div>
           {busy && <div className="small muted">Раскладываю текст по главам…</div>}
+          <label className="btn ghost sm" style={{ alignSelf: 'flex-start' }}>
+            Вернуть всё из копии (.json)
+            <input
+              type="file"
+              hidden
+              accept=".json,application/json"
+              onChange={async (e) => {
+                const file = e.target.files?.[0]
+                if (!file) return
+                try {
+                  const { added } = await restoreBackup(await readBackupFile(file))
+                  toast(added ? 'Всё на месте — истории вернулись из копии' : 'В этой копии нет историй')
+                  go({ view: 'library' })
+                } catch (err) {
+                  toast(err instanceof Error ? err.message : 'Не получилось прочитать файл')
+                }
+              }}
+            />
+          </label>
           {cloud ? (
             <SyncSection sync={sync} />
           ) : (
