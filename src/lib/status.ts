@@ -12,7 +12,7 @@ export const STATUSES: { id: SceneStatus; label: string; color: string }[] = [
 export const statusOf = (id: SceneStatus) => STATUSES.find((s) => s.id === id) ?? STATUSES[0]
 
 export const MARKER_STATES: Record<MarkerState | 'late', { label: string; color: string; hint: string }> = {
-  hanging: { label: 'Висит', color: 'var(--mk-hanging)', hint: 'Посеян, но не решено, где раскроется' },
+  hanging: { label: 'Без раскрытия', color: 'var(--mk-hanging)', hint: 'Заложен, но не решено, где раскроется' },
   waiting: { label: 'Ждёт раскрытия', color: 'var(--mk-waiting)', hint: 'Место раскрытия запланировано' },
   late: { label: 'Пропущен?', color: 'var(--mk-late)', hint: 'Раскрытие было запланировано раньше, чем ты сейчас пишешь, но не отмечено' },
   closed: { label: 'Раскрыт', color: 'var(--mk-closed)', hint: 'Маячок сработал' },

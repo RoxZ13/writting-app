@@ -244,7 +244,7 @@ function MarkerStatus({ data }: { data: ProjectData }) {
         go({ view: 'board' })
       }}
     >
-      ✦ {waiting ? `${waiting} ждут` : 'все на месте'}
+      ✦ {waiting ? `маячки: ${waiting} без раскрытия` : 'маячки на месте'}
     </button>
   )
 }

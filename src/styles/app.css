@@ -3757,3 +3757,227 @@ main.page {
     display: none !important;
   }
 }
+
+/* =====================================================================
+   Council verdict: the page stays empty, the scene plan lives in the margin.
+   ===================================================================== */
+.now-line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  transition: opacity 0.4s;
+}
+.now-line .pp-now {
+  padding: 6px 0 2px;
+  text-align: left;
+  font-size: 14px;
+}
+.now-line .pp-now-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+  text-align: left;
+}
+.now-line .pp-due {
+  width: 100%;
+}
+.write.typing .now-line {
+  opacity: 0.25;
+}
+.tool-count {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+}
+.tool-due {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mk-waiting);
+}
+.write-brief .inner {
+  gap: 0;
+  padding: 10px 6px 60px;
+}
+.plan-head {
+  display: flex;
+  align-items: center;
+  padding: 4px 10px 12px 16px;
+}
+.plan .pp-body {
+  gap: 20px;
+}
+.pp-explain {
+  margin: -2px 0 8px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.lens-label {
+  font-size: 13px;
+  color: var(--ink-3);
+  margin-right: -4px;
+}
+
+/* Phone: the board becomes a list of chapters and scenes. */
+.timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 96px;
+}
+.tl-chapter {
+  background: var(--surface);
+  border-radius: 18px;
+  overflow: hidden;
+}
+.tl-chapter.missing {
+  outline: 1.5px dashed var(--line-2);
+  outline-offset: -1.5px;
+}
+.tl-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: none;
+  text-align: left;
+  padding: 14px 16px;
+  font-size: 16px;
+  color: var(--ink);
+}
+.tl-caret {
+  width: 12px;
+  color: var(--ink-3);
+  flex: none;
+}
+.tl-title {
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tl-meta {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  flex: none;
+}
+.tl-mk {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--mk-waiting);
+  flex: none;
+}
+.tl-gap {
+  margin: -6px 16px 12px 36px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.tl-body {
+  display: flex;
+  flex-direction: column;
+  padding: 0 8px 12px;
+}
+.tl-goal {
+  margin: -4px 8px 8px 28px;
+  font-size: 13.5px;
+  color: var(--ink-2);
+}
+.tl-scene {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: 0;
+  background: none;
+  text-align: left;
+  padding: 10px 10px 10px 14px;
+  border-radius: 12px;
+  color: var(--ink);
+}
+.tl-scene:active {
+  background: var(--fill);
+}
+.tl-scene.current {
+  background: var(--fill);
+}
+.tl-scene.dim {
+  opacity: 0.3;
+}
+.tl-scene .status-dot {
+  flex: none;
+}
+.tl-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.tl-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+.tl-name.untitled {
+  color: var(--ink-2);
+}
+.tl-sub {
+  font-family: var(--serif);
+  font-size: 13.5px;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tl-body .quick-add {
+  margin: 4px 6px 0;
+}
+.tl-body .column-markers {
+  margin: 8px 6px 0;
+}
+.tl-head .here,
+.tl-scene .here {
+  flex: none;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+/* The "Сейчас" line stays in sight while the text scrolls. */
+.passport-wrap {
+  position: sticky;
+  top: calc(var(--header-h) + 50px);
+  z-index: 9;
+  margin-top: 0;
+  background: var(--paper);
+}
+.now-line {
+  padding-bottom: 6px;
+}
+.passport-wrap::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  height: 14px;
+  background: linear-gradient(var(--paper), transparent);
+  pointer-events: none;
+}
+.passport-wrap:empty::after {
+  display: none;
+}
+.write.typing .passport-wrap {
+  opacity: 0;
+  transition: opacity 0.4s;
+}
+.write.mode-edit .passport-wrap {
+  background: var(--bg);
+}
+.write.mode-edit .passport-wrap::after {
+  background: linear-gradient(var(--bg), transparent);
+}
