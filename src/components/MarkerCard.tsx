@@ -41,7 +41,7 @@ export function MarkerCard({ marker, data, open: startOpen = false }: { marker: 
           </label>
           <label className="small muted">
             Раскроется
-            <PlacePicker data={data} marker={marker} side="payoff" emptyLabel="? пока не знаю — пусть висит" onChange={set} />
+            <PlacePicker data={data} marker={marker} side="payoff" emptyLabel="? пока не знаю — решу потом" onChange={set} />
           </label>
           <button
             className="btn ghost sm"

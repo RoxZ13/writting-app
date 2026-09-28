@@ -6,9 +6,9 @@ import { createMarker, mergeSceneIntoPrevious, patch, remove, save, snapshotScen
 import { markerPayoffChapter, markerStatus, unusedLines, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { MARKER_STATES, noteKind, STATUSES, timeAgo } from '../lib/status'
-import { hotkey } from '../lib/session'
+import { hotkey, isTouch } from '../lib/session'
 import { toast } from '../lib/ui'
-import { Faces, RefChips } from './Refs'
+import { RefChips } from './Refs'
 
 /** Update beats from the freshest stored copy, so quick successive edits never overwrite each other. */
 export async function updateBeats(sceneId: string, fn: (beats: Beat[]) => Beat[]) {
@@ -17,8 +17,6 @@ export async function updateBeats(sceneId: string, fn: (beats: Beat[]) => Beat[]
     if (current) await patch<Scene>('scenes', sceneId, { beats: fn(current.beats) })
   })
 }
-
-const OPEN_KEY = 'manuscript.passport'
 
 /** Markers that belong to this scene: planted in it, to be paid off in it, or planned for its chapter. */
 export function sceneMarkers(data: ProjectData, scene: Scene) {
@@ -33,140 +31,125 @@ export function sceneMarkers(data: ProjectData, scene: Scene) {
 }
 
 /**
- * Everything about the scene in one place, right above its text: what it is for, the plan,
- * the markers to plant or pay off here, who is in it. Folded, it is one quiet line with the
- * current plan item; unfolded, a card. Rare things live under "Ещё".
+ * The one quiet line above the text: the current plan item (or what the scene is for),
+ * and the markers that must be paid off right here. Everything else lives in the plan on the side.
  */
-export function ScenePassport({
+export function SceneNow({ data, scene, onOpenPlan }: { data: ProjectData; scene: Scene; onOpenPlan: () => void }) {
+  const { toPay } = sceneMarkers(data, scene)
+  const next = scene.beats.find((b) => !b.done)
+  const tick = (b: Beat) => void updateBeats(scene.id, (all) => all.map((x) => (x.id === b.id ? { ...x, done: true } : x)))
+  if (!next && !scene.goal && !toPay.length) return null
+  return (
+    <div className="now-line">
+      {next ? (
+        <div className="pp-now">
+          <button className="compass-check" title="Готово — к следующему пункту" onClick={() => tick(next)} />
+          <span className="muted">Сейчас:</span>
+          <button className="link-plain pp-now-text" title="Открыть план сцены" onClick={onOpenPlan}>
+            {next.text}
+          </button>
+        </div>
+      ) : (
+        scene.goal && (
+          <div className="pp-now">
+            <span className="muted">Зачем:</span>
+            <button className="link-plain pp-now-text" title="Открыть план сцены" onClick={onOpenPlan}>
+              {scene.goal}
+            </button>
+          </div>
+        )
+      )}
+      {toPay.length > 0 && (
+        <button className="pp-now pp-due link-plain" onClick={onOpenPlan}>
+          <span>◎</span> Здесь раскрыть: {toPay.map((m) => m.title).join(' · ')}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Everything about the scene, on the side of the text like notes in a margin: what it is for,
+ * the plan, the markers to plant or pay off here, who is in it. Rare things live under "Ещё".
+ */
+export function ScenePlan({
   data,
   scene,
   editor,
   onOpenMarker,
+  onClose,
 }: {
   data: ProjectData
   scene: Scene
   editor: Editor | null
   onOpenMarker: (id: string) => void
+  onClose: () => void
 }) {
-  const [open, setOpenState] = useState(() => {
-    try {
-      return localStorage.getItem(OPEN_KEY) === '1'
-    } catch {
-      return false
-    }
-  })
-  const setOpen = (v: boolean) => {
-    setOpenState(v)
-    try {
-      localStorage.setItem(OPEN_KEY, v ? '1' : '0')
-    } catch {
-      /* ignore */
-    }
-  }
   const goalRef = useRef<HTMLTextAreaElement>(null)
   const { toPay, toPlant, planted } = sceneMarkers(data, scene)
-  const markerCount = toPay.length + toPlant.length + planted.length
   const people = scene.characterIds ?? []
   const quotes = unusedLines(data, people)
-  const done = scene.beats.filter((b) => b.done).length
-  const next = scene.beats.find((b) => !b.done)
   const notes = data.notes.filter((n) => n.sceneId === scene.id && !n.archived && n.kind !== 'quote' && n.kind !== 'dialogue')
-  const empty = !scene.goal && !scene.beats.length && !markerCount && !people.length && !notes.length
 
-  // Opening an empty passport lands in the first field, so typing never goes into the manuscript.
+  // An empty plan opens straight into its first field, so typing never goes into the manuscript.
   useEffect(() => {
-    if (open && empty) goalRef.current?.focus()
+    if (!scene.goal && !scene.beats.length && !isTouch()) goalRef.current?.focus()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
-
-  const tick = (b: Beat) => void updateBeats(scene.id, (all) => all.map((x) => (x.id === b.id ? { ...x, done: true } : x)))
+  }, [scene.id])
 
   return (
-    <section className={`passport ${open ? 'open' : ''}`} aria-label="Паспорт сцены">
-      <div className="pp-bar">
-        <button className="pp-toggle" onClick={() => setOpen(!open)} aria-expanded={open}>
-          <span className="pp-caret">{open ? '▾' : '▸'}</span>
-          {open ? (
-            <span className="pp-title">Паспорт сцены</span>
-          ) : empty ? (
-            <span className="pp-empty">Паспорт сцены — цель, план, маячки, герои</span>
-          ) : (
-            <span className="pp-goal">{scene.goal || 'Цель сцены не записана'}</span>
-          )}
-          <span className="pp-chips">
-            {scene.beats.length > 0 && (
-              <span title="План сцены">
-                ☑ {done}/{scene.beats.length}
-              </span>
-            )}
-            {markerCount > 0 && (
-              <span className={toPay.length ? 'pp-mk due' : 'pp-mk'} title="Маячки этой сцены">
-                ✦ {markerCount}
-              </span>
-            )}
-            {notes.length > 0 && <span title="Заметки на полях">✎ {notes.length}</span>}
-            <Faces data={data} ids={people} max={3} />
-          </span>
+    <section className="plan" aria-label="План сцены">
+      <div className="plan-head">
+        <span className="eyebrow">План сцены</span>
+        <span className="spacer" />
+        <button className="icon-btn" aria-label="Скрыть план" title="Скрыть план" onClick={onClose}>
+          ×
         </button>
       </div>
+      <div className="pp-body">
+        <Field
+          inputRef={goalRef}
+          value={scene.goal}
+          placeholder="Зачем эта сцена? Что в ней меняется?"
+          onSave={(goal) => void patch<Scene>('scenes', scene.id, { goal })}
+        />
 
-      {!open && next && (
-        <div className="pp-now">
-          <button className="compass-check" title="Готово — к следующему пункту" onClick={() => tick(next)} />
-          <span className="muted">Сейчас:</span> <span className="pp-now-text">{next.text}</span>
+        <div className="pp-section">
+          <h4>По пунктам</h4>
+          <Beats beats={scene.beats} onChange={(fn) => void updateBeats(scene.id, fn)} />
         </div>
-      )}
-      {!open && toPay.length > 0 && (
-        <div className="pp-now pp-due">
-          <span>◎</span> Здесь раскрыть: {toPay.map((m) => m.title).join(' · ')}
+
+        <div className="pp-section">
+          <h4>Маячки</h4>
+          <p className="pp-explain">Деталь, которую закладываешь сейчас, чтобы раскрыть потом.{hotkey(' В тексте — ⌘/Ctrl + M.')}</p>
+          <MarkerRows title="Раскрыть здесь" icon="◎" list={toPay} data={data} onOpen={onOpenMarker} />
+          <MarkerRows title="Заложить в этой главе" icon="✦" list={toPlant} data={data} onOpen={onOpenMarker} />
+          <MarkerRows title="Заложены здесь" icon="✦" list={planted} data={data} onOpen={onOpenMarker} />
+          <MarkerAdd data={data} scene={scene} />
         </div>
-      )}
 
-      {open && (
-        <div className="pp-body">
-          <Field
-            inputRef={goalRef}
-            value={scene.goal}
-            placeholder="Зачем эта сцена? Что в ней меняется?"
-            onSave={(goal) => void patch<Scene>('scenes', scene.id, { goal })}
-          />
-
-          <div className="pp-section">
-            <h4>План</h4>
-            <Beats beats={scene.beats} onChange={(fn) => void updateBeats(scene.id, fn)} />
-          </div>
-
-          <div className="pp-section">
-            <h4>Маячки</h4>
-            <MarkerRows title="Раскрыть здесь" icon="◎" list={toPay} data={data} onOpen={onOpenMarker} />
-            <MarkerRows title="Посеять в этой главе" icon="✦" list={toPlant} data={data} onOpen={onOpenMarker} />
-            <MarkerRows title="Посеяны здесь" icon="✦" list={planted} data={data} onOpen={onOpenMarker} />
-            <MarkerAdd data={data} scene={scene} />
-          </div>
-
-          <div className="pp-section">
-            <h4>Кто в сцене</h4>
-            <RefChips data={data} sceneId={scene.id} field="characterIds" selected={people} />
-            {quotes.length > 0 && <Quotes data={data} scene={scene} editor={editor} quotes={quotes} />}
-          </div>
-
-          {notes.length > 0 && (
-            <div className="pp-section">
-              <h4>Заметки на полях</h4>
-              {notes.map((n) => (
-                <div key={n.id} className="pp-note">
-                  <span className="pp-note-text">{n.text}</span>
-                  <button className="icon-btn" title="Сделано" onClick={() => void patch<Note>('notes', n.id, { archived: true })}>
-                    ✓
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <More data={data} scene={scene} editor={editor} />
+        <div className="pp-section">
+          <h4>Кто в сцене</h4>
+          <RefChips data={data} sceneId={scene.id} field="characterIds" selected={people} />
+          {quotes.length > 0 && <Quotes data={data} scene={scene} editor={editor} quotes={quotes} />}
         </div>
-      )}
+
+        {notes.length > 0 && (
+          <div className="pp-section">
+            <h4>Заметки на полях</h4>
+            {notes.map((n) => (
+              <div key={n.id} className="pp-note">
+                <span className="pp-note-text">{n.text}</span>
+                <button className="icon-btn" title="Сделано" onClick={() => void patch<Note>('notes', n.id, { archived: true })}>
+                  ✓
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <More data={data} scene={scene} editor={editor} />
+      </div>
     </section>
   )
 }
@@ -191,7 +174,7 @@ function MarkerRows({ title, icon, list, data, onOpen }: { title: string; icon: 
             <button className="link-plain" onClick={() => onOpen(m.id)}>
               {m.title || 'без названия'}
             </button>
-            {!m.payoffSceneId && !m.payoffChapterId && <span className="pp-hang">висит</span>}
+            {!m.payoffSceneId && !m.payoffChapterId && <span className="pp-hang" title="Ещё не решено, где он раскроется">без раскрытия</span>}
           </div>
         )
       })}
@@ -204,7 +187,7 @@ function MarkerAdd({ data, scene }: { data: ProjectData; scene: Scene }) {
   return (
     <input
       className="quick-add small"
-      placeholder={`+ маячок в этой сцене${hotkey(' (или ⌘/Ctrl+M прямо в тексте)')}`}
+      placeholder="+ маячок в этой сцене"
       value={v}
       onChange={(e) => setV(e.target.value)}
       onKeyDown={async (e) => {

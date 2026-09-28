@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useState } from 'react'
 import { db, type Marker, type Note, type Project, type Scene, type SceneText } from '../db/db'
 import { createMarker, createNote, patch, save, snapshotScene } from '../db/repo'
-import { ScenePassport } from '../components/ScenePassport'
+import { SceneNow, ScenePlan, sceneMarkers } from '../components/ScenePlan'
 import { Icon } from '../components/Icon'
 import { TypoControls } from '../components/TypoControls'
 import { MarkerCard } from '../components/MarkerCard'
@@ -20,14 +20,17 @@ type Mode = 'write' | 'edit' | 'rewrite'
 const PANELS_KEY = 'manuscript.panels'
 const MODE_KEY = 'manuscript.mode'
 
-function loadPanels(): { nav: boolean } {
+function loadPanels(): { nav: boolean; plan: boolean } {
   const wide = typeof matchMedia !== 'undefined' && matchMedia('(min-width: 1101px)').matches
   try {
-    return { nav: wide, ...JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}') }
+    const saved = JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}')
+    // Side panels only stay open between visits on a wide screen; on a phone they cover the text.
+    return wide ? { nav: true, plan: false, ...saved } : { nav: false, plan: false }
   } catch {
-    return { nav: wide }
+    return { nav: wide, plan: false }
   }
 }
+const isWide = () => matchMedia('(min-width: 1101px)').matches
 function loadMode(): Mode {
   try {
     const m = localStorage.getItem(MODE_KEY)
@@ -123,8 +126,13 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
       /* ignore */
     }
   }
-  const togglePanel = (k: 'nav') => persistPanels({ ...panels, [k]: !panels[k] })
-  const closeOverlays = () => setPanels((p) => ({ ...p, nav: false }))
+  const togglePanel = (k: 'nav' | 'plan') => {
+    // Narrow screens have room for one panel at a time.
+    const next = isWide() ? { ...panels, [k]: !panels[k] } : { nav: false, plan: false, [k]: !panels[k] }
+    persistPanels(next)
+  }
+  const openPlan = () => !panels.plan && togglePanel('plan')
+  const closeOverlays = () => setPanels((p) => ({ ...p, nav: false, plan: false }))
 
   const setMode = (m: Mode) => {
     if (m === 'rewrite' && !scene?.rewriteFrom) {
@@ -149,18 +157,21 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
     'write',
     `mode-${mode}`,
     panels.nav && 'nav-open',
+    panels.plan && 'brief-open',
     typing && 'typing',
     rewriting && 'rewriting',
   ]
     .filter(Boolean)
     .join(' ')
   const chapter = data.chapterById.get(scene.chapterId)
+  const due = sceneMarkers(data, scene).toPay.length
+  const beatsDone = scene.beats.filter((b) => b.done).length
 
   return (
     <div className={cls}>
       <aside className="write-side" aria-label="Структура">
         <div className="inner">
-          <Structure data={data} sceneId={sceneId} onPick={() => !matchMedia('(min-width: 1101px)').matches && closeOverlays()} />
+          <Structure data={data} sceneId={sceneId} onPick={() => !isWide() && closeOverlays()} />
         </div>
       </aside>
 
@@ -178,9 +189,20 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
             {mode !== 'write' && <span className="mode-chip">{mode === 'edit' ? 'правка' : 'переписываю'}</span>}
           </div>
           <span className="spacer" />
-          <span className="small muted hide-sm" style={{ whiteSpace: 'nowrap' }}>
-            {formatWords(words ?? scene.wordCount)}
-          </span>
+          <button
+            className={`tool ${panels.plan ? 'on' : ''}`}
+            title={panels.plan ? 'Скрыть план сцены' : 'План сцены: зачем она, по пунктам, маячки, кто в ней'}
+            onClick={() => togglePanel('plan')}
+          >
+            <Icon name="sidebar" size={17} />
+            <span className="tool-label">План</span>
+            {scene.beats.length > 0 && (
+              <span className="tool-count">
+                {beatsDone}/{scene.beats.length}
+              </span>
+            )}
+            {due > 0 && <span className="tool-due" title="Здесь нужно раскрыть маячок" />}
+          </button>
           <div className="typo-anchor">
             <button className={`tool ${typoOpen ? 'on' : ''}`} title="Шрифт, размер, ширина текста" onClick={() => setTypoOpen(!typoOpen)}>
               <span className="aa">Aa</span>
@@ -195,10 +217,6 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
               </>
             )}
           </div>
-          <button className="tool" title={`Маячок: что потом нужно раскрыть${hotkey(' (⌘/Ctrl + M)')}`} onClick={() => editor && setAction(selectionForMarker(editor))}>
-            <Icon name="spark" size={17} />
-            <span className="tool-label">Маячок</span>
-          </button>
           <div className="typo-anchor">
             <button className={`tool ${menuOpen ? 'on' : ''}`} title="Режимы и прочее" aria-label="Ещё" onClick={() => setMenuOpen(!menuOpen)}>
               ⋯
@@ -207,6 +225,20 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
               <>
                 <div className="typo-back" onClick={() => setMenuOpen(false)} />
                 <div className="typo-pop card write-menu">
+                  <button
+                    className="mode-item"
+                    onClick={() => {
+                      setMenuOpen(false)
+                      if (editor) setAction(selectionForMarker(editor))
+                    }}
+                  >
+                    <span className="mode-dot">✦</span>
+                    <span>
+                      <strong>Маячок здесь</strong>
+                      <span className="mode-hint">Деталь, которую раскроешь потом{hotkey(' · ⌘/Ctrl + M')}</span>
+                    </span>
+                  </button>
+                  <div className="hr" />
                   <div className="menu-label">Режим</div>
                   {(
                     [
@@ -258,7 +290,7 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
                     </span>
                   </button>
                   <button
-                    className="mode-item show-sm-flex"
+                    className="mode-item"
                     onClick={() => {
                       setMenuOpen(false)
                       setFinishing(true)
@@ -277,9 +309,6 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
               </>
             )}
           </div>
-          <button className="btn sm hide-sm finish-btn" onClick={() => setFinishing(true)}>
-            Закончить
-          </button>
         </div>
 
         {!bannerHidden && data.project.nextStep && (
@@ -298,7 +327,7 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
           </div>
         )}
         <div className="passport-wrap">
-          <ScenePassport data={data} scene={scene} editor={editor} onOpenMarker={setOpenMarker} />
+          <SceneNow data={data} scene={scene} onOpenPlan={openPlan} />
         </div>
 
         <div className="editor-area">
@@ -318,6 +347,14 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
           </div>
         </div>
       </div>
+
+      <aside className="write-brief" aria-label="План сцены">
+        <div className="inner">
+          {panels.plan && (
+            <ScenePlan key={scene.id} data={data} scene={scene} editor={editor} onOpenMarker={setOpenMarker} onClose={() => togglePanel('plan')} />
+          )}
+        </div>
+      </aside>
 
       <div className="write-backdrop" onClick={closeOverlays} />
 
@@ -541,7 +578,7 @@ function MarkerFromSelection({
         payoffChapterId: draft.payoffChapterId,
       })
       mark(m.id, 'setup')
-      toast(m.payoffChapterId ? 'Маячок посеян, раскрытие запланировано' : 'Маячок посеян — он будет висеть, пока не выберешь, где раскрыть')
+      toast(m.payoffChapterId ? 'Маячок заложен, раскрытие запланировано' : 'Маячок заложен. Он будет гореть красным, пока не выберешь, где раскрыть')
       onClose()
     }
     return (
@@ -566,7 +603,7 @@ function MarkerFromSelection({
               data={data}
               marker={draft as Marker}
               side="payoff"
-              emptyLabel="? Пока не знаю — пусть висит"
+              emptyLabel="? Пока не знаю — решу потом"
               onChange={(c) => setDraft((d) => ({ ...d, ...c }))}
             />
           </label>
@@ -614,7 +651,7 @@ function MarkerFromSelection({
             >
               <span className="t">{m.title}</span>
               <span className="small muted">
-                {from ? `посеян: ${data.chapterById.get(from)?.title}` : ''}
+                {from ? `заложен: ${data.chapterById.get(from)?.title}` : ''}
                 {markerPayoffChapter(m, data) === scene.chapterId && ' · запланирован в этой главе'}
               </span>
             </button>

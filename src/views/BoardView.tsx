@@ -45,12 +45,15 @@ export function BoardView({ data }: { data: ProjectData }) {
   const [newLine, setNewLine] = useState<string | null>(null)
 
   // Open on "ты здесь", not wherever the previous screen was scrolled to.
+  const phone = usePhone()
   useEffect(() => {
     window.scrollTo(0, 0)
     requestAnimationFrame(() =>
-      document.querySelector('.card-scene.current')?.scrollIntoView({ inline: 'center', block: 'nearest' }),
+      document
+        .querySelector('.card-scene.current, .tl-scene.current')
+        ?.scrollIntoView({ inline: 'center', block: phone ? 'center' : 'nearest' }),
     )
-  }, [])
+  }, [phone])
   const [openScene, setOpenScene] = useState<string | null>(null)
   const [openMarker, setOpenMarker] = useState<string | null>(null)
   const [dragging, setDragging] = useState<string | null>(null)
@@ -100,6 +103,7 @@ export function BoardView({ data }: { data: ProjectData }) {
     <div className="board-page">
       <div className="board-bar">
         <h1>Доска</h1>
+        <span className="lens-label hide-sm">Показать:</span>
         <div className="seg lens">
           <button aria-pressed={lens.kind === 'all'} onClick={() => setLens({ kind: 'all' })}>
             Всё
@@ -162,32 +166,36 @@ export function BoardView({ data }: { data: ProjectData }) {
       )}
       {lens.kind === 'line' && (
         <div className="lens-note">
-          Ветка «{lineName}»: пунктир — главы, где её сцен нет. Так видно, где линия провисает.
+          Ветка «{lineName}»: пунктир — главы, где её сцен нет. Так видно, где линия пропадает надолго.
         </div>
       )}
 
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
-        <div className="board">
-          {data.outline.map(({ chapter, scenes }, i) => (
-            <Column
-              key={chapter.id}
-              data={data}
-              chapter={chapter}
-              scenes={scenes}
-              lens={lens}
-              isFirst={i === 0}
-              onMove={(d) => moveChapter(i, d)}
-              onAddAfter={() => void addChapterAfter(i)}
-              onOpenScene={setOpenScene}
-              onOpenMarker={setOpenMarker}
-            />
-          ))}
-          <button className="add-column" onClick={() => void createChapter(data.project.id, `Глава ${data.chapters.length + 1}`)}>
-            + Глава
-          </button>
-        </div>
-        <DragOverlay>{dragging && data.sceneById.get(dragging) ? <Card data={data} scene={data.sceneById.get(dragging)!} lens={lens} overlay /> : null}</DragOverlay>
-      </DndContext>
+      {phone ? (
+        <Timeline data={data} lens={lens} onOpenScene={setOpenScene} onOpenMarker={setOpenMarker} />
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+          <div className="board">
+            {data.outline.map(({ chapter, scenes }, i) => (
+              <Column
+                key={chapter.id}
+                data={data}
+                chapter={chapter}
+                scenes={scenes}
+                lens={lens}
+                isFirst={i === 0}
+                onMove={(d) => moveChapter(i, d)}
+                onAddAfter={() => void addChapterAfter(i)}
+                onOpenScene={setOpenScene}
+                onOpenMarker={setOpenMarker}
+              />
+            ))}
+            <button className="add-column" onClick={() => void createChapter(data.project.id, `Глава ${data.chapters.length + 1}`)}>
+              + Глава
+            </button>
+          </div>
+          <DragOverlay>{dragging && data.sceneById.get(dragging) ? <Card data={data} scene={data.sceneById.get(dragging)!} lens={lens} overlay /> : null}</DragOverlay>
+        </DndContext>
+      )}
 
       {openScene && data.sceneById.get(openScene) && (
         <SceneSheet data={data} scene={data.sceneById.get(openScene)!} onClose={() => setOpenScene(null)} />
@@ -337,14 +345,14 @@ function Column({
       <div className="marker-add">
         <input
           className="quick-add small"
-          placeholder={markerSide === 'setup' ? '✦ посеять маячок здесь…' : '◎ здесь раскрыть…'}
+          placeholder={markerSide === 'setup' ? '✦ заложить маячок здесь…' : '◎ здесь раскрыть…'}
           value={markerDraft}
           onChange={(e) => setMarkerDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void addMarker()}
         />
         <button
           className="side-toggle"
-          title="Переключить: посеять / раскрыть"
+          title="Переключить: заложить / раскрыть"
           onClick={() => setMarkerSide(markerSide === 'setup' ? 'payoff' : 'setup')}
         >
           {markerSide === 'setup' ? '✦' : '◎'}
@@ -407,5 +415,124 @@ function Card({ data, scene, lens, overlay }: { data: ProjectData; scene: Scene;
         <Faces data={data} ids={scene.characterIds ?? []} max={3} />
       </div>
     </article>
+  )
+}
+
+/** Phones: a horizontal board does not fit, so chapters become a quiet vertical list of scenes. */
+function usePhone() {
+  const query = '(max-width: 760px)'
+  const [phone, setPhone] = useState(() => matchMedia(query).matches)
+  useEffect(() => {
+    const mq = matchMedia(query)
+    const on = () => setPhone(mq.matches)
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [])
+  return phone
+}
+
+function Timeline({
+  data,
+  lens,
+  onOpenScene,
+  onOpenMarker,
+}: {
+  data: ProjectData
+  lens: Lens
+  onOpenScene: (id: string) => void
+  onOpenMarker: (id: string) => void
+}) {
+  const here = data.project.lastSceneId ? data.sceneById.get(data.project.lastSceneId)?.chapterId : undefined
+  const [open, setOpen] = useState<Set<string>>(() => new Set(here ? [here] : data.chapters.slice(0, 1).map((c) => c.id)))
+  const toggle = (id: string) =>
+    setOpen((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  return (
+    <div className="timeline">
+      {data.outline.map(({ chapter, scenes }) => {
+        const pay = data.markers.filter((m) => !m.resolved && markerPayoffChapter(m, data) === chapter.id)
+        const plant = data.markers.filter((m) => !m.resolved && markerSetupChapter(m, data) === chapter.id)
+        const lineMissing = lens.kind === 'line' && !scenes.some((s) => s.lineIds?.includes(lens.id))
+        const isOpen = open.has(chapter.id)
+        return (
+          <section key={chapter.id} className={`tl-chapter ${isOpen ? 'open' : ''} ${lineMissing ? 'missing' : ''}`}>
+            <button className="tl-head" aria-expanded={isOpen} onClick={() => toggle(chapter.id)}>
+              <span className="tl-caret">{isOpen ? '▾' : '▸'}</span>
+              <span className="tl-title">{chapter.title}</span>
+              {chapter.id === here && !isOpen && <span className="here">ты здесь</span>}
+              <span className="spacer" />
+              {pay.length > 0 && <span className="tl-mk">◎ {pay.length}</span>}
+              {plant.length > 0 && <span className="tl-mk">✦ {plant.length}</span>}
+              <span className="tl-meta">{scenes.length} сц.</span>
+            </button>
+            {lineMissing && <div className="tl-gap">нет сцен этой ветки</div>}
+            {isOpen && (
+              <div className="tl-body">
+                {chapter.goal && <div className="tl-goal">{chapter.goal}</div>}
+                {scenes.map((s) => (
+                  <TimelineScene key={s.id} data={data} scene={s} lens={lens} onOpen={() => onOpenScene(s.id)} />
+                ))}
+                <TimelineAdd data={data} chapter={chapter} lens={lens} />
+                {(pay.length > 0 || plant.length > 0) && (
+                  <div className="column-markers">
+                    {pay.map((m) => (
+                      <MarkerPill key={m.id} data={data} marker={m} side="payoff" onOpen={() => onOpenMarker(m.id)} />
+                    ))}
+                    {plant.map((m) => (
+                      <MarkerPill key={m.id} data={data} marker={m} side="setup" onOpen={() => onOpenMarker(m.id)} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )
+      })}
+      <button className="btn ghost" onClick={() => void createChapter(data.project.id, `Глава ${data.chapters.length + 1}`)}>
+        + Глава
+      </button>
+    </div>
+  )
+}
+
+function TimelineScene({ data, scene, lens, onOpen }: { data: ProjectData; scene: Scene; lens: Lens; onOpen: () => void }) {
+  const markers = data.markers.filter((m) => m.setupSceneId === scene.id || m.payoffSceneId === scene.id)
+  const dim = (lens.kind === 'line' && !scene.lineIds?.includes(lens.id)) || (lens.kind === 'markers' && markers.length === 0)
+  const current = data.project.lastSceneId === scene.id
+  const sub = scene.goal || scene.excerpt
+  return (
+    <button className={`tl-scene ${dim ? 'dim' : ''} ${current ? 'current' : ''}`} onClick={onOpen}>
+      <span className="status-dot" style={{ background: statusOf(scene.status).color }} />
+      <span className="tl-text">
+        <span className={`tl-name ${scene.title.trim() ? '' : 'untitled'}`}>{sceneName(data, scene)}</span>
+        {sub && <span className="tl-sub">{sub}</span>}
+      </span>
+      {markers.length > 0 && <span className="tl-mk">✦ {markers.length}</span>}
+      {current && <span className="here">ты здесь</span>}
+    </button>
+  )
+}
+
+function TimelineAdd({ data, chapter, lens }: { data: ProjectData; chapter: Chapter; lens: Lens }) {
+  const [draft, setDraft] = useState('')
+  const add = async () => {
+    const title = draft.trim()
+    if (!title) return
+    setDraft('')
+    await createScene(data.project.id, chapter.id, title, { status: 'idea', lineIds: lens.kind === 'line' ? [lens.id] : [] })
+  }
+  return (
+    <input
+      className="quick-add small"
+      placeholder="+ сцена: кратко, что происходит"
+      value={draft}
+      onChange={(e) => setDraft(e.target.value)}
+      onKeyDown={(e) => e.key === 'Enter' && void add()}
+      onBlur={() => void add()}
+    />
   )
 }
