@@ -28,6 +28,16 @@ export function TypoControls() {
   return (
     <div className="typo">
       <Choice
+        label="Вид"
+        k="calm"
+        t={t}
+        set={set}
+        options={[
+          ['on', 'Тихий'],
+          ['off', 'С панелями'],
+        ]}
+      />
+      <Choice
         label="Шрифт"
         k="font"
         t={t}
@@ -81,6 +91,16 @@ export function TypoControls() {
         options={[
           ['gap', 'С отбивкой'],
           ['indent', 'Красная строка'],
+        ]}
+      />
+      <Choice
+        label="Абзац в фокусе"
+        k="focusPara"
+        t={t}
+        set={set}
+        options={[
+          ['off', 'Нет'],
+          ['on', 'Остальные бледнее'],
         ]}
       />
       <Choice

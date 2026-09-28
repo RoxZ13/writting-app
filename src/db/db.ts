@@ -146,6 +146,9 @@ export interface Note extends Base {
   /** Матчасть (kind 'lore'): the entry's name — a place, a spell, an event — and its topic. */
   title?: string
   topic?: string
+  /** Матчасть pinned to places in the book; heroes go in characterIds. */
+  sceneIds?: string[]
+  chapterIds?: string[]
 }
 
 /** A scene's text, stored apart from its card so plan edits and writing never collide. id = scene id. */

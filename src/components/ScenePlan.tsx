@@ -2,14 +2,14 @@ import type { Editor } from '@tiptap/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { db, uid, type Beat, type Marker, type Note, type Scene, type SceneText } from '../db/db'
-import { createMarker, mergeSceneIntoPrevious, patch, remove, save, snapshotScene } from '../db/repo'
+import { createMarker, createNote, mergeSceneIntoPrevious, patch, remove, save, snapshotScene } from '../db/repo'
 import { markerPayoffChapter, markerStatus, unusedLines, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { MARKER_STATES, noteKind, STATUSES, timeAgo } from '../lib/status'
 import { hotkey, isTouch } from '../lib/session'
 import { toast } from '../lib/ui'
 import { RefChips } from './Refs'
-import { loreInText } from '../lib/lore'
+import { loreForScene, type LoreReason } from '../lib/lore'
 import { docParagraphs } from '../lib/text'
 
 /** Update beats from the freshest stored copy, so quick successive edits never overwrite each other. */
@@ -158,26 +158,61 @@ export function ScenePlan({
   )
 }
 
-/** Lore entries this scene's text mentions — the facts to keep straight while writing it. */
+const WHY: Record<LoreReason, string> = { scene: 'прикреплено к сцене', chapter: 'к главе', hero: 'к герою', mention: 'упомянуто в тексте' }
+
+/** Матчасть for this scene: pinned to it, its chapter or its people, or mentioned in the text. */
 function SceneLore({ data, scene }: { data: ProjectData; scene: Scene }) {
   const text = useLiveQuery(() => (data.lore.length ? db.texts.get(scene.id) : undefined), [scene.id, data.lore.length])
   const found = useMemo(
-    () => (text ? loreInText(data.lore, [scene.title, scene.goal, ...docParagraphs(text.content)].join('\n')) : []),
-    [text, data.lore, scene.title, scene.goal],
+    () => loreForScene(data.lore, scene, text ? [scene.title, scene.goal, ...docParagraphs(text.content)].join('\n') : ''),
+    [text, data.lore, scene],
   )
-  if (!found.length) return null
+  const others = data.lore.filter((n) => !found.some((f) => f.note.id === n.id))
+  const pin = (n: Note) => void patch<Note>('notes', n.id, { sceneIds: [...new Set([...(n.sceneIds ?? []), scene.id])] })
+  const unpin = (n: Note) => void patch<Note>('notes', n.id, { sceneIds: (n.sceneIds ?? []).filter((id) => id !== scene.id) })
   return (
     <div className="pp-section">
-      <h4>Матчасть в сцене</h4>
-      {found.map((n) => (
+      <h4>Матчасть</h4>
+      {found.map(({ note: n, reason }) => (
         <details key={n.id} className="pp-lore">
           <summary>
             {n.title}
-            {n.topic && <span className="muted small"> · {n.topic}</span>}
+            <span className="muted small"> · {WHY[reason]}</span>
           </summary>
           <div className="pp-lore-text">{n.text || 'пока без описания'}</div>
+          {reason === 'scene' && (
+            <button className="link small" onClick={() => unpin(n)}>
+              открепить от сцены
+            </button>
+          )}
         </details>
       ))}
+      <select
+        className="select sm pp-lore-add"
+        value=""
+        onChange={async (e) => {
+          const v = e.target.value
+          if (v === '__new') {
+            const title = prompt('Название записи — место, заклинание, событие…')?.trim()
+            if (!title) return
+            const n = await createNote('', 'lore', data.project.id)
+            await patch<Note>('notes', n.id, { title, sceneIds: [scene.id] })
+            toast('Запись создана и прикреплена. Описание — в «Герои → Матчасть»')
+          } else {
+            const n = data.lore.find((x) => x.id === v)
+            if (n) pin(n)
+          }
+        }}
+      >
+        <option value="">+ прикрепить матчасть…</option>
+        {others.map((n) => (
+          <option key={n.id} value={n.id}>
+            {n.title}
+            {n.topic ? ` · ${n.topic}` : ''}
+          </option>
+        ))}
+        <option value="__new">Новая запись…</option>
+      </select>
     </div>
   )
 }

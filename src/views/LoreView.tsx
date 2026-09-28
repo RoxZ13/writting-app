@@ -3,6 +3,7 @@ import type { Note } from '../db/db'
 import { createNote, patch, remove } from '../db/repo'
 import type { ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
+import { sceneName } from '../lib/hooks'
 import { InlineEdit, toast } from '../lib/ui'
 
 /** "Герои · Матчасть": two sides of the same world, one tab. */
@@ -47,7 +48,7 @@ export function LoreView({ data }: { data: ProjectData }) {
         <input className="input lore-search" placeholder="Найти в матчасти" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
       <p className="small muted" style={{ marginTop: 0 }}>
-        Места, магия, даты, кто что знает. Если запись упоминается в сцене, она всплывёт в плане этой сцены.
+        Места, магия, даты, кто что знает. Прикрепи запись к герою, главе или сцене («+ где нужно») — она будет в плане этих сцен. Упомянутые в тексте записи всплывают сами.
       </p>
       {topics.length > 0 && (
         <div className="row lore-topics">
@@ -70,7 +71,7 @@ export function LoreView({ data }: { data: ProjectData }) {
       />
       <div className="lore-grid">
         {shown.map((n) => (
-          <LoreCard key={n.id} n={n} />
+          <LoreCard key={n.id} n={n} data={data} />
         ))}
       </div>
       {!data.lore.length && <div className="empty">Пока пусто. Начни с того, что чаще всего приходится проверять.</div>}
@@ -78,7 +79,7 @@ export function LoreView({ data }: { data: ProjectData }) {
   )
 }
 
-function LoreCard({ n }: { n: Note }) {
+function LoreCard({ n, data }: { n: Note; data: ProjectData }) {
   const set = (changes: Partial<Note>) => void patch<Note>('notes', n.id, changes)
   return (
     <article className="card lore-card">
@@ -98,6 +99,80 @@ function LoreCard({ n }: { n: Note }) {
       </div>
       <InlineEdit className="lore-topic" value={n.topic ?? ''} placeholder="тема: места, магия, даты…" onSave={(topic) => set({ topic: topic.trim() || undefined })} />
       <InlineEdit className="lore-text" multiline value={n.text} placeholder="Что важно помнить" onSave={(text) => set({ text })} />
+      <LorePins n={n} data={data} />
     </article>
+  )
+}
+
+/** Where this entry is needed: heroes, chapters, scenes. It then shows up in the plan of those scenes. */
+function LorePins({ n, data }: { n: Note; data: ProjectData }) {
+  const heroes = (n.characterIds ?? []).map((id) => data.characterById.get(id)).filter(Boolean)
+  const chapters = (n.chapterIds ?? []).map((id) => data.chapterById.get(id)).filter(Boolean)
+  const scenes = (n.sceneIds ?? []).map((id) => data.sceneById.get(id)).filter(Boolean)
+  const drop = (field: 'characterIds' | 'chapterIds' | 'sceneIds', id: string) =>
+    void patch<Note>('notes', n.id, { [field]: (n[field] ?? []).filter((x) => x !== id) })
+  const add = (value: string) => {
+    const [kind, id] = value.split(':')
+    const field = kind === 'h' ? 'characterIds' : kind === 'c' ? 'chapterIds' : 'sceneIds'
+    void patch<Note>('notes', n.id, { [field]: [...new Set([...(n[field] ?? []), id])] })
+  }
+  return (
+    <div className="lore-pins">
+      {heroes.map((h) => (
+        <span key={h!.id} className="lore-pin">
+          {h!.name}
+          <button aria-label="Открепить" onClick={() => drop('characterIds', h!.id)}>
+            ×
+          </button>
+        </span>
+      ))}
+      {chapters.map((c) => (
+        <span key={c!.id} className="lore-pin">
+          {c!.title}
+          <button aria-label="Открепить" onClick={() => drop('chapterIds', c!.id)}>
+            ×
+          </button>
+        </span>
+      ))}
+      {scenes.map((s) => (
+        <span key={s!.id} className="lore-pin">
+          {data.chapterById.get(s!.chapterId)?.title} · {sceneName(data, s!)}
+          <button aria-label="Открепить" onClick={() => drop('sceneIds', s!.id)}>
+            ×
+          </button>
+        </span>
+      ))}
+      <select className="lore-pin-add" value="" onChange={(e) => e.target.value && add(e.target.value)} title="Прикрепить к герою, главе или сцене — запись появится в плане этих сцен">
+        <option value="">+ где нужно</option>
+        {data.characters.length > 0 && (
+          <optgroup label="Герой">
+            {data.characters.map((c) => (
+              <option key={c.id} value={`h:${c.id}`}>
+                {c.name}
+              </option>
+            ))}
+          </optgroup>
+        )}
+        <optgroup label="Глава целиком">
+          {data.chapters.map((c) => (
+            <option key={c.id} value={`c:${c.id}`}>
+              {c.title}
+            </option>
+          ))}
+        </optgroup>
+        {data.outline.map(({ chapter, scenes: list }) =>
+          list.length ? (
+            <optgroup key={chapter.id} label={`Сцены: ${chapter.title}`}>
+              {list.map((s) => (
+                <option key={s.id} value={`s:${s.id}`}>
+                  {sceneName(data, s)}
+                  {s.goal ? ` — ${s.goal.slice(0, 40)}` : ''}
+                </option>
+              ))}
+            </optgroup>
+          ) : null,
+        )}
+      </select>
+    </div>
   )
 }
