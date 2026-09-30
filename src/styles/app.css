@@ -5565,3 +5565,108 @@ button.deadline {
 .write.typing .margin-note {
   opacity: 0.35;
 }
+
+/* Colour you change where you see it: a dot (or the hero's letter) opens the palette. */
+.color-dot-wrap {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+.color-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--line-2);
+  padding: 0;
+  cursor: pointer;
+}
+button.avatar {
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: #fff;
+  font-weight: 700;
+}
+.color-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-columns: repeat(5, 26px);
+  gap: 8px;
+  padding: 12px;
+  border-radius: 14px;
+  box-shadow: var(--shadow), 0 0 0 1px var(--line);
+}
+.branches {
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 560px;
+}
+.branches h3 {
+  margin: 0 0 6px;
+}
+.branch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+}
+.branch-name {
+  flex: 1;
+  font-weight: 600;
+}
+/* Points are pulled up and down with the mouse or a finger. */
+.sl-scene {
+  touch-action: none;
+  cursor: grab;
+}
+.sl-scene:active {
+  cursor: grabbing;
+}
+.sl-add {
+  cursor: pointer;
+  outline: none;
+}
+.sl-add circle {
+  fill: var(--surface);
+  stroke: var(--line-2);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+.sl-add text {
+  font-family: var(--sans);
+  font-size: 16px;
+  fill: var(--ink-3);
+}
+.sl-add.chapter text {
+  font-size: 13px;
+  font-weight: 600;
+}
+.sl-add:hover circle,
+.sl-add:focus-visible circle {
+  stroke: var(--ink);
+  stroke-dasharray: none;
+}
+.sl-add:hover text,
+.sl-add:focus-visible text {
+  fill: var(--ink);
+}
+.sl-chip.add {
+  background: none;
+  border: 1px dashed var(--line-2);
+  color: var(--ink-3);
+}
+.essence-title {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+.book-page > .essence {
+  margin-bottom: 20px;
+}

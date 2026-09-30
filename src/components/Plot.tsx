@@ -52,7 +52,7 @@ export function Arc({ scenes }: { scenes: Scene[] }) {
 const ESSENCE_KEY = 'manuscript.essence'
 
 /** What the story is about, how it ends and what drives it — kept in sight above the board. */
-export function Essence({ project }: { project: Project }) {
+export function Essence({ project, embedded }: { project: Project; embedded?: boolean }) {
   const filled = !!(project.premise || project.ending || project.drive)
   const [open, setOpenState] = useState(() => {
     try {
@@ -71,7 +71,9 @@ export function Essence({ project }: { project: Project }) {
   }
   const set = (changes: Partial<Project>) => void patch<Project>('projects', project.id, changes)
 
-  if (!open) {
+  // On the board only as a reminder once filled in; it is written on «Книга» (embedded).
+  if (!embedded && !filled) return null
+  if (!open && !embedded) {
     return (
       <button className={`essence-bar ${filled ? '' : 'empty'}`} onClick={() => setOpen(true)}>
         {filled ? (
@@ -104,11 +106,13 @@ export function Essence({ project }: { project: Project }) {
   return (
     <section className="essence card">
       <div className="essence-head">
-        <span className="eyebrow">Суть истории</span>
+        <span className={embedded ? 'essence-title' : 'eyebrow'}>Замысел</span>
         <span className="spacer" />
-        <button className="link small" onClick={() => setOpen(false)}>
-          свернуть
-        </button>
+        {!embedded && (
+          <button className="link small" onClick={() => setOpen(false)}>
+            свернуть
+          </button>
+        )}
       </div>
       <div className="essence-grid">
         <label>
