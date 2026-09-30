@@ -6,45 +6,32 @@ import { SyncSection } from './SettingsView'
 import { readBackupFile, restoreBackup } from '../lib/backup'
 import { toast } from '../lib/ui'
 
-export function Welcome({ onCreated, sync }: { onCreated: (id: string) => void; sync: SyncStatus }) {
-  const [title, setTitle] = useState('')
+export function Welcome({ onCreated, sync }: { onCreated: (id: string, view: 'text' | 'board') => void; sync: SyncStatus }) {
   const [cloud, setCloud] = useState(false)
   const [busy, setBusy] = useState(false)
 
+  // No name asked: the page opens at once, the name can come later (or from the first phrase).
   const create = async (file?: File) => {
     setBusy(true)
-    const id = await createStory({ title, file })
+    const id = await createStory({ file })
     setBusy(false)
-    onCreated(id)
-    go({ view: file ? 'board' : 'text' })
+    onCreated(id, file ? 'board' : 'text')
   }
 
   return (
     <div className="welcome">
-      <div className="card" style={{ width: 'min(520px, 100%)', padding: 36 }}>
+      <div className="card welcome-card">
         <div className="brand" style={{ marginBottom: 18 }}>
           <div className="logo">Manuscript.</div>
-          <div className="tagline">The writer’s studio</div>
+          <div className="tagline">тихое место для историй</div>
         </div>
         <p className="muted" style={{ marginTop: 0 }}>
-          Место, где всегда видно, что ты сейчас пишешь, зачем, и какие маячки ещё ждут раскрытия.
+          Пиши с первой фразы или начни с плана — сцены, главы и всё, что нельзя забыть, будут рядом.
         </p>
         <div className="stack">
-          <label className="field-label" htmlFor="ptitle">
-            Как называется история?
-          </label>
-          <input
-            id="ptitle"
-            className="input"
-            placeholder="Название — его всегда можно поменять"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void create()}
-            autoFocus
-          />
           <div className="row">
             <button className="btn primary" disabled={busy} onClick={() => void create()}>
-              Начать с чистого листа
+              Начать историю
             </button>
             <label className="btn">
               Импортировать .docx / .txt
@@ -52,32 +39,31 @@ export function Welcome({ onCreated, sync }: { onCreated: (id: string) => void; 
             </label>
           </div>
           {busy && <div className="small muted">Раскладываю текст по главам…</div>}
-          <label className="btn ghost sm" style={{ alignSelf: 'flex-start' }}>
-            Вернуть всё из копии (.json)
-            <input
-              type="file"
-              hidden
-              accept=".json,application/json"
-              onChange={async (e) => {
-                const file = e.target.files?.[0]
-                if (!file) return
-                try {
-                  const { added } = await restoreBackup(await readBackupFile(file))
-                  toast(added ? 'Всё на месте — истории вернулись из копии' : 'В этой копии нет историй')
-                  go({ view: 'library' })
-                } catch (err) {
-                  toast(err instanceof Error ? err.message : 'Не получилось прочитать файл')
-                }
-              }}
-            />
-          </label>
-          {cloud ? (
-            <SyncSection sync={sync} />
-          ) : (
-            <button className="btn ghost sm" style={{ alignSelf: 'flex-start' }} onClick={() => setCloud(true)}>
-              Уже пишу на другом устройстве — войти
+          <div className="welcome-more">
+            <label className="link-plain">
+              Вернуть из копии
+              <input
+                type="file"
+                hidden
+                accept=".json,application/json"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (!file) return
+                  try {
+                    const { added } = await restoreBackup(await readBackupFile(file))
+                    toast(added ? 'Всё на месте — истории вернулись из копии' : 'В этой копии нет историй')
+                    go({ view: 'library' })
+                  } catch (err) {
+                    toast(err instanceof Error ? err.message : 'Не получилось прочитать файл')
+                  }
+                }}
+              />
+            </label>
+            <button className="link-plain" onClick={() => setCloud(!cloud)}>
+              Уже пишу на другом устройстве
             </button>
-          )}
+          </div>
+          {cloud && <SyncSection sync={sync} />}
         </div>
       </div>
     </div>

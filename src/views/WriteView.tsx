@@ -9,6 +9,7 @@ import { TypoControls } from '../components/TypoControls'
 import { MarkerCard } from '../components/MarkerCard'
 import { PlacePicker } from '../components/Refs'
 import { SceneEditor, type SelectionAction } from '../components/SceneEditor'
+import { TitlePage } from '../components/TitlePage'
 import { editHintsKey } from '../components/EditHints'
 import { countHints } from '../lib/editcheck'
 import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
@@ -421,6 +422,9 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
         <div className="editor-area">
           {rewriting && <RewriteOld scene={scene} editor={editor} onDone={() => setModeState('write')} />}
           <div className="editor-wrap">
+            {text && !rewriting && (
+              <TitlePage key={scene.id} project={data.project} editor={editor} empty={[...data.scenes, ...data.pool.scenes].every((s) => !s.wordCount)} />
+            )}
             {text && (
               <SceneEditor
                 scene={scene}

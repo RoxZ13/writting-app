@@ -6,13 +6,32 @@ import { alive, patch, remove } from '../db/repo'
 import { COVERS, createStory, deadlineText } from '../lib/stories'
 import { timeAgo } from '../lib/status'
 import { formatWords } from '../lib/text'
-import { Modal, toast } from '../lib/ui'
+import { toast } from '../lib/ui'
 import { BookCover, CoverPicker } from '../components/BookCover'
 import { useCover } from '../lib/cover'
+import { DateChip } from '../components/DateChip'
 
 /** All stories side by side — authors rarely write just one. */
-export function LibraryView({ projects, currentId, onOpen }: { projects: Project[]; currentId: string; onOpen: (id: string) => void }) {
-  const [creating, setCreating] = useState(false)
+export function LibraryView({
+  projects,
+  currentId,
+  onOpen,
+}: {
+  projects: Project[]
+  currentId: string
+  onOpen: (id: string, view?: 'text' | 'board') => void
+}) {
+  const [busy, setBusy] = useState(false)
+  // A new story opens at once on its page; name, cover and deadline can come later (on «Книга»).
+  const create = async (file?: File) => {
+    setBusy(true)
+    try {
+      const id = await createStory({ file })
+      onOpen(id, file ? 'board' : 'text')
+    } finally {
+      setBusy(false)
+    }
+  }
   const stats = useLiveQuery(async () => {
     const scenes = alive(await db.scenes.toArray())
     const chapters = alive(await db.chapters.toArray())
@@ -34,7 +53,11 @@ export function LibraryView({ projects, currentId, onOpen }: { projects: Project
           <h1>Истории</h1>
           <div className="muted">Твои рукописи и черновики</div>
         </div>
-        <button className="btn primary big-pill" onClick={() => setCreating(true)}>
+        <label className="btn ghost">
+          {busy ? 'Раскладываю…' : 'Импорт .docx / .txt'}
+          <input type="file" hidden accept=".docx,.txt,.md,.html,.htm" onChange={(e) => e.target.files?.[0] && void create(e.target.files[0])} />
+        </label>
+        <button className="btn primary big-pill" disabled={busy} onClick={() => void create()}>
           + Новая история
         </button>
       </div>
@@ -43,13 +66,12 @@ export function LibraryView({ projects, currentId, onOpen }: { projects: Project
         {projects.map((p) => (
           <StoryCard key={p.id} p={p} current={p.id === currentId} stats={stats?.[p.id]} onOpen={() => onOpen(p.id)} />
         ))}
-        <button className="story add" onClick={() => setCreating(true)}>
+        <button className="story add" disabled={busy} onClick={() => void create()}>
           <span className="plus">+</span>
           Новая история
         </button>
       </div>
 
-      {creating && <NewStory onClose={() => setCreating(false)} onCreated={onOpen} />}
     </div>
   )
 }
@@ -89,15 +111,10 @@ function StoryCard({
                   onBlur={(e) => e.target.value.trim() && e.target.value !== p.title && void patch<Project>('projects', p.id, { title: e.target.value.trim() })}
                 />
               </label>
-              <label className="menu-field">
+              <div className="menu-field">
                 <span>Дедлайн</span>
-                <input
-                  className="input"
-                  type="date"
-                  defaultValue={p.deadline ?? ''}
-                  onChange={(e) => void patch<Project>('projects', p.id, { deadline: e.target.value || undefined })}
-                />
-              </label>
+                <DateChip value={p.deadline} empty="+ поставить дату" onChange={(deadline) => void patch<Project>('projects', p.id, { deadline })} />
+              </div>
               <div className="menu-field">
                 <span>Обложка</span>
                 <CoverPicker projectId={p.id} />
@@ -140,60 +157,5 @@ function StoryCard({
         </button>
       </div>
     </article>
-  )
-}
-
-function NewStory({ onClose, onCreated }: { onClose: () => void; onCreated: (id: string) => void }) {
-  const [title, setTitle] = useState('')
-  const [color, setColor] = useState(COVERS[0])
-  const [deadline, setDeadline] = useState('')
-  const [genre, setGenre] = useState('')
-  const [busy, setBusy] = useState(false)
-  const create = async (file?: File) => {
-    setBusy(true)
-    const id = await createStory({ title, file, color, deadline, genre })
-    setBusy(false)
-    onClose()
-    onCreated(id)
-  }
-  return (
-    <Modal onClose={onClose} label="Новая история">
-      <div className="stack">
-        <h2>Новая история</h2>
-        <label>
-          <span className="field-label">Название</span>
-          <input className="input" autoFocus value={title} placeholder="Как она называется?" onChange={(e) => setTitle(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void create()} />
-        </label>
-        <label>
-          <span className="field-label">Жанр</span>
-          <input className="input" value={genre} placeholder="Например, «Фэнтези»" onChange={(e) => setGenre(e.target.value)} />
-        </label>
-        <div>
-          <span className="field-label">Цвет обложки</span>
-          <div className="covers">
-            {COVERS.map((c) => (
-              <button key={c} className={`swatch ${c === color ? 'on' : ''}`} style={{ background: c }} aria-label="Цвет" onClick={() => setColor(c)} />
-            ))}
-          </div>
-        </div>
-        <label>
-          <span className="field-label">Дедлайн (необязательно)</span>
-          <input className="input" type="date" value={deadline} onChange={(e) => setDeadline(e.target.value)} />
-        </label>
-        <div className="row">
-          <button className="btn primary" disabled={busy} onClick={() => void create()}>
-            Создать
-          </button>
-          <label className="btn">
-            {busy ? 'Раскладываю…' : 'Из файла .docx / .txt'}
-            <input type="file" hidden accept=".docx,.txt,.md,.html,.htm" onChange={(e) => e.target.files?.[0] && void create(e.target.files[0])} />
-          </label>
-          <span className="spacer" />
-          <button className="btn ghost" onClick={onClose}>
-            Отмена
-          </button>
-        </div>
-      </div>
-    </Modal>
   )
 }

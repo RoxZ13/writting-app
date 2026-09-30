@@ -36,6 +36,7 @@ import { markerPayoffChapter, markerQuiet, markerSetupChapter, markerStatus, sce
 import { MARKER_STATES, statusOf } from '../lib/status'
 import { InlineEdit, Modal, toast } from '../lib/ui'
 import { deadlineText } from '../lib/stories'
+import { formatScenes } from '../lib/text'
 
 type Lens = { kind: 'all' } | { kind: 'line'; id: string } | { kind: 'markers' }
 
@@ -92,6 +93,7 @@ export function BoardView({ data }: { data: ProjectData }) {
   const showArc = [...data.scenes, ...data.pool.scenes].some((s) => s.heat)
   const hanging = data.markers.filter((m) => ['hanging', 'late'].includes(markerStatus(m, data)))
   const quiet = data.markers.filter((m) => markerQuiet(m, data))
+  const filters = data.markers.length > 0 || data.lines.length > 0 || lens.kind !== 'all'
 
   const addChapterAfter = async (i: number) => {
     const c = await createChapter(data.project.id, `Глава ${i + 2}`)
@@ -112,14 +114,19 @@ export function BoardView({ data }: { data: ProjectData }) {
     <div className="board-page">
       <div className="board-bar">
         <h1>Доска</h1>
-        <span className="lens-label hide-sm">Показать:</span>
-        <div className="seg lens">
-          <button aria-pressed={lens.kind === 'all'} onClick={() => setLens({ kind: 'all' })}>
-            Всё
-          </button>
-          <button aria-pressed={lens.kind === 'markers'} onClick={() => setLens({ kind: 'markers' })}>
-            Маячки{hanging.length > 0 && <span className="lens-count">{hanging.length}</span>}
-          </button>
+        {/* Filters only once there is something to filter; «+ ветка» is always there. */}
+        {filters && <span className="lens-label hide-sm">Показать:</span>}
+        <div className={`seg lens ${filters ? '' : 'bare'}`}>
+          {filters && (
+            <>
+              <button aria-pressed={lens.kind === 'all'} onClick={() => setLens({ kind: 'all' })}>
+                Всё
+              </button>
+              <button aria-pressed={lens.kind === 'markers'} onClick={() => setLens({ kind: 'markers' })}>
+                Маячки{hanging.length > 0 && <span className="lens-count">{hanging.length}</span>}
+              </button>
+            </>
+          )}
           {data.lines.map((l) => (
             <button
               key={l.id}
@@ -271,7 +278,7 @@ function Column({
           </button>
           <InlineEdit className="column-title" value={chapter.title} onSave={(title) => void patch<Chapter>('chapters', chapter.id, { title })} />
           <span className="column-count">
-            {scenes.length} сц.
+            {formatScenes(scenes.length)}
             {chapter.publishedAt && (
               <span className="published" title="Выложена">
                 ✓ {new Date(chapter.publishedAt + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
@@ -422,6 +429,9 @@ function LineNote({ data, lineId, onGone }: { data: ProjectData; lineId: string;
   )
 }
 
+/** Nothing written anywhere yet: the «you are here» marks and the like mean nothing so far. */
+const storyEmpty = (data: ProjectData) => ![...data.scenes, ...data.pool.scenes].some((s) => s.wordCount > 0)
+
 function MarkerLinks({ list, onOpen }: { list: Marker[]; onOpen: (id: string) => void }) {
   return (
     <>
@@ -452,7 +462,7 @@ function PoolColumn({ data, lens, onOpenScene }: { data: ProjectData; lens: Lens
     <section ref={setNodeRef} className={`column pool ${isOver ? 'over' : ''}`}>
       <header className="column-head">
         <div className="column-title pool-title">Пока без места</div>
-        <div className="column-meta">{scenes.length ? `${scenes.length} сц. — перетащи в главу` : 'Выпиши сцены, которые уже есть в голове. Место найдёшь потом.'}</div>
+        <div className="column-meta">{scenes.length ? `${formatScenes(scenes.length)} — перетащи в главу` : 'Сцены, которые уже крутятся в голове. Хоть одно слово на каждую — место найдёшь потом.'}</div>
       </header>
       <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
         <div className="cards">
@@ -507,7 +517,7 @@ function Card({ data, scene, lens, overlay }: { data: ProjectData; scene: Scene;
   const markers = data.markers.filter((m) => m.setupSceneId === scene.id || m.payoffSceneId === scene.id)
   const dim =
     (lens.kind === 'line' && !scene.lineIds?.includes(lens.id)) || (lens.kind === 'markers' && markers.length === 0)
-  const current = data.project.lastSceneId === scene.id
+  const current = data.project.lastSceneId === scene.id && !storyEmpty(data)
   const showMarkers = lens.kind === 'markers' && markers.length > 0
   return (
     <article className={`card-scene ${dim ? 'dim' : ''} ${overlay ? 'overlay' : ''} ${current ? 'current' : ''} ${scene.node ? 'node' : ''}`}>
@@ -526,7 +536,7 @@ function Card({ data, scene, lens, overlay }: { data: ProjectData; scene: Scene;
       {(current || showMarkers) && (
         <div className="card-foot">
           {showMarkers && <span className="mk-count">✦ {markers.length}</span>}
-          {current && <span className="here">ты здесь</span>}
+          {current && !storyEmpty(data) && <span className="here">ты здесь</span>}
         </div>
       )}
     </article>
@@ -558,7 +568,10 @@ function Timeline({
   onOpenMarker: (id: string) => void
 }) {
   const here = data.project.lastSceneId ? data.sceneById.get(data.project.lastSceneId)?.chapterId : undefined
-  const [open, setOpen] = useState<Set<string>>(() => new Set(here ? [here] : data.chapters.slice(0, 1).map((c) => c.id)))
+  // In a story with no text yet, «Пока без места» is the way in, so it starts open.
+  const [open, setOpen] = useState<Set<string>>(
+    () => new Set([...(here ? [here] : data.chapters.slice(0, 1).map((c) => c.id)), ...(storyEmpty(data) ? ['pool'] : [])]),
+  )
   const toggle = (id: string) =>
     setOpen((prev) => {
       const next = new Set(prev)
@@ -574,7 +587,7 @@ function Timeline({
           <span className="tl-caret">{poolOpen ? '▾' : '▸'}</span>
           <span className="tl-title">Пока без места</span>
           <span className="spacer" />
-          <span className="tl-meta">{data.pool.scenes.length ? `${data.pool.scenes.length} сц.` : 'сцены из головы'}</span>
+          <span className="tl-meta">{data.pool.scenes.length ? formatScenes(data.pool.scenes.length) : 'сцены из головы'}</span>
         </button>
         {poolOpen && (
           <div className="tl-body">
@@ -595,11 +608,11 @@ function Timeline({
             <button className="tl-head" aria-expanded={isOpen} onClick={() => toggle(chapter.id)}>
               <span className="tl-caret">{isOpen ? '▾' : '▸'}</span>
               <span className="tl-title">{chapter.title}</span>
-              {chapter.id === here && !isOpen && <span className="here">ты здесь</span>}
+              {chapter.id === here && !isOpen && !storyEmpty(data) && <span className="here">ты здесь</span>}
               <span className="spacer" />
               {pay.length > 0 && <span className="tl-mk">◎ {pay.length}</span>}
               {plant.length > 0 && <span className="tl-mk">✦ {plant.length}</span>}
-              <span className="tl-meta">{scenes.length} сц.</span>
+              <span className="tl-meta">{formatScenes(scenes.length)}</span>
             </button>
             {lineMissing && <div className="tl-gap">нет сцен этой ветки</div>}
             {isOpen && (
@@ -645,7 +658,7 @@ function TimelineScene({ data, scene, lens, onOpen }: { data: ProjectData; scene
         {sub && <span className="tl-sub">{sub}</span>}
       </span>
       {markers.length > 0 && <span className="tl-mk">✦ {markers.length}</span>}
-      {current && <span className="here">ты здесь</span>}
+      {current && !storyEmpty(data) && <span className="here">ты здесь</span>}
     </button>
   )
 }

@@ -56,7 +56,7 @@ export function SceneEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({ heading: false, codeBlock: false, code: false, horizontalRule: false }),
-      Placeholder.configure({ placeholder: 'Начни с одной фразы. Остальное подтянется.' }),
+      Placeholder.configure({ placeholder: 'Любая фраза. Можно из середины.' }),
       Focus.configure({ className: 'has-focus', mode: 'deepest' }),
       MarkerMark,
       EditHints,

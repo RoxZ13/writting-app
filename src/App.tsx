@@ -37,6 +37,13 @@ export function App() {
   const [searching, setSearching] = useState(false)
   const [sync, setSync] = useState<SyncStatus>(getSyncStatus)
   const reveal = useReveal(route.view === 'text')
+  // A brand-new, still empty story keeps its header in view until the first key: the author sees once where things are.
+  const [fresh, setFresh] = useState(false)
+  useEffect(() => {
+    const on = (e: Event) => setFresh((e as CustomEvent<boolean>).detail)
+    window.addEventListener('manuscript:fresh', on)
+    return () => window.removeEventListener('manuscript:fresh', on)
+  }, [])
 
   // Tell the boot watchdog in index.html that storage answered and the app is alive.
   useEffect(() => {
@@ -62,11 +69,15 @@ export function App() {
     if (projectId) void tidyImportedScenes(projectId).then(() => recountWords(projectId))
   }, [projectId])
 
-  const selectProject = useCallback((id: string) => {
+  // A story opens where it was left: the text, or the board for someone who plans first.
+  const selectProject = useCallback((id: string, view?: 'text' | 'board') => {
     setProjectId(id)
     setCurrentProjectId(id)
-    go({ view: 'text' })
+    go({ view: view ?? lastView(id) })
   }, [])
+  useEffect(() => {
+    if (projectId && (route.view === 'text' || route.view === 'board')) rememberView(projectId, route.view)
+  }, [projectId, route.view])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -107,7 +118,7 @@ export function App() {
         <aside className="lib-side">
           <div className="brand">
             <div className="logo">Manuscript.</div>
-            <div className="tagline">The writer’s studio</div>
+            <div className="tagline">тихое место для историй</div>
           </div>
           <div className="side-label">Menu</div>
           <nav className="lib-nav">
@@ -124,8 +135,8 @@ export function App() {
               </button>
             ))}
           </nav>
-          <button className="lib-back" onClick={() => go({ view: 'text' })}>
-            ← К «{data.project.title}»
+          <button className="lib-back" onClick={() => go({ view: lastView(data.project.id) })}>
+            ← К истории
           </button>
         </aside>
         <main className="lib-main">
@@ -139,7 +150,7 @@ export function App() {
   }
 
   return (
-    <div className={`app app-${route.view} ${reveal ? 'reveal' : ''}`}>
+    <div className={`app app-${route.view} ${reveal || (fresh && route.view === 'text') ? 'reveal' : ''}`}>
       <AppHeader data={data} route={route} sync={sync} onSearch={() => setSearching(true)} />
       {sync.state !== 'ok' && <BackupReminder />}
       {route.view === 'text' && textScene && (
@@ -166,7 +177,7 @@ export function App() {
         </main>
       )}
       {route.view !== 'text' && (
-        <button className="fab" title="Быстро записать мысль, цитату, маячок (Ctrl/⌘ + J)" onClick={() => setCapture(true)}>
+        <button className="fab" title="Быстрая запись: мысль, цитата, маячок (Ctrl/⌘ + J)" aria-label="Быстрая запись" onClick={() => setCapture(true)}>
           <Icon name="bolt" size={22} />
         </button>
       )}
@@ -308,6 +319,22 @@ function Landmark({ data }: { data: ProjectData }) {
       {chapters}
     </button>
   )
+}
+
+const VIEW_KEY = 'manuscript.view.'
+function lastView(projectId: string): 'text' | 'board' {
+  try {
+    return localStorage.getItem(VIEW_KEY + projectId) === 'board' ? 'board' : 'text'
+  } catch {
+    return 'text'
+  }
+}
+function rememberView(projectId: string, view: 'text' | 'board') {
+  try {
+    localStorage.setItem(VIEW_KEY + projectId, view)
+  } catch {
+    /* ignore */
+  }
 }
 
 /**

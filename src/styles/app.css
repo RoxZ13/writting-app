@@ -4964,3 +4964,128 @@ button.deadline {
     bottom: calc(env(safe-area-inset-bottom) + 76px);
   }
 }
+
+/* =====================================================================
+   First minutes: welcome and a new story's title page.
+   ===================================================================== */
+.welcome-card {
+  width: min(520px, 100%);
+  padding: 36px;
+}
+@media (max-width: 480px) {
+  .welcome-card {
+    padding: 28px 22px;
+  }
+}
+.welcome-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink-3);
+}
+.welcome-more .link-plain {
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.welcome-more .link-plain:hover {
+  color: var(--ink);
+}
+
+/* A new, empty story: its name and what it is about sit on the page, above the text. */
+.title-page {
+  /* Inside the editor column, so it lines up with the text. */
+  margin: 8px 0 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.title-page input {
+  border: 0;
+  background: none;
+  outline: none;
+  padding: 0;
+  width: 100%;
+  font-family: var(--text-font);
+  color: var(--ink);
+}
+.title-page .tp-title {
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.title-page .tp-about {
+  font-size: 18px;
+  color: var(--ink-2);
+}
+.title-page input::placeholder {
+  color: var(--ink-3);
+  opacity: 0.7;
+}
+.title-page .tp-rule {
+  width: 40px;
+  height: 1px;
+  background: var(--line-2);
+  margin: 18px 0 2px;
+}
+.title-page .tp-door {
+  align-self: flex-start;
+  font-size: 13px;
+  color: var(--ink-3);
+  margin-top: 4px;
+  transition: opacity 0.3s;
+}
+.title-page .tp-door:hover {
+  color: var(--ink);
+}
+.title-page .tp-door.gone {
+  opacity: 0;
+  pointer-events: none;
+}
+@media (max-width: 760px) {
+  .title-page .tp-title {
+    font-size: 28px;
+  }
+}
+
+/* A new story's board: one dashed invitation (the essence), the rest solid and quiet. */
+.column.pool {
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+}
+.column.pool.over {
+  background: var(--fill);
+}
+.add-column {
+  flex: 0 0 auto;
+  align-self: flex-start;
+  height: auto;
+  border: 0;
+  padding: 14px 12px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+.add-column:hover {
+  background: var(--fill);
+}
+.seg.lens.bare {
+  background: none;
+  padding: 0;
+  flex: 0 0 auto;
+  width: auto;
+}
+/* On the phone, an empty «Пока без места» is solid too: the essence line is the one dashed invitation. */
+.tl-chapter.pool {
+  background: var(--surface);
+  border: 1.5px solid var(--line);
+}
+@media (max-width: 760px) {
+  .add-column {
+    height: auto;
+    align-self: stretch;
+  }
+}
