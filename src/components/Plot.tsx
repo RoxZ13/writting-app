@@ -76,17 +76,27 @@ export function Essence({ project }: { project: Project }) {
       <button className={`essence-bar ${filled ? '' : 'empty'}`} onClick={() => setOpen(true)}>
         {filled ? (
           <>
-            <span className="essence-k">Финал</span>
-            <span className="essence-v">{project.ending || 'ещё не решён'}</span>
             {project.premise && (
               <>
                 <span className="essence-k">О чём</span>
                 <span className="essence-v">{project.premise}</span>
               </>
             )}
+            {project.ending && (
+              <>
+                <span className="essence-k">Финал</span>
+                <span className="essence-v">{project.ending}</span>
+              </>
+            )}
+            {!project.premise && !project.ending && (
+              <>
+                <span className="essence-k">Что движет</span>
+                <span className="essence-v">{project.drive}</span>
+              </>
+            )}
           </>
         ) : (
-          '+ Суть истории: о чём она и чем закончится'
+          '+ О чём история — можно одной строкой, можно позже'
         )}
       </button>
     )
@@ -107,7 +117,7 @@ export function Essence({ project }: { project: Project }) {
         </label>
         <label>
           <span className="essence-k">Чем закончится</span>
-          <InlineEdit multiline value={project.ending ?? ''} placeholder="Финал — к нему ведёт всё остальное" onSave={(ending) => set({ ending })} />
+          <InlineEdit multiline value={project.ending ?? ''} placeholder="Если уже знаешь — к нему поведёт всё остальное" onSave={(ending) => set({ ending })} />
         </label>
         <label>
           <span className="essence-k">Что движет героями</span>

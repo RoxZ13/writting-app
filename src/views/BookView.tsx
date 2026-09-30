@@ -30,6 +30,7 @@ export function BookView({ data }: { data: ProjectData }) {
   const words = data.scenes.reduce((n, s) => n + s.wordCount, 0)
   const cover = useCover(p.id)
   const cp = chapterProgress(p, data.chapters, data.scenes)
+  const early = words < 1000 && !data.chapters.some((c) => c.publishedAt)
 
   const exportWord = async () => download(await exportDocx(p.title, await loadChapters(data)), `${p.title}.docx`)
   const platform = platformOf(p)
@@ -63,7 +64,7 @@ export function BookView({ data }: { data: ProjectData }) {
         <div className="stack" style={{ flex: 1, minWidth: 0 }}>
           <span className="eyebrow">О книге</span>
           <InlineEdit className="book-title" value={p.title} onSave={(title) => title.trim() && set({ title })} />
-          <InlineEdit className="book-genre" value={p.genre ?? ''} placeholder="Жанр — например, «Фэнтези, гет, макси»" onSave={(genre) => set({ genre })} />
+          <InlineEdit className="book-genre" value={p.genre ?? ''} placeholder="Жанр — например, фэнтези, гет, макси" onSave={(genre) => set({ genre })} />
           <div>
             <span className="field-label">Стадия</span>
             <div className="seg">
@@ -92,25 +93,28 @@ export function BookView({ data }: { data: ProjectData }) {
             </div>
             <div>
               <span className="field-label">Главы</span>
-              <div className="chapters-landmark">
-                <strong>
-                  {cp.written} из {cp.total}
-                </strong>{' '}
-                написано{cp.left > 0 ? ` · осталось ${cp.left}` : ' · все'}
-                {cp.daysPerChapter && <span className="muted"> · к дедлайну ≈ глава в {cp.daysPerChapter} дн.</span>}
-              </div>
+              {!early && (
+                <div className="chapters-landmark">
+                  <strong>
+                    {cp.written} из {cp.total}
+                  </strong>{' '}
+                  написано{cp.left > 0 ? ` · осталось ${cp.left}` : ' · все'}
+                  {cp.daysPerChapter && <span className="muted"> · к дедлайну ≈ глава в {cp.daysPerChapter} дн.</span>}
+                </div>
+              )}
               <label className="row small muted" style={{ gap: 8, marginTop: 6 }}>
                 всего будет
-                <NumberField value={p.targetChapters} placeholder={String(data.chapters.length)} onSave={(targetChapters) => set({ targetChapters })} />
+                <NumberField value={p.targetChapters} placeholder={early ? 'пока не знаю' : String(data.chapters.length)} onSave={(targetChapters) => set({ targetChapters })} />
               </label>
             </div>
           </div>
         </div>
       </div>
 
-      <PublishSection data={data} onCopy={(id) => void copyChapter(id)} />
+      {/* Publishing and pace mean something from the first thousand words; on an empty book they only reproach. */}
+      {!early && <PublishSection data={data} onCopy={(id) => void copyChapter(id)} />}
 
-      <PaceSection data={data} />
+      {!early && <PaceSection data={data} />}
 
       <details className="card settings-section book-fold">
         <summary>

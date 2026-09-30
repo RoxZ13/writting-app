@@ -3,10 +3,13 @@ import { alive, createProject, remove, save } from '../db/repo'
 import { importBook } from '../components/ImportPanel'
 import { parseBook, readFileAsBlocks } from './importer'
 
+/** A story created without a name; the first phrase can name it later. */
+export const UNTITLED = 'Без названия'
+
 /** Create a story, optionally from a file (its header gives the title when none is typed). */
 export async function createStory(opts: { title?: string; file?: File; color?: string; deadline?: string; genre?: string }) {
   const book = opts.file ? parseBook(await readFileAsBlocks(opts.file)) : undefined
-  const name = opts.title?.trim() || book?.title || opts.file?.name.replace(/\.[^.]+$/, '') || 'Новая история'
+  const name = opts.title?.trim() || book?.title || opts.file?.name.replace(/\.[^.]+$/, '') || UNTITLED
   const project = await createProject(name)
   if (book) {
     // Replace the starter chapter with the imported text.
@@ -21,7 +24,10 @@ export async function createStory(opts: { title?: string; file?: File; color?: s
     await save('projects', { ...(await db.projects.get(project.id))!, lastSceneId: first })
   }
   const fresh = (await db.projects.get(project.id))!
-  await save('projects', { ...fresh, color: opts.color, deadline: opts.deadline || undefined, genre: opts.genre?.trim() || undefined, stage: 'writing' })
+  // No colour asked for: a quiet one that the other books on the shelf do not use yet.
+  const used = new Set(alive(await db.projects.toArray()).map((p) => p.color))
+  const color = opts.color ?? COVERS.find((c) => !used.has(c)) ?? COVERS[Math.floor(Math.random() * COVERS.length)]
+  await save('projects', { ...fresh, color, deadline: opts.deadline || undefined, genre: opts.genre?.trim() || undefined, stage: book ? 'writing' : 'idea' })
   return project.id
 }
 

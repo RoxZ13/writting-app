@@ -55,7 +55,7 @@ export const alive = <T extends Base>(rows: T[]) => rows.filter((r) => !r.delete
 export async function createProject(title: string): Promise<Project> {
   const now = Date.now()
   const project = await save<Project>('projects', { id: uid(), title, createdAt: now, updatedAt: now })
-  const chapter = await createChapter(project.id, 'Вся история')
+  const chapter = await createChapter(project.id, 'Глава 1')
   const scene = await createScene(project.id, chapter.id, 'Первая сцена')
   await patch<Project>('projects', project.id, { lastSceneId: scene.id })
   return project

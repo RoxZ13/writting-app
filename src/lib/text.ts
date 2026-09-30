@@ -81,3 +81,10 @@ export function lastSentences(doc: unknown, n = 2): string {
   }
   return out.join(' ')
 }
+
+/** «1 сцена», «3 сцены», «12 сцен». */
+export const formatScenes = (n: number) => {
+  const m10 = n % 10
+  const m100 = n % 100
+  return `${n} ${m10 === 1 && m100 !== 11 ? 'сцена' : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 'сцены' : 'сцен'}`
+}
