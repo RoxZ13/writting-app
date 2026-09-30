@@ -638,7 +638,7 @@ function FinishSession({ project, onClose }: { project: Project; onClose: () => 
             className="textarea"
             rows={3}
             autoFocus
-            placeholder="Где остановилась и что дальше. Например: «дописать молчание Тома, потом — почему вмешивается Коллум»"
+            placeholder="Где остановилась и что дальше — пара слов, чтобы завтра начать без раскачки"
             value={v}
             onChange={(e) => setV(e.target.value)}
           />
@@ -703,7 +703,7 @@ function MarkerFromSelection({
             <input
               className="input"
               autoFocus
-              placeholder="Например: откуда у Тома амулет"
+              placeholder="Что потом нужно раскрыть — одной фразой"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && void create()}
@@ -857,7 +857,7 @@ function CommentDialog({
           className="textarea"
           rows={3}
           autoFocus
-          placeholder="Что здесь поправить или проверить? Например: «читатель просил пояснить, откуда амулет»"
+          placeholder="Что здесь поправить или проверить?"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {

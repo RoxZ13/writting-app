@@ -12,6 +12,7 @@ import { makeExcerpt } from '../lib/importer'
 import { session } from '../lib/session'
 import { MarkerMark } from './MarkerMark'
 import { EditHints } from './EditHints'
+import { Typography } from './Typography'
 import { CommentMark } from './CommentMark'
 import { findInEditor } from '../lib/search'
 
@@ -58,7 +59,11 @@ export function SceneEditor({
       MarkerMark,
       EditHints,
       CommentMark,
+      Typography,
     ],
+    // Only our own typing shortcuts and **bold** / *italic*: a dash or «>» at the start of a line stays text,
+    // it never turns into a list or a quote block (dialogue starts with a dash).
+    enableInputRules: ['bold', 'italic', 'strike', 'mnTypography'],
     content: initial.content as object,
     editorProps: {
       // Spelling underlines follow the setting: while writing they only distract.

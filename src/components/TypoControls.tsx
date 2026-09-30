@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { applyTypo, DEFAULT_TYPO, loadTypo, type Typo } from '../lib/typography'
+import { hotkey } from '../lib/session'
 
 type Opt<K extends keyof Typo> = [Typo[K], string]
 
@@ -28,16 +29,6 @@ export function TypoControls() {
   return (
     <div className="typo">
       <Choice
-        label="Вид"
-        k="calm"
-        t={t}
-        set={set}
-        options={[
-          ['on', 'Тихий'],
-          ['off', 'С панелями'],
-        ]}
-      />
-      <Choice
         label="Шрифт"
         k="font"
         t={t}
@@ -61,72 +52,97 @@ export function TypoControls() {
           <span className="small muted">{t.size}</span>
         </div>
       </div>
-      <Choice
-        label="Ширина"
-        k="width"
-        t={t}
-        set={set}
-        options={[
-          ['narrow', 'Узко'],
-          ['medium', 'Средне'],
-          ['wide', 'Широко'],
-        ]}
-      />
-      <Choice
-        label="Межстрочный"
-        k="leading"
-        t={t}
-        set={set}
-        options={[
-          ['tight', 'Плотно'],
-          ['normal', 'Обычно'],
-          ['loose', 'Свободно'],
-        ]}
-      />
-      <Choice
-        label="Абзацы"
-        k="para"
-        t={t}
-        set={set}
-        options={[
-          ['gap', 'С отбивкой'],
-          ['indent', 'Красная строка'],
-        ]}
-      />
-      <Choice
-        label="Абзац в фокусе"
-        k="focusPara"
-        t={t}
-        set={set}
-        options={[
-          ['off', 'Нет'],
-          ['on', 'Остальные бледнее'],
-        ]}
-      />
-      <Choice
-        label="Орфография"
-        k="spell"
-        t={t}
-        set={set}
-        options={[
-          ['edit', 'Только при правке'],
-          ['always', 'Всегда'],
-          ['never', 'Выкл'],
-        ]}
-      />
-      <Choice
-        label="Строка"
-        k="typewriter"
-        t={t}
-        set={set}
-        options={[
-          ['off', 'Как обычно'],
-          ['on', 'По центру экрана'],
-        ]}
-      />
-      <button className="link small" style={{ alignSelf: 'flex-start' }} onClick={() => set(DEFAULT_TYPO)}>
-        Сбросить
-      </button>
+      <div className="typo-cheat">
+        <span className="field-label">Пишешь — и оформляется само</span>
+        <div>
+          <code>*слово*</code> → <em>курсив</em> · <code>**слово**</code> → <strong>жирный</strong>
+        </div>
+        <div>
+          <code>---</code> → — · <code>-</code> и пробел в начале строки → «— » · <code>...</code> → … · <code>"</code> → « »
+        </div>
+        <div className="muted">{hotkey('⌘/Ctrl + I — курсив, ⌘/Ctrl + B — жирный: можно нажать и печатать дальше')}</div>
+      </div>
+      <details className="typo-more">
+        <summary>Больше настроек</summary>
+        <div className="typo">
+          <Choice
+            label="Вид"
+            k="calm"
+            t={t}
+            set={set}
+            options={[
+              ['on', 'Тихий'],
+              ['off', 'С панелями'],
+            ]}
+          />
+          <Choice
+            label="Ширина"
+            k="width"
+            t={t}
+            set={set}
+            options={[
+              ['narrow', 'Узко'],
+              ['medium', 'Средне'],
+              ['wide', 'Широко'],
+            ]}
+          />
+          <Choice
+            label="Межстрочный"
+            k="leading"
+            t={t}
+            set={set}
+            options={[
+              ['tight', 'Плотно'],
+              ['normal', 'Обычно'],
+              ['loose', 'Свободно'],
+            ]}
+          />
+          <Choice
+            label="Абзацы"
+            k="para"
+            t={t}
+            set={set}
+            options={[
+              ['gap', 'С отбивкой'],
+              ['indent', 'Красная строка'],
+            ]}
+          />
+          <Choice
+            label="Абзац в фокусе"
+            k="focusPara"
+            t={t}
+            set={set}
+            options={[
+              ['off', 'Нет'],
+              ['on', 'Остальные бледнее'],
+            ]}
+          />
+          <Choice
+            label="Строка"
+            k="typewriter"
+            t={t}
+            set={set}
+            options={[
+              ['off', 'Как обычно'],
+              ['on', 'По центру экрана'],
+            ]}
+          />
+          <Choice
+            label="Орфография"
+            k="spell"
+            t={t}
+            set={set}
+            options={[
+              ['edit', 'Только при правке'],
+              ['always', 'Всегда'],
+              ['never', 'Выкл'],
+            ]}
+          />
+          <button className="link small" style={{ alignSelf: 'flex-start' }} onClick={() => set(DEFAULT_TYPO)}>
+            Сбросить
+          </button>
+        </div>
+      </details>
     </div>
   )
 }

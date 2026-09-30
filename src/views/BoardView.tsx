@@ -29,9 +29,8 @@ import {
 } from '../db/repo'
 import { MarkerCard } from '../components/MarkerCard'
 import { Arc, Essence } from '../components/Plot'
-import { Faces } from '../components/Refs'
 import { SceneSheet } from '../components/SceneSheet'
-import { chapterCharacters, markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
+import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
 import { MARKER_STATES, statusOf } from '../lib/status'
 import { InlineEdit, Modal, toast } from '../lib/ui'
 import { deadlineText } from '../lib/stories'
@@ -136,7 +135,7 @@ export function BoardView({ data }: { data: ProjectData }) {
             <input
               className="ref-input"
               autoFocus
-              placeholder="Например, «Линия Альфарда»"
+              placeholder="Например, «линия второго героя»"
               value={newLine}
               onChange={(e) => setNewLine(e.target.value)}
               onBlur={() => setNewLine(null)}
@@ -248,10 +247,8 @@ function Column({
   const [draft, setDraft] = useState('')
   const [markerDraft, setMarkerDraft] = useState('')
   const [markerSide, setMarkerSide] = useState<'setup' | 'payoff'>('setup')
-  const words = scenes.reduce((n, s) => n + s.wordCount, 0)
   const plant = data.markers.filter((m) => markerSetupChapter(m, data) === chapter.id)
   const pay = data.markers.filter((m) => markerPayoffChapter(m, data) === chapter.id)
-  const people = chapterCharacters(data, chapter.id)
   const lineMissing = lens.kind === 'line' && !scenes.some((s) => s.lineIds?.includes(lens.id))
   const hasCurrent = scenes.some((s) => s.id === data.project.lastSceneId)
   // On phones chapters are a list; only the chapter you are in starts unfolded.
@@ -278,6 +275,14 @@ function Column({
             {folded ? '▸' : '▾'}
           </button>
           <InlineEdit className="column-title" value={chapter.title} onSave={(title) => void patch<Chapter>('chapters', chapter.id, { title })} />
+          <span className="column-count">
+            {scenes.length} сц.
+            {chapter.publishedAt && (
+              <span className="published" title="Выложена на Фикбук">
+                ✓ {new Date(chapter.publishedAt + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+              </span>
+            )}
+          </span>
           <details className="menu">
             <summary className="icon-btn" aria-label="Действия с главой">
               ⋯
@@ -322,15 +327,6 @@ function Column({
             {scenes.some((x) => x.status !== 'done') && ` · не готово ${scenes.filter((x) => x.status !== 'done').length} сц.`}
           </div>
         )}
-        <div className="column-meta">
-          {scenes.length} сц. · {words.toLocaleString('ru-RU')} сл.
-          {chapter.publishedAt && (
-            <span className="published" title="Выложена на Фикбук">
-              ✓ {new Date(chapter.publishedAt + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
-            </span>
-          )}
-          <Faces data={data} ids={people} max={5} />
-        </div>
         {showArc && scenes.some((s) => s.heat || s.node) && <Arc scenes={scenes} />}
       </header>
 
@@ -353,7 +349,7 @@ function Column({
         onBlur={() => void addScene()}
       />
 
-      {(plant.length > 0 || pay.length > 0 || lens.kind === 'markers') && (
+      {lens.kind === 'markers' && (
         <div className="column-markers">
           {pay.map((m) => (
             <MarkerPill key={m.id} data={data} marker={m} side="payoff" onOpen={() => onOpenMarker(m.id)} />
@@ -363,6 +359,7 @@ function Column({
           ))}
         </div>
       )}
+      {lens.kind === 'markers' && (
       <div className="marker-add">
         <input
           className="quick-add small"
@@ -379,6 +376,7 @@ function Column({
           {markerSide === 'setup' ? '✦' : '◎'}
         </button>
       </div>
+      )}
     </section>
   )
 }
@@ -454,16 +452,19 @@ function SortableCard({ data, scene, lens, onOpen }: { data: ProjectData; scene:
   )
 }
 
+/**
+ * A scene on the board, kept quiet: its name and one line about it. Details (status, words, people,
+ * the song) live in the scene sheet; the marker count only shows under «Показать: маячки».
+ */
 function Card({ data, scene, lens, overlay }: { data: ProjectData; scene: Scene; lens: Lens; overlay?: boolean }) {
   const lines = (scene.lineIds ?? []).map((id) => data.lineById.get(id)).filter(Boolean)
   const markers = data.markers.filter((m) => m.setupSceneId === scene.id || m.payoffSceneId === scene.id)
   const dim =
     (lens.kind === 'line' && !scene.lineIds?.includes(lens.id)) || (lens.kind === 'markers' && markers.length === 0)
-  const st = statusOf(scene.status)
   const current = data.project.lastSceneId === scene.id
+  const showMarkers = lens.kind === 'markers' && markers.length > 0
   return (
     <article className={`card-scene ${dim ? 'dim' : ''} ${overlay ? 'overlay' : ''} ${current ? 'current' : ''} ${scene.node ? 'node' : ''}`}>
-      {scene.node && <div className="node-label">◆ узловая точка</div>}
       {lines.length > 0 && (
         <div className="line-strip">
           {lines.map((l) => (
@@ -471,17 +472,17 @@ function Card({ data, scene, lens, overlay }: { data: ProjectData; scene: Scene;
           ))}
         </div>
       )}
-      {scene.epigraph && <div className="card-epigraph">♪ {scene.epigraph}</div>}
-      <div className={`card-title ${scene.title.trim() ? '' : 'untitled'}`}>{sceneName(data, scene)}</div>
-      {scene.goal ? <div className="card-goal">{scene.goal}</div> : scene.excerpt && <div className="card-excerpt">{scene.excerpt}</div>}
-      <div className="card-foot">
-        <span className="status-dot" style={{ background: st.color }} title={st.label} />
-        {scene.wordCount > 0 ? <span>{scene.wordCount.toLocaleString('ru-RU')}</span> : <span>план</span>}
-        {markers.length > 0 && <span className="mk-count">✦ {markers.length}</span>}
-        {current && <span className="here">ты здесь</span>}
-        <span className="spacer" />
-        <Faces data={data} ids={scene.characterIds ?? []} max={3} />
+      <div className={`card-title ${scene.title.trim() ? '' : 'untitled'}`}>
+        {scene.node && <span title="Узловая точка">◆ </span>}
+        {sceneName(data, scene)}
       </div>
+      {scene.goal ? <div className="card-goal">{scene.goal}</div> : scene.excerpt && <div className="card-excerpt">{scene.excerpt}</div>}
+      {(current || showMarkers) && (
+        <div className="card-foot">
+          {showMarkers && <span className="mk-count">✦ {markers.length}</span>}
+          {current && <span className="here">ты здесь</span>}
+        </div>
+      )}
     </article>
   )
 }
