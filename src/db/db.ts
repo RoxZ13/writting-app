@@ -129,6 +129,8 @@ export interface Marker extends Base {
   /** Planned at chapter level on the board, before the exact scene is known. */
   setupChapterId?: string
   payoffChapterId?: string
+  /** «Эхо»: scenes where it is mentioned again between planting and payoff, so the reader does not forget it. */
+  echoSceneIds?: string[]
   resolved: boolean
   createdAt: number
 }

@@ -112,3 +112,26 @@ export function chapterProgress(
   }
   return { written, total, left, planned: !!project.targetChapters, daysPerChapter }
 }
+
+/**
+ * What is already «in the bank»: words this month and how many weeks in a row the author came back.
+ * Only ever counts up; a missed week simply is not mentioned.
+ */
+export function bank(project: Project, now = Date.now()) {
+  const d = new Date(now)
+  const month = dayKey(new Date(d.getFullYear(), d.getMonth(), 1).getTime()).slice(0, 7)
+  let monthWords = 0
+  for (const [k, n] of Object.entries(project.progress ?? {})) if (k.startsWith(month)) monthWords += n
+  monthWords += pendingFor(project.id)
+  const wrote = (key: string) => (project.progress?.[key] ?? 0) > 0 || (key === dayKey(now) && pendingFor(project.id) > 0)
+  // Weeks start on Monday. The current week counts once something is written in it.
+  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate() - ((d.getDay() + 6) % 7)).getTime()
+  const weekHas = (start: number) => Array.from({ length: 7 }, (_, i) => dayKey(start + i * DAY + DAY / 2)).some(wrote)
+  let weeks = 0
+  let start = weekHas(monday) ? monday : monday - 7 * DAY
+  while (weeks < 60 && weekHas(start)) {
+    weeks++
+    start -= 7 * DAY
+  }
+  return { monthName: d.toLocaleDateString('ru-RU', { month: 'long' }), monthWords, weeks }
+}

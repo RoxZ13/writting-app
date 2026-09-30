@@ -45,6 +45,7 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
                 ['auto', 'Как в системе'],
                 ['light', 'Светлая'],
                 ['dark', 'Тёмная'],
+                ['paper', 'Бумага'],
               ] as [Theme, string][]
             ).map(([t, label]) => (
               <button

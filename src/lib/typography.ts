@@ -13,9 +13,11 @@ export interface Typo {
   focusPara: 'off' | 'on'
   /** The browser's spelling underlines: always, only while editing («Править»), or never. */
   spell: 'always' | 'edit' | 'never'
+  /** On opening a scene: a quiet plate with the last note and the last two sentences. */
+  resume: 'on' | 'off'
 }
 
-export const DEFAULT_TYPO: Typo = { font: 'serif', size: 18, width: 'medium', leading: 'normal', para: 'gap', typewriter: 'off', calm: 'on', focusPara: 'off', spell: 'edit' }
+export const DEFAULT_TYPO: Typo = { font: 'serif', size: 18, width: 'medium', leading: 'normal', para: 'gap', typewriter: 'off', calm: 'on', focusPara: 'off', spell: 'edit', resume: 'on' }
 
 const KEY = 'manuscript.typo'
 const WIDTH = { narrow: '560px', medium: '660px', wide: '800px' }

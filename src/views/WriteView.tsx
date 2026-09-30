@@ -18,7 +18,9 @@ import { clock, useSprint } from '../lib/sprint'
 import { endFocus, FocusStart } from '../components/Focus'
 import { dayKey, wordsOn } from '../lib/pace'
 import { MARKER_STATES, statusOf } from '../lib/status'
-import { docParagraphs, emptyDoc, formatWords } from '../lib/text'
+import { docParagraphs, emptyDoc, formatWords, lastSentences } from '../lib/text'
+import { loadTypo } from '../lib/typography'
+import { diffParagraphs } from '../lib/diff'
 import { InlineEdit, Modal, toast } from '../lib/ui'
 
 type Mode = 'write' | 'edit' | 'rewrite'
@@ -400,20 +402,17 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
           </div>
         </div>
 
-        {!bannerHidden && data.project.nextStep && (
-          <div className="last-time">
-            <span className="muted">В прошлый раз:</span> {data.project.nextStep}
-            <button
-              className="icon-btn"
-              aria-label="Скрыть"
-              onClick={() => {
-                sessionStorage.setItem('manuscript.banner', '1')
-                setBannerHidden(true)
-              }}
-            >
-              ×
-            </button>
-          </div>
+        {text && editor && !rewriting && (
+          <Resume
+            key={scene.id}
+            note={bannerHidden ? '' : (data.project.nextStep ?? '')}
+            doc={text.content}
+            editor={editor}
+            onNoteSeen={() => {
+              sessionStorage.setItem('manuscript.banner', '1')
+              setBannerHidden(true)
+            }}
+          />
         )}
         <div className="passport-wrap">
           <SceneNow data={data} scene={scene} onOpenPlan={openPlan} />
@@ -537,6 +536,8 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
 function RewriteOld({ scene, editor, onDone }: { scene: Scene; editor: Editor | null; onDone: () => void }) {
   const snap = useLiveQuery(() => (scene.rewriteFrom ? db.snapshots.get(scene.rewriteFrom) : undefined), [scene.rewriteFrom])
   const [hidden, setHidden] = useState(false)
+  const [changes, setChanges] = useState(false)
+  const now = useLiveQuery(() => (changes ? db.texts.get(scene.id) : undefined), [changes, scene.id])
   const finish = async (keepNew: boolean) => {
     if (!keepNew && snap && editor) {
       if (!confirm('Вернуть старый текст? Новый черновик сохранится в версиях.')) return
@@ -558,14 +559,33 @@ function RewriteOld({ scene, editor, onDone }: { scene: Scene; editor: Editor | 
   return (
     <aside className="old-text">
       <div className="old-head">
-        <span>Было</span>
+        <div className="seg old-seg">
+          <button aria-pressed={!changes} onClick={() => setChanges(false)}>
+            Было
+          </button>
+          <button aria-pressed={changes} onClick={() => setChanges(true)} title="Убранное — зачёркнуто, новое — подчёркнуто">
+            Что изменилось
+          </button>
+        </div>
         <span className="spacer" />
         <button className="link" onClick={() => setHidden(true)}>
           скрыть
         </button>
       </div>
       <div className="old-body">
-        {snap ? docParagraphs(snap.content).map((p, i) => <p key={i}>{p}</p>) : <p>…</p>}
+        {!snap ? (
+          <p>…</p>
+        ) : changes && now ? (
+          diffParagraphs(docParagraphs(snap.content), docParagraphs(now.content)).map((para, i) => (
+            <p key={i}>
+              {para.map((piece, k) =>
+                piece.kind === 'same' ? piece.text : piece.kind === 'del' ? <del key={k}>{piece.text}</del> : <ins key={k}>{piece.text}</ins>,
+              )}
+            </p>
+          ))
+        ) : (
+          docParagraphs(snap.content).map((p, i) => <p key={i}>{p}</p>)
+        )}
       </div>
       <div className="old-foot">
         <button className="btn sm primary" onClick={() => void finish(true)}>
@@ -609,6 +629,55 @@ function StartRewrite({ scene, editor, onClose, onStarted }: { scene: Scene; edi
         </button>
       </div>
     </Modal>
+  )
+}
+
+/**
+ * «Подхватить мысль»: on opening a scene, the note left last time and the last two sentences,
+ * so the way back into the text is one tap. Goes away with the first typed letter.
+ */
+function Resume({ note, doc, editor, onNoteSeen }: { note: string; doc: unknown; editor: Editor; onNoteSeen: () => void }) {
+  const [tail] = useState(() => lastSentences(doc, 2))
+  const [open, setOpen] = useState(() => loadTypo().resume === 'on' && Boolean(note || tail))
+  const close = useCallback(() => {
+    setOpen(false)
+    if (note) onNoteSeen()
+  }, [note, onNoteSeen])
+  useEffect(() => {
+    if (!open) return
+    const onUpdate = ({ transaction }: { transaction: { docChanged: boolean } }) => {
+      if (transaction.docChanged) close()
+    }
+    editor.on('update', onUpdate)
+    return () => {
+      editor.off('update', onUpdate)
+    }
+  }, [open, editor, close])
+  if (!open) return null
+  const resume = () => {
+    close()
+    editor.chain().focus('end', { scrollIntoView: true }).run()
+  }
+  return (
+    <div className="resume" role="note">
+      {note && (
+        <div className="resume-note">
+          <span className="muted">В прошлый раз:</span> {note}
+        </div>
+      )}
+      {tail && <div className="resume-tail">…{tail}</div>}
+      <div className="row">
+        {tail && (
+          <button className="btn primary" onClick={resume}>
+            Продолжить отсюда
+          </button>
+        )}
+        <span className="spacer" />
+        <button className="icon-btn" aria-label="Скрыть" onClick={close}>
+          ×
+        </button>
+      </div>
+    </div>
   )
 }
 

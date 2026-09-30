@@ -108,6 +108,22 @@ export function markerStatus(m: Marker, data: ProjectData): 'hanging' | 'waiting
   return 'waiting'
 }
 
+/**
+ * A marker still waiting for its payoff that the reader last saw `gap` or more chapters ago
+ * (counting from where the author writes now). A reminder scene — «эхо» — keeps it alive.
+ */
+export function markerQuiet(m: Marker, data: ProjectData, gap = 4): boolean {
+  if (markerStatus(m, data) !== 'waiting') return false
+  const curScene = data.project.lastSceneId ? data.sceneById.get(data.project.lastSceneId) : undefined
+  const cur = curScene ? data.chapterIndex.get(curScene.chapterId) : undefined
+  if (cur === undefined) return false
+  const seen = [markerSetupChapter(m, data), ...(m.echoSceneIds ?? []).map((id) => data.sceneById.get(id)?.chapterId)]
+    .map((c) => (c ? data.chapterIndex.get(c) : undefined))
+    .filter((i): i is number => i !== undefined && i <= cur)
+  if (!seen.length) return false
+  return cur - Math.max(...seen) >= gap
+}
+
 /** Quotes and dialogues of the given characters that have not been used in the text yet. */
 export function unusedLines(data: ProjectData, characterIds: string[]): Note[] {
   if (!characterIds.length) return []

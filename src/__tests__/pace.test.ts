@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Project } from '../db/db'
-import { chapterProgress, dayKey, pace } from '../lib/pace'
+import { bank, chapterProgress, dayKey, pace } from '../lib/pace'
 
 const DAY = 86400000
 const now = new Date('2026-10-01T15:00:00').getTime()
@@ -44,5 +44,15 @@ describe('chapter landmark', () => {
   it('falls back to the chapters that exist, never counting the pool', () => {
     const r = chapterProgress(project({}), chapters, scenes, now)
     expect([r.written, r.total, r.left, r.daysPerChapter]).toEqual([1, 3, 2, undefined])
+  })
+})
+
+describe('bank', () => {
+  it('sums the month and counts weeks the author came back, from last week if this one is still empty', () => {
+    const p = project({ progress: { '2026-10-01': 100, '2026-09-30': 500, '2026-09-22': 300, '2026-09-15': 300, '2026-09-01': 50 } })
+    expect(bank(p, now)).toMatchObject({ monthWords: 100, weeks: 3 })
+    const quiet = project({ progress: { '2026-09-22': 300, '2026-09-15': 300 } })
+    expect(bank(quiet, now).weeks).toBe(2)
+    expect(bank(project({}), now)).toMatchObject({ monthWords: 0, weeks: 0 })
   })
 })

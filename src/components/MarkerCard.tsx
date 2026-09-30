@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { Marker } from '../db/db'
 import { patch, remove } from '../db/repo'
-import { markerStatus, type ProjectData } from '../lib/hooks'
+import { markerStatus, sceneName, type ProjectData } from '../lib/hooks'
 import { MARKER_STATES } from '../lib/status'
 import { InlineEdit } from '../lib/ui'
 import { PlacePicker } from './Refs'
@@ -23,7 +23,8 @@ export function MarkerCard({ marker, data, open: startOpen = false }: { marker: 
         />
         <InlineEdit className="t" multiline value={marker.title} placeholder="Что нельзя забыть?" onSave={(title) => set({ title })} />
         <button className="mk-state" title={st.hint} style={{ color: st.color }} onClick={() => setOpen(!open)}>
-          {st.label} {open ? '▴' : '▾'}
+          {st.label}
+          {marker.echoSceneIds?.length ? <span className="mk-echo-count"> · ~{marker.echoSceneIds.length}</span> : null} {open ? '▴' : '▾'}
         </button>
       </div>
       {open && (
@@ -39,6 +40,7 @@ export function MarkerCard({ marker, data, open: startOpen = false }: { marker: 
             Посеян
             <PlacePicker data={data} marker={marker} side="setup" emptyLabel="— не указано —" onChange={set} />
           </label>
+          <Echoes data={data} marker={marker} onChange={set} />
           <label className="small muted">
             Раскроется
             <PlacePicker data={data} marker={marker} side="payoff" emptyLabel="? пока не знаю — решу потом" onChange={set} />
@@ -52,6 +54,47 @@ export function MarkerCard({ marker, data, open: startOpen = false }: { marker: 
           </button>
         </div>
       )}
+    </div>
+  )
+}
+
+/**
+ * «Эхо»: the scenes in between where the thing flickers again, so it is not forgotten by the payoff.
+ * Not a separate state — just more places on the same marker.
+ */
+function Echoes({ data, marker, onChange }: { data: ProjectData; marker: Marker; onChange: (c: Partial<Marker>) => void }) {
+  const ids = (marker.echoSceneIds ?? []).filter((id) => data.sceneById.has(id))
+  const set = (next: string[]) => onChange({ echoSceneIds: next })
+  return (
+    <div className="small muted mk-echoes">
+      <span>Напомнила</span>
+      {ids.map((id) => (
+        <span key={id} className="chip">
+          {sceneName(data, data.sceneById.get(id)!)}
+          <button className="chip-x" aria-label="Убрать" onClick={() => set(ids.filter((x) => x !== id))}>
+            ×
+          </button>
+        </span>
+      ))}
+      <select
+        className="select"
+        value=""
+        onChange={(e) => e.target.value && set([...ids, e.target.value])}
+        aria-label="Добавить сцену, где маячок мелькнул ещё раз"
+      >
+        <option value="">{ids.length ? '+ ещё сцена' : '— нигде, пока только посеян —'}</option>
+        {data.outline.map(({ chapter, scenes }) => (
+          <optgroup key={chapter.id} label={chapter.title}>
+            {scenes
+              .filter((s) => !ids.includes(s.id) && s.id !== marker.setupSceneId && s.id !== marker.payoffSceneId)
+              .map((s) => (
+                <option key={s.id} value={s.id}>
+                  {sceneName(data, s)}
+                </option>
+              ))}
+          </optgroup>
+        ))}
+      </select>
     </div>
   )
 }

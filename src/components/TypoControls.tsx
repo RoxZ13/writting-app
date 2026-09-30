@@ -60,6 +60,9 @@ export function TypoControls() {
         <div>
           <code>---</code> → — · <code>-</code> и пробел в начале строки → «— » · <code>...</code> → … · <code>"</code> → « »
         </div>
+        <div>
+          <code>// заметка</code> и Enter → уходит на поля
+        </div>
         <div className="muted">{hotkey('⌘/Ctrl + I — курсив, ⌘/Ctrl + B — жирный: можно нажать и печатать дальше')}</div>
       </div>
       <details className="typo-more">
@@ -115,6 +118,16 @@ export function TypoControls() {
             options={[
               ['off', 'Нет'],
               ['on', 'Остальные бледнее'],
+            ]}
+          />
+          <Choice
+            label="Вход в сцену"
+            k="resume"
+            t={t}
+            set={set}
+            options={[
+              ['on', 'Подхватить мысль'],
+              ['off', 'Сразу текст'],
             ]}
           />
           <Choice

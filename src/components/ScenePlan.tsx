@@ -29,7 +29,8 @@ export function sceneMarkers(data: ProjectData, scene: Scene) {
   )
   const toPlant = data.markers.filter((m) => !m.setupSceneId && m.setupChapterId === scene.chapterId && !toPay.includes(m))
   const planted = data.markers.filter((m) => m.setupSceneId === scene.id && !toPay.includes(m))
-  return { toPay, toPlant, planted }
+  const echoed = data.markers.filter((m) => m.echoSceneIds?.includes(scene.id) && !toPay.includes(m) && !planted.includes(m))
+  return { toPay, toPlant, planted, echoed }
 }
 
 /**
@@ -88,7 +89,7 @@ export function ScenePlan({
   onClose: () => void
 }) {
   const goalRef = useRef<HTMLTextAreaElement>(null)
-  const { toPay, toPlant, planted } = sceneMarkers(data, scene)
+  const { toPay, toPlant, planted, echoed } = sceneMarkers(data, scene)
   const people = scene.characterIds ?? []
   const quotes = unusedLines(data, people)
   const notes = data.notes.filter((n) => n.sceneId === scene.id && !n.archived && n.kind !== 'quote' && n.kind !== 'dialogue')
@@ -96,7 +97,7 @@ export function ScenePlan({
   // Only what is filled in is shown; everything empty waits in one «+ добавить» line.
   const [opened, setOpened] = useState<Set<PlanPart>>(new Set())
   useEffect(() => setOpened(new Set()), [scene.id])
-  const markerCount = toPay.length + toPlant.length + planted.length
+  const markerCount = toPay.length + toPlant.length + planted.length + echoed.length
   const filled: Record<PlanPart, boolean> = {
     goal: !!scene.goal.trim(),
     beats: scene.beats.length > 0,
@@ -144,6 +145,7 @@ export function ScenePlan({
             <MarkerRows title="Раскрыть здесь" icon="◎" list={toPay} data={data} onOpen={onOpenMarker} />
             <MarkerRows title="Заложить в этой главе" icon="✦" list={toPlant} data={data} onOpen={onOpenMarker} />
             <MarkerRows title="Заложены здесь" icon="✦" list={planted} data={data} onOpen={onOpenMarker} />
+            <MarkerRows title="Напомнила здесь" icon="~" list={echoed} data={data} onOpen={onOpenMarker} />
             <MarkerAdd data={data} scene={scene} />
           </div>
         )}
