@@ -42,38 +42,42 @@
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']):not([data-theme='paper']) {
-    --bg: #0c0c0e;
-    --side: #111113;
-    --paper: #121214;
-    --surface: #18181b;
-    --fill: #222226;
-    --ink: #f4f4f5;
-    --ink-2: #b4b4bb;
-    --ink-3: #75757d;
-    --line: #26262a;
-    --line-2: #33333a;
-    --accent: #f4f4f5;
-    --accent-soft: #26262a;
-    --focus: #f4f4f5;
-    --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+    /* «Сумерки»: warm dark, easy on the eyes at night; amber marks where you are. */
+    --bg: #15161a;
+    --side: #18191e;
+    --paper: #15161a;
+    --surface: #1e2026;
+    --fill: #262830;
+    --ink: #ece6da;
+    --ink-2: #bdb7ab;
+    --ink-3: #8a867e;
+    --line: #26282e;
+    --line-2: #34363d;
+    --accent: #ece6da;
+    --accent-soft: #26282e;
+    --accent-2: #e3aa5b;
+    --focus: #ece6da;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 10px 30px rgba(0, 0, 0, 0.3);
     color-scheme: dark;
   }
 }
 :root[data-theme='dark'] {
-  --bg: #0c0c0e;
-  --side: #111113;
-  --paper: #121214;
-  --surface: #18181b;
-  --fill: #222226;
-  --ink: #f4f4f5;
-  --ink-2: #b4b4bb;
-  --ink-3: #75757d;
-  --line: #26262a;
-  --line-2: #33333a;
-  --accent: #f4f4f5;
-  --accent-soft: #26262a;
-  --focus: #f4f4f5;
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  /* «Сумерки»: warm dark, easy on the eyes at night; amber marks where you are. */
+  --bg: #15161a;
+  --side: #18191e;
+  --paper: #15161a;
+  --surface: #1e2026;
+  --fill: #262830;
+  --ink: #ece6da;
+  --ink-2: #bdb7ab;
+  --ink-3: #8a867e;
+  --line: #26282e;
+  --line-2: #34363d;
+  --accent: #ece6da;
+  --accent-soft: #26282e;
+  --accent-2: #e3aa5b;
+  --focus: #ece6da;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 10px 30px rgba(0, 0, 0, 0.3);
   color-scheme: dark;
 }
 /* «Бумага»: low contrast, warm grey — easy on the eyes for long sessions. */
@@ -5282,4 +5286,113 @@ button.deadline {
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* =====================================================================
+   Design step 2: «Сейчас» as a quiet pill at the bottom of the page.
+   ===================================================================== */
+.passport-wrap,
+[data-calm='on'] .app-text .passport-wrap,
+.write.mode-edit .passport-wrap {
+  position: fixed;
+  top: auto;
+  bottom: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(calc(var(--measure) + 64px), calc(100% - 32px));
+  margin: 0;
+  padding: 0;
+  background: none;
+  z-index: 15;
+}
+.passport-wrap::after,
+.write.mode-edit .passport-wrap::after {
+  display: none;
+}
+.now-line {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 7px 16px 7px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow), 0 0 0 1px var(--line);
+  max-width: 100%;
+  box-sizing: border-box;
+}
+.now-line .pp-now {
+  padding: 0;
+  min-width: 0;
+  font-size: 13.5px;
+}
+.now-line .pp-due {
+  width: auto;
+  flex: none;
+  padding: 0 0 0 12px;
+  border-left: 1px solid var(--line-2);
+  font-size: 13px;
+}
+/* The resume plate sits above it. */
+.resume {
+  bottom: 84px;
+}
+.write.typing .passport-wrap {
+  opacity: 0;
+  pointer-events: none;
+}
+@media (max-width: 760px) {
+  .passport-wrap,
+  [data-calm='on'] .app-text .passport-wrap,
+  .write.mode-edit .passport-wrap {
+    bottom: calc(env(safe-area-inset-bottom) + 84px);
+  }
+  .now-line {
+    flex-wrap: wrap;
+    border-radius: 18px;
+    row-gap: 4px;
+  }
+  .now-line .pp-due {
+    border-left: 0;
+    padding-left: 0;
+  }
+  .resume {
+    bottom: calc(env(safe-area-inset-bottom) + 150px);
+  }
+}
+/* A little room under the text, so its last lines never sit under the pill. */
+.editor-wrap {
+  padding-bottom: 90px;
+}
+
+/* Phone: the scene plan slides up from the bottom, like a sheet. */
+@media (max-width: 760px) {
+  .write-brief {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: min(72dvh, 600px);
+    border-radius: 22px 22px 0 0;
+    clip-path: inset(100% 0 0 0);
+    border-left: 0;
+  }
+  .write-brief::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--line-2);
+    margin: 10px auto 0;
+  }
+  .write-brief .inner {
+    height: calc(100% - 14px);
+    overflow-y: auto;
+  }
+}
+/* «You are here» reads as a ring, so it never blends with the «being written» dots. */
+.navi-chapter.here .navi-dot {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-2) 28%, transparent);
 }
