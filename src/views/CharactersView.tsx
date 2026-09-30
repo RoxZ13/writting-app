@@ -4,12 +4,13 @@ import { alive, save } from '../db/repo'
 import { countMentions, heroesFromDescription, mentionPatterns } from '../lib/heroes'
 import { docParagraphs } from '../lib/text'
 import { Modal } from '../lib/ui'
-import type { Character, Note } from '../db/db'
+import type { Character, Line, Note } from '../db/db'
 import { createLine, createNote, findOrCreateCharacter, mergeCharacters, patch, remove } from '../db/repo'
 import type { ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { InlineEdit, toast } from '../lib/ui'
 import { WorldNav } from './LoreView'
+import { ColorDot } from '../components/ColorDot'
 import { useWhereFound, WhereFound } from '../components/WhereFound'
 import type { Found } from '../lib/mentions'
 
@@ -72,7 +73,46 @@ export function CharactersView({ data }: { data: ProjectData }) {
           </p>
         </div>
       </div>
+      <Branches data={data} />
     </div>
+  )
+}
+
+/** Story branches (the lines on the board): their colour, name and removal, next to the people. */
+function Branches({ data }: { data: ProjectData }) {
+  const [name, setName] = useState('')
+  const count = (id: string) => [...data.scenes, ...data.pool.scenes].filter((s) => s.lineIds?.includes(id)).length
+  const del = async (id: string, title: string) => {
+    if (!confirm(`Удалить ветку «${title}»? Сцены останутся, с них просто снимется отметка.`)) return
+    for (const s of [...data.scenes, ...data.pool.scenes])
+      if (s.lineIds?.includes(id)) await patch<Scene>('scenes', s.id, { lineIds: s.lineIds.filter((x) => x !== id) })
+    await remove('lines', id)
+  }
+  return (
+    <section className="branches card">
+      <h3>Сюжетные ветки</h3>
+      {data.lines.map((l) => (
+        <div key={l.id} className="branch-row">
+          <ColorDot color={l.color} label={l.name} onChange={(color) => void patch<Line>('lines', l.id, { color })} />
+          <InlineEdit className="branch-name" value={l.name} onSave={(n) => n.trim() && void patch<Line>('lines', l.id, { name: n.trim() })} />
+          <span className="small muted">{count(l.id)} сц.</span>
+          <button className="icon-btn" aria-label={`Удалить ветку «${l.name}»`} title="Удалить ветку" onClick={() => void del(l.id, l.name)}>
+            ×
+          </button>
+        </div>
+      ))}
+      <input
+        className="quick-add"
+        placeholder="+ ветка — например, линия второго героя"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={async (e) => {
+          if (e.key !== 'Enter' || !name.trim()) return
+          await createLine(data.project.id, name.trim())
+          setName('')
+        }}
+      />
+    </section>
   )
 }
 
@@ -85,9 +125,18 @@ function Person({ data, c, found }: { data: ProjectData; c: Character; found?: F
   return (
     <article className="person card">
       <div className="row" style={{ flexWrap: 'nowrap' }}>
-        <span className="avatar" style={{ background: c.color }}>
+        <ColorDot
+          className="avatar"
+          color={c.color}
+          label={c.name}
+          onChange={(color) => {
+            set({ color })
+            // The hero's own branch follows the hero's colour.
+            if (line) void patch<Line>('lines', line.id, { color })
+          }}
+        >
           {c.name.trim()[0]?.toUpperCase()}
-        </span>
+        </ColorDot>
         <InlineEdit className="person-name" value={c.name} onSave={(name) => set({ name })} />
         <details className="menu">
           <summary className="icon-btn" aria-label="Действия">

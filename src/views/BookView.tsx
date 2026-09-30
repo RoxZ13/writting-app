@@ -2,6 +2,7 @@ import { db, type Project } from '../db/db'
 import { patch, remove } from '../db/repo'
 import { ImportPanel } from '../components/ImportPanel'
 import { BookCover, CoverPicker } from '../components/BookCover'
+import { Essence } from '../components/Plot'
 import { DateChip } from '../components/DateChip'
 import { useCover } from '../lib/cover'
 import { NumberField, PaceSection, PublishSection } from '../components/BookSections'
@@ -110,6 +111,8 @@ export function BookView({ data }: { data: ProjectData }) {
           </div>
         </div>
       </div>
+
+      <Essence project={p} embedded />
 
       {/* Publishing and pace mean something from the first thousand words; on an empty book they only reproach. */}
       {!early && <PublishSection data={data} onCopy={(id) => void copyChapter(id)} />}
