@@ -10,6 +10,7 @@ import { MarkerCard } from '../components/MarkerCard'
 import { PlacePicker } from '../components/Refs'
 import { SceneEditor, type SelectionAction } from '../components/SceneEditor'
 import { TitlePage } from '../components/TitlePage'
+import { MarginNotes } from '../components/MarginNotes'
 import { editHintsKey } from '../components/EditHints'
 import { countHints } from '../lib/editcheck'
 import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
@@ -435,6 +436,7 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
                 onCommentClick={setOpenComment}
               />
             )}
+            {text && !rewriting && <MarginNotes key={scene.id} data={data} editor={editor} onOpen={setOpenComment} />}
           </div>
         </div>
       </div>
