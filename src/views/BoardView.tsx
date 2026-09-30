@@ -273,7 +273,7 @@ function Column({
           <span className="column-count">
             {scenes.length} сц.
             {chapter.publishedAt && (
-              <span className="published" title="Выложена на Фикбук">
+              <span className="published" title="Выложена">
                 ✓ {new Date(chapter.publishedAt + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
               </span>
             )}

@@ -3,6 +3,7 @@ import { patch } from '../db/repo'
 import type { ProjectData } from '../lib/hooks'
 import { bank, dayKey, pace, totalWords } from '../lib/pace'
 import { formatWords } from '../lib/text'
+import { PLATFORMS, platformOf } from '../lib/platforms'
 
 const DAY = 86400000
 const date = (d: Date | string) =>
@@ -100,12 +101,14 @@ function forecastText(p: Project, pc: ReturnType<typeof pace>): string {
   return s
 }
 
-/** The work's page on Ficbook: typed by the author, or the link in the imported header. */
+/** The work's page on its site: typed by the author, or (for Ficbook) the link in the imported header. */
 export function ficbookLink(p: Project): string | undefined {
-  return p.ficbookUrl || p.description?.match(/https?:\/\/ficbook\.net\/readfic\/[\w-]+/)?.[0]
+  if (p.ficbookUrl) return p.ficbookUrl
+  if (platformOf(p).id !== 'ficbook') return undefined
+  return p.description?.match(/https?:\/\/ficbook\.net\/readfic\/[\w-]+/)?.[0]
 }
 
-/** Where the book stands on Ficbook: what is up, what is next and how ready it is. */
+/** Where the book stands on its site: what is up, what is next and how ready it is. */
 export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (chapterId: string) => void }) {
   const p = data.project
   const setCh = (c: Chapter, changes: Partial<Chapter>) => void patch<Chapter>('chapters', c.id, changes)
@@ -122,10 +125,12 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
       : undefined
   const daysLeft = due ? Math.ceil((due.getTime() - Date.now()) / DAY) : undefined
   const link = ficbookLink(p)
+  const site = platformOf(p)
+  const copyLabel = site.for ? `Скопировать ${site.for}` : 'Скопировать главу'
 
   return (
     <section className="card settings-section stack">
-      <h3>Выкладка на Фикбук</h3>
+      <h3>Выкладка {site.to}</h3>
       {next ? (
         <div className="publish-next">
           <div>
@@ -139,11 +144,11 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
           </div>
           <div className="row">
             <button className="btn primary sm" onClick={() => onCopy(next.chapter.id)}>
-              Скопировать для Фикбука
+              {copyLabel}
             </button>
             {link && (
               <a className="btn sm" href={link} target="_blank" rel="noreferrer">
-                Открыть на Фикбуке ↗
+                Открыть {site.at} ↗
               </a>
             )}
             <button className="btn sm" onClick={() => setCh(next.chapter, { publishedAt: dayKey() })}>
@@ -157,16 +162,27 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
       <details>
         <summary className="small">Все главы и план выкладки</summary>
         <div className="stack" style={{ gap: 12, marginTop: 10 }}>
+          <div className="typo-row">
+            <span className="typo-label">Площадка</span>
+            <div className="seg">
+              {PLATFORMS.map((x) => (
+                <button key={x.id} aria-pressed={site.id === x.id} onClick={() => void patch<Project>('projects', p.id, { platform: x.id })}>
+                  {x.name}
+                </button>
+              ))}
+            </div>
+          </div>
           <label className="row" style={{ gap: 10 }}>
             <span className="small">Новая глава каждые</span>
             <NumberField value={p.publishEvery} placeholder="7" onSave={(publishEvery) => void patch<Project>('projects', p.id, { publishEvery })} />
             <span className="small">дн.</span>
           </label>
           <label className="stack" style={{ gap: 4 }}>
-            <span className="field-label">Работа на Фикбуке</span>
+            <span className="field-label">Работа {site.at}</span>
             <input
+              key={site.id}
               className="input"
-              placeholder="https://ficbook.net/readfic/…"
+              placeholder={site.url}
               defaultValue={p.ficbookUrl ?? link ?? ''}
               onBlur={(e) => void patch<Project>('projects', p.id, { ficbookUrl: e.target.value.trim() || undefined })}
             />
@@ -184,7 +200,7 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
                 defaultValue={chapter.publishedAt ?? ''}
                 onChange={(e) => setCh(chapter, { publishedAt: e.target.value || undefined })}
               />
-              <button className="icon-btn" title="Скопировать для Фикбука" onClick={() => onCopy(chapter.id)}>
+              <button className="icon-btn" title={copyLabel} onClick={() => onCopy(chapter.id)}>
                 ⧉
               </button>
             </div>

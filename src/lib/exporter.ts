@@ -50,6 +50,37 @@ export function chapterToFicbook({ scenes }: ExportChapter): string {
     .join('\n\n<center>* * *</center>\n\n')
 }
 
+// ---------------- Other sites: rich text ----------------
+
+const esc = (t: string) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+/** One paragraph → HTML with <em>, <strong>, <s> — what rich editors (Author.Today, Литнет, AO3) take on paste. */
+function paragraphToHtml(p: PMNode): string {
+  return (p.content ?? [])
+    .map((n) => {
+      if (n.type === 'hardBreak') return '<br>'
+      let t = esc(n.text ?? '')
+      if (!t) return ''
+      if (has(n.marks, 'strike')) t = `<s>${t}</s>`
+      if (has(n.marks, 'italic')) t = `<em>${t}</em>`
+      if (has(n.marks, 'bold')) t = `<strong>${t}</strong>`
+      return t
+    })
+    .join('')
+    .replace(/<\/em><em>|<\/strong><strong>|<\/s><s>/g, '')
+}
+
+/** A chapter for pasting into a rich editor: HTML with formatting, and plain text for editors that only take text. */
+export function chapterToRich({ scenes }: ExportChapter): { html: string; text: string } {
+  const parts = scenes.map((s) => blocksOf(s.content).filter((p) => (p.content ?? []).some((n) => n.text?.trim())))
+  const filled = parts.filter((ps) => ps.length)
+  const html = filled.map((ps) => ps.map((p) => `<p>${paragraphToHtml(p)}</p>`).join('\n')).join('\n<p style="text-align:center">* * *</p>\n')
+  const text = filled
+    .map((ps) => ps.map((p) => (p.content ?? []).map((n) => (n.type === 'hardBreak' ? '\n' : (n.text ?? ''))).join('')).join('\n'))
+    .join('\n\n* * *\n\n')
+  return { html, text }
+}
+
 // ---------------- DOCX ----------------
 
 export async function exportDocx(projectTitle: string, chapters: ExportChapter[]): Promise<Blob> {
