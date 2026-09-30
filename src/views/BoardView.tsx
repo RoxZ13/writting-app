@@ -33,7 +33,7 @@ import { MarkerCard } from '../components/MarkerCard'
 import { Arc, Essence } from '../components/Plot'
 import { SceneSheet } from '../components/SceneSheet'
 import { StoryLine } from '../components/StoryLine'
-import { markerPayoffChapter, markerQuiet, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
+import { isNode, markerPayoffChapter, markerQuiet, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
 import { MARKER_STATES, statusOf } from '../lib/status'
 import { InlineEdit, Modal, toast } from '../lib/ui'
 import { deadlineText } from '../lib/stories'
@@ -383,7 +383,7 @@ function Column({
             {scenes.some((x) => x.status !== 'done') && ` · не готово ${scenes.filter((x) => x.status !== 'done').length} сц.`}
           </div>
         )}
-        {showArc && scenes.some((s) => s.heat || s.node) && <Arc scenes={scenes} />}
+        {showArc && scenes.some((s) => s.heat || isNode(s, data)) && <Arc scenes={scenes} isNode={(s) => isNode(s, data)} />}
       </header>
 
       <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
@@ -574,7 +574,7 @@ function Card({ data, scene, lens, overlay }: { data: ProjectData; scene: Scene;
   const current = data.project.lastSceneId === scene.id && !storyEmpty(data)
   const showMarkers = lens.kind === 'markers' && markers.length > 0
   return (
-    <article className={`card-scene ${dim ? 'dim' : ''} ${overlay ? 'overlay' : ''} ${current ? 'current' : ''} ${scene.node ? 'node' : ''}`}>
+    <article className={`card-scene ${dim ? 'dim' : ''} ${overlay ? 'overlay' : ''} ${current ? 'current' : ''} ${isNode(scene, data) ? 'node' : ''}`}>
       {lines.length > 0 && (
         <div className="line-strip">
           {lines.map((l) => (
@@ -583,7 +583,7 @@ function Card({ data, scene, lens, overlay }: { data: ProjectData; scene: Scene;
         </div>
       )}
       <div className={`card-title ${scene.title.trim() ? '' : 'untitled'}`}>
-        {scene.node && <span title="Узловая точка">◆ </span>}
+        {isNode(scene, data) && <span title="Узел: здесь сходятся ветки">◆ </span>}
         {sceneName(data, scene)}
       </div>
       {scene.goal ? <div className="card-goal">{scene.goal}</div> : scene.excerpt && <div className="card-excerpt">{scene.excerpt}</div>}
@@ -727,8 +727,8 @@ function TimelineScene({ data, scene, lens, onOpen }: { data: ProjectData; scene
   const current = data.project.lastSceneId === scene.id
   const sub = scene.goal || scene.excerpt
   return (
-    <button className={`tl-scene ${dim ? 'dim' : ''} ${current ? 'current' : ''} ${scene.node ? 'node' : ''}`} onClick={onOpen}>
-      {scene.node ? <span className="tl-node">◆</span> : <span className="status-dot" style={{ background: statusOf(scene.status).color }} />}
+    <button className={`tl-scene ${dim ? 'dim' : ''} ${current ? 'current' : ''} ${isNode(scene, data) ? 'node' : ''}`} onClick={onOpen}>
+      {isNode(scene, data) ? <span className="tl-node">◆</span> : <span className="status-dot" style={{ background: statusOf(scene.status).color }} />}
       <span className="tl-text">
         <span className={`tl-name ${scene.title.trim() ? '' : 'untitled'}`}>{sceneName(data, scene)}</span>
         {sub && <span className="tl-sub">{sub}</span>}

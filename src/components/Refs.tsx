@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import type { Marker } from '../db/db'
-import { createLine, findOrCreateCharacter, toggleSceneRef } from '../db/repo'
+import type { Character, Line, Marker } from '../db/db'
+import { createLine, findOrCreateCharacter, patch, toggleSceneRef } from '../db/repo'
+import { ColorDot } from './ColorDot'
 import { sceneName, type ProjectData } from '../lib/hooks'
 
 /** Toggleable chips for a scene's story lines (ветки) or characters, with inline "+ new". */
@@ -33,15 +34,20 @@ export function RefChips({
       {items.map((it) => {
         const on = selected.includes(it.id)
         return (
-          <button
-            key={it.id}
-            className={`ref-chip ${on ? 'on' : ''}`}
-            style={{ '--c': it.color } as React.CSSProperties}
-            onClick={() => void toggleSceneRef(sceneId, field, it.id)}
-          >
-            <span className="dot" />
-            {it.name}
-          </button>
+          <span key={it.id} className={`ref-chip-wrap ${on ? 'on' : ''}`}>
+            {/* The colour is changed right here — also for a hero or branch just created. */}
+            <ColorDot
+              className="color-dot chip-dot"
+              color={it.color}
+              label={it.name}
+              onChange={(color) =>
+                void (field === 'lineIds' ? patch<Line>('lines', it.id, { color }) : patch<Character>('characters', it.id, { color }))
+              }
+            />
+            <button className={`ref-chip ${on ? 'on' : ''}`} style={{ '--c': it.color } as React.CSSProperties} onClick={() => void toggleSceneRef(sceneId, field, it.id)}>
+              {it.name}
+            </button>
+          </span>
         )
       })}
       {adding ? (

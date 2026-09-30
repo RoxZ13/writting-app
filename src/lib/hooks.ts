@@ -124,6 +124,12 @@ export function markerQuiet(m: Marker, data: ProjectData, gap = 4): boolean {
   return cur - Math.max(...seen) >= gap
 }
 
+/** A node is where story branches meet: a scene that belongs to two or more of them. */
+export function sceneBranches(s: Scene, data: ProjectData) {
+  return (s.lineIds ?? []).map((id) => data.lineById.get(id)).filter((l): l is NonNullable<typeof l> => !!l)
+}
+export const isNode = (s: Scene, data: ProjectData) => sceneBranches(s, data).length > 1
+
 /** Quotes and dialogues of the given characters that have not been used in the text yet. */
 export function unusedLines(data: ProjectData, characterIds: string[]): Note[] {
   if (!characterIds.length) return []

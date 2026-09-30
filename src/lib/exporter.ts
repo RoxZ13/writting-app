@@ -19,6 +19,23 @@ function blocksOf(doc: unknown): PMNode[] {
   return out
 }
 
+// ---------------- Typography on the way out ----------------
+
+/**
+ * Text pasted from elsewhere or imported keeps hyphens and straight quotes; the site gets
+ * proper ones: «— » at the start of a line of dialogue, « — » between words, «ёлочки», «…».
+ * Tags (<i>, <b>) are left alone.
+ */
+export function tidyTypography(line: string): string {
+  return line
+    .replace(/^((?:<[^>]+>)*)\s*[-–]\s+/, '$1— ')
+    .replace(/(\S)\s+[-–]{1,2}\s+/g, '$1 — ')
+    .replace(/---?/g, '—')
+    .replace(/\.\.\./g, '…')
+    .replace(/(^|[\s(\[«—>])"/g, '$1«')
+    .replace(/"/g, '»')
+}
+
 // ---------------- Ficbook ----------------
 
 /** One paragraph → Ficbook markup (`<i>`, `<b>`, `<s>`). */
@@ -37,12 +54,14 @@ export function paragraphToFicbook(p: PMNode): string {
     .replace(/<\/i><i>|<\/b><b>|<\/s><s>/g, '')
 }
 
+const ficbookLine = (p: PMNode) => tidyTypography(paragraphToFicbook(p))
+
 /** A chapter as Ficbook text: one line per paragraph, scenes separated by a centered `* * *`. */
 export function chapterToFicbook({ scenes }: ExportChapter): string {
   return scenes
     .map((s) =>
       blocksOf(s.content)
-        .map(paragraphToFicbook)
+        .map(ficbookLine)
         .filter((l) => l.trim())
         .join('\n'),
     )
@@ -74,9 +93,9 @@ function paragraphToHtml(p: PMNode): string {
 export function chapterToRich({ scenes }: ExportChapter): { html: string; text: string } {
   const parts = scenes.map((s) => blocksOf(s.content).filter((p) => (p.content ?? []).some((n) => n.text?.trim())))
   const filled = parts.filter((ps) => ps.length)
-  const html = filled.map((ps) => ps.map((p) => `<p>${paragraphToHtml(p)}</p>`).join('\n')).join('\n<p style="text-align:center">* * *</p>\n')
+  const html = filled.map((ps) => ps.map((p) => `<p>${tidyTypography(paragraphToHtml(p))}</p>`).join('\n')).join('\n<p style="text-align:center">* * *</p>\n')
   const text = filled
-    .map((ps) => ps.map((p) => (p.content ?? []).map((n) => (n.type === 'hardBreak' ? '\n' : (n.text ?? ''))).join('')).join('\n'))
+    .map((ps) => ps.map((p) => tidyTypography((p.content ?? []).map((n) => (n.type === 'hardBreak' ? '\n' : (n.text ?? ''))).join(''))).join('\n'))
     .join('\n\n* * *\n\n')
   return { html, text }
 }

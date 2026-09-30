@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Scene } from '../db/db'
 import { createMarker, ensurePool, mergeSceneIntoPrevious, moveScene, patch, remove, splitChapterAt } from '../db/repo'
 import { go } from '../lib/router'
-import { sceneName, type ProjectData } from '../lib/hooks'
+import { isNode, sceneBranches, sceneName, type ProjectData } from '../lib/hooks'
 import { STATUSES } from '../lib/status'
 import { toast } from '../lib/ui'
 import { MarkerCard } from './MarkerCard'
@@ -73,9 +73,11 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
           Писать эту сцену →
         </button>
         <div className="sheet-plot">
-          <button className={`chip-toggle ${scene.node ? 'on' : ''}`} onClick={() => set({ node: !scene.node })} title="Крупная веха сюжета — остальные сцены встают между такими">
-            ◆ Узловая точка
-          </button>
+          {isNode(scene, data) && (
+            <span className="sheet-node" title="Сцена, где сходятся ветки, — узел истории">
+              ◆ здесь сходятся {sceneBranches(scene, data).map((l) => l.name).join(' и ')}
+            </span>
+          )}
           <span className="sheet-heat">
             <span className="muted small">Накал</span>
             <Heat scene={scene} large />

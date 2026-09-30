@@ -121,6 +121,13 @@ function Person({ data, c, found }: { data: ProjectData; c: Character; found?: F
   const line = data.lines.find((l) => l.name === c.name)
   const lines = data.notes.filter((n) => (n.kind === 'quote' || n.kind === 'dialogue') && n.characterIds?.includes(c.id) && !n.archived)
   const set = (changes: Partial<Character>) => void patch<Character>('characters', c.id, changes)
+  // Scenes and quotes stay; they just no longer name this hero.
+  const delHero = async () => {
+    if (!confirm(`Удалить героя «${c.name}»? Сцены и цитаты останутся, с них снимется отметка.`)) return
+    for (const s of [...data.scenes, ...data.pool.scenes])
+      if (s.characterIds?.includes(c.id)) await patch<Scene>('scenes', s.id, { characterIds: s.characterIds.filter((x) => x !== c.id) })
+    await remove('characters', c.id)
+  }
 
   return (
     <article className="person card">
@@ -158,7 +165,7 @@ function Person({ data, c, found }: { data: ProjectData; c: Character; found?: F
                   ⇢ {o.name}
                 </button>
               ))}
-            <button className="danger" onClick={() => confirm(`Удалить героя «${c.name}»?`) && void remove('characters', c.id)}>
+            <button className="danger" onClick={() => void delHero()}>
               Удалить героя
             </button>
           </div>
@@ -207,6 +214,9 @@ function Person({ data, c, found }: { data: ProjectData; c: Character; found?: F
           }}
         />
       </div>
+      <button className="link small muted person-delete" onClick={() => void delHero()}>
+        удалить героя
+      </button>
     </article>
   )
 }
