@@ -1,9 +1,9 @@
 import { db, type Project } from '../db/db'
 import { patch, remove } from '../db/repo'
 import { ImportPanel } from '../components/ImportPanel'
-import { BookCover } from '../components/BookCover'
+import { BookCover, CoverPicker } from '../components/BookCover'
 import { DateChip } from '../components/DateChip'
-import { coverFromClipboard, coverFromUrl, imageToCover, setCover, useCover } from '../lib/cover'
+import { useCover } from '../lib/cover'
 import { NumberField, PaceSection, PublishSection } from '../components/BookSections'
 import { chapterProgress } from '../lib/pace'
 import { chapterToFicbook, download, exportDocx, type ExportChapter } from '../lib/exporter'
@@ -139,48 +139,3 @@ export function BookView({ data }: { data: ProjectData }) {
 }
 
 /** The author's own cover: from a file, a copied picture, or a link — the usual story with a Ficbook cover. */
-function CoverPicker({ projectId }: { projectId: string }) {
-  const cover = useCover(projectId)
-  const run = async (fn: () => Promise<string>, done = 'Обложка на месте') => {
-    try {
-      await setCover(projectId, await fn())
-      toast(done)
-    } catch (e) {
-      toast(e instanceof Error ? e.message : 'Не получилось')
-    }
-  }
-  return (
-    <div className="cover-actions">
-      <label className="btn sm">
-        {cover ? 'Другая картинка' : 'Загрузить картинку'}
-        <input type="file" hidden accept="image/*" onChange={(e) => e.target.files?.[0] && void run(() => imageToCover(e.target.files![0]))} />
-      </label>
-      <button className="btn sm" onClick={() => void run(coverFromClipboard)} title="Скопируй обложку (на телефоне — долгое нажатие → «Скопировать») и нажми сюда">
-        Вставить скопированную
-      </button>
-      <button
-        className="btn sm"
-        onClick={() => {
-          const url = prompt('Ссылка на картинку обложки (на Фикбуке: правый клик по обложке → «Копировать адрес изображения»)')
-          if (!url) return
-          void (async () => {
-            try {
-              const { src, offline } = await coverFromUrl(url)
-              await setCover(projectId, src)
-              toast(offline ? 'Обложка на месте' : 'Обложка на месте. Сайт не дал её сохранить — без интернета она не покажется, лучше загрузить файлом')
-            } catch (e) {
-              toast(e instanceof Error ? e.message : 'Не получилось')
-            }
-          })()
-        }}
-      >
-        По ссылке
-      </button>
-      {cover && (
-        <button className="btn sm ghost" onClick={() => void setCover(projectId, undefined)}>
-          Убрать
-        </button>
-      )}
-    </div>
-  )
-}

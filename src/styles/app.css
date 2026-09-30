@@ -1529,11 +1529,22 @@ h2 {
   border-radius: 14px;
   padding: 11px 14px;
 }
+/* Our own arrow: the system one sits flush against the edge on Windows and differs everywhere. */
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 40px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238e8e95' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 12px 8px;
+  text-overflow: ellipsis;
+}
 .input:focus,
 .textarea:focus,
 .select:focus {
   border-color: var(--ink);
-  background: var(--surface);
+  background-color: var(--surface);
 }
 .field-label,
 .eyebrow,
@@ -3066,8 +3077,32 @@ main.page {
   border: 2px solid var(--surface);
   box-shadow: 0 0 0 1px var(--line-2);
 }
-.swatch.on {
+.swatch.on,
+.swatch[aria-checked='true'] {
   box-shadow: 0 0 0 2px var(--ink);
+}
+.line-note {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.line-note-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.line-note .line-name {
+  font-weight: 600;
+  color: var(--ink);
+}
+.line-note .swatches {
+  display: flex;
+  gap: 6px;
+}
+.line-note .swatch {
+  width: 20px;
+  height: 20px;
 }
 .column-deadline {
   margin-top: 6px;

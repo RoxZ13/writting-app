@@ -22,14 +22,33 @@ export async function setCover(projectId: string, src: string | undefined) {
 
 /** Scale a picture down to cover size and keep it as a JPEG data URL, so it works offline. */
 export async function imageToCover(blob: Blob, maxSide = 900): Promise<string> {
-  const bmp = await createImageBitmap(blob)
-  const k = Math.min(1, maxSide / Math.max(bmp.width, bmp.height))
+  const img = await decode(blob)
+  const k = Math.min(1, maxSide / Math.max(img.width, img.height))
   const canvas = document.createElement('canvas')
-  canvas.width = Math.round(bmp.width * k)
-  canvas.height = Math.round(bmp.height * k)
-  canvas.getContext('2d')!.drawImage(bmp, 0, 0, canvas.width, canvas.height)
-  bmp.close?.()
+  canvas.width = Math.max(1, Math.round(img.width * k))
+  canvas.height = Math.max(1, Math.round(img.height * k))
+  canvas.getContext('2d')!.drawImage(img.source, 0, 0, canvas.width, canvas.height)
+  img.done()
   return canvas.toDataURL('image/jpeg', 0.85)
+}
+
+/** Decode a picture. createImageBitmap is missing or picky in some browsers (older Safari), so fall back to <img>. */
+async function decode(blob: Blob): Promise<{ source: CanvasImageSource; width: number; height: number; done: () => void }> {
+  try {
+    const bmp = await createImageBitmap(blob)
+    return { source: bmp, width: bmp.width, height: bmp.height, done: () => bmp.close?.() }
+  } catch {
+    const url = URL.createObjectURL(blob)
+    try {
+      const img = new Image()
+      img.src = url
+      await img.decode()
+      return { source: img, width: img.naturalWidth, height: img.naturalHeight, done: () => URL.revokeObjectURL(url) }
+    } catch {
+      URL.revokeObjectURL(url)
+      throw new Error('Не получилось открыть картинку. Попробуй JPG или PNG')
+    }
+  }
 }
 
 /**

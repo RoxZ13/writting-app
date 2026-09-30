@@ -7,7 +7,8 @@ import { COVERS, createStory, deadlineText } from '../lib/stories'
 import { timeAgo } from '../lib/status'
 import { formatWords } from '../lib/text'
 import { Modal, toast } from '../lib/ui'
-import { BookCover } from '../components/BookCover'
+import { BookCover, CoverPicker } from '../components/BookCover'
+import { useCover } from '../lib/cover'
 
 /** All stories side by side — authors rarely write just one. */
 export function LibraryView({ projects, currentId, onOpen }: { projects: Project[]; currentId: string; onOpen: (id: string) => void }) {
@@ -66,6 +67,7 @@ function StoryCard({
 }) {
   const dl = deadlineText(p.deadline)
   const color = p.color ?? '#0b0b0c'
+  const cover = useCover(p.id)
   return (
     <article className={`story ${current ? 'current' : ''}`}>
       <BookCover project={p} onClick={onOpen} />
@@ -98,17 +100,20 @@ function StoryCard({
               </label>
               <div className="menu-field">
                 <span>Обложка</span>
-                <div className="covers">
-                  {COVERS.map((c) => (
-                    <button
-                      key={c}
-                      className={`swatch ${c === color ? 'on' : ''}`}
-                      style={{ background: c }}
-                      aria-label="Цвет обложки"
-                      onClick={() => void patch<Project>('projects', p.id, { color: c })}
-                    />
-                  ))}
-                </div>
+                <CoverPicker projectId={p.id} />
+                {!cover && (
+                  <div className="covers">
+                    {COVERS.map((c) => (
+                      <button
+                        key={c}
+                        className={`swatch ${c === color ? 'on' : ''}`}
+                        style={{ background: c }}
+                        aria-label="Цвет обложки"
+                        onClick={() => void patch<Project>('projects', p.id, { color: c })}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
               <button
                 className="danger"

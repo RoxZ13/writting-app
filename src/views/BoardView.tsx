@@ -14,7 +14,7 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useEffect, useState } from 'react'
-import type { Chapter, Marker, Scene } from '../db/db'
+import type { Chapter, Line, Marker, Scene } from '../db/db'
 import {
   createChapter,
   createLine,
@@ -24,7 +24,9 @@ import {
   ensurePool,
   mergeIntoPrevious,
   moveScene,
+  PALETTE,
   patch,
+  remove,
   reorderChapters,
 } from '../db/repo'
 import { MarkerCard } from '../components/MarkerCard'
@@ -90,7 +92,6 @@ export function BoardView({ data }: { data: ProjectData }) {
   const showArc = [...data.scenes, ...data.pool.scenes].some((s) => s.heat)
   const hanging = data.markers.filter((m) => ['hanging', 'late'].includes(markerStatus(m, data)))
   const quiet = data.markers.filter((m) => markerQuiet(m, data))
-  const lineName = lens.kind === 'line' ? data.lineById.get(lens.id)?.name : undefined
 
   const addChapterAfter = async (i: number) => {
     const c = await createChapter(data.project.id, `Глава ${i + 2}`)
@@ -146,7 +147,7 @@ export function BoardView({ data }: { data: ProjectData }) {
                 const l = await createLine(data.project.id, newLine.trim())
                 setNewLine(null)
                 setLens({ kind: 'line', id: l.id })
-                toast('Ветка создана. Отмечай её сцены: клик по сцене → «Ветки»')
+                toast('Ветка создана. Цвет — тут же, под доской. Сцены отмечай: клик по сцене → «Ветки»')
               }}
             />
           )}
@@ -171,11 +172,7 @@ export function BoardView({ data }: { data: ProjectData }) {
           )}
         </div>
       )}
-      {lens.kind === 'line' && (
-        <div className="lens-note">
-          Ветка «{lineName}»: пунктир — главы, где её сцен нет. Так видно, где линия пропадает надолго.
-        </div>
-      )}
+      {lens.kind === 'line' && data.lineById.get(lens.id) && <LineNote data={data} lineId={lens.id} onGone={() => setLens({ kind: 'all' })} />}
 
       {phone ? (
         <Timeline data={data} lens={lens} onOpenScene={setOpenScene} onOpenMarker={setOpenMarker} />
@@ -389,6 +386,42 @@ function EmptyChapterHint() {
 }
 
 /** "Пока без места": scenes from the author's head, jotted down before they have a chapter. */
+/** The chosen branch: its name, colour and removal live right where it is looked at. */
+function LineNote({ data, lineId, onGone }: { data: ProjectData; lineId: string; onGone: () => void }) {
+  const line = data.lineById.get(lineId)!
+  const del = async () => {
+    if (!confirm(`Удалить ветку «${line.name}»? Сцены останутся, с них просто снимется отметка.`)) return
+    for (const s of [...data.scenes, ...data.pool.scenes])
+      if (s.lineIds?.includes(line.id)) await patch<Scene>('scenes', s.id, { lineIds: s.lineIds.filter((x) => x !== line.id) })
+    await remove('lines', line.id)
+    onGone()
+  }
+  return (
+    <div className="lens-note line-note">
+      <div className="line-note-head">
+        <InlineEdit className="line-name" value={line.name} placeholder="Название ветки" onSave={(name) => name.trim() && void patch<Line>('lines', line.id, { name: name.trim() })} />
+        <div className="swatches" role="radiogroup" aria-label="Цвет ветки">
+          {PALETTE.map((c) => (
+            <button
+              key={c}
+              role="radio"
+              aria-checked={line.color === c}
+              aria-label={`Цвет ${c}`}
+              className="swatch"
+              style={{ background: c }}
+              onClick={() => void patch<Line>('lines', line.id, { color: c })}
+            />
+          ))}
+        </div>
+        <button className="link small muted" onClick={() => void del()}>
+          удалить ветку
+        </button>
+      </div>
+      <div>Пунктир — главы, где её сцен нет. Так видно, где линия пропадает надолго.</div>
+    </div>
+  )
+}
+
 function MarkerLinks({ list, onOpen }: { list: Marker[]; onOpen: (id: string) => void }) {
   return (
     <>
