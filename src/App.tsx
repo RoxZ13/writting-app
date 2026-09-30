@@ -201,8 +201,9 @@ function AppHeader({ data, route, sync, onSearch }: { data: ProjectData; route: 
           {data.project.title} <span className="caret">▾</span>
         </button>
         <span className="sync-dot" data-state={sync.state} title={syncTitle} />
-        <MarkerStatus data={data} />
-        <Landmark data={data} />
+        {/* While writing, no counters or dates in sight: they live on the board and the book page. */}
+        {route.view !== 'text' && <MarkerStatus data={data} />}
+        {route.view !== 'text' && <Landmark data={data} />}
       </div>
       <nav className="tabs">
         {TABS.map((t) => (

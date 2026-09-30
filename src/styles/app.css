@@ -4709,3 +4709,81 @@ button.deadline {
     height: calc(100dvh - 64px);
   }
 }
+/* Quick capture: the text first; what kind it is — optional, below. */
+.capture-kinds {
+  align-self: flex-start;
+  transform: scale(0.92);
+  transform-origin: left center;
+  opacity: 0.8;
+}
+/* Plan: only what is filled; the rest waits here. */
+.pp-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.pp-add-btn {
+  border: 1px dashed var(--line-2);
+  background: none;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.pp-add-btn:hover {
+  background: var(--fill);
+}
+/* «Где встречается» on hero and lore cards. */
+.where-found {
+  margin-top: 8px;
+  font-size: 13px;
+}
+.where-found summary {
+  cursor: pointer;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.wf-chapter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin-top: 6px;
+}
+.wf-title {
+  font-weight: 600;
+  color: var(--ink-2);
+  margin-right: 2px;
+}
+.wf-scene {
+  display: inline-flex;
+  align-items: center;
+  background: var(--fill);
+  border-radius: 999px;
+  padding: 1px 4px 1px 9px;
+}
+.wf-scene .link-plain {
+  font-size: 12.5px;
+}
+.wf-not {
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  padding: 0 4px;
+  opacity: 0;
+}
+.wf-scene:hover .wf-not {
+  opacity: 1;
+}
+@media (hover: none) {
+  .wf-not {
+    opacity: 0.6;
+  }
+}
+.aliases {
+  font-size: 12.5px;
+  color: var(--ink-3);
+}

@@ -6,7 +6,7 @@ import { createMarker, createNote, mergeSceneIntoPrevious, patch, remove, save, 
 import { markerPayoffChapter, markerStatus, unusedLines, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { MARKER_STATES, noteKind, STATUSES, timeAgo } from '../lib/status'
-import { hotkey, isTouch } from '../lib/session'
+import { hotkey } from '../lib/session'
 import { toast } from '../lib/ui'
 import { RefChips } from './Refs'
 import { loreForScene, type LoreReason } from '../lib/lore'
@@ -93,11 +93,23 @@ export function ScenePlan({
   const quotes = unusedLines(data, people)
   const notes = data.notes.filter((n) => n.sceneId === scene.id && !n.archived && n.kind !== 'quote' && n.kind !== 'dialogue')
 
-  // An empty plan opens straight into its first field, so typing never goes into the manuscript.
-  useEffect(() => {
-    if (!scene.goal && !scene.beats.length && !isTouch()) goalRef.current?.focus()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [scene.id])
+  // Only what is filled in is shown; everything empty waits in one «+ добавить» line.
+  const [opened, setOpened] = useState<Set<PlanPart>>(new Set())
+  useEffect(() => setOpened(new Set()), [scene.id])
+  const markerCount = toPay.length + toPlant.length + planted.length
+  const filled: Record<PlanPart, boolean> = {
+    goal: !!scene.goal.trim(),
+    beats: scene.beats.length > 0,
+    markers: markerCount > 0,
+    people: people.length > 0,
+    lore: false,
+  }
+  const show = (p: PlanPart) => filled[p] || opened.has(p)
+  const open = (p: PlanPart) => {
+    setOpened((prev) => new Set(prev).add(p))
+    if (p === 'goal') requestAnimationFrame(() => goalRef.current?.focus())
+  }
+  const empty = !Object.values(filled).some(Boolean) && !notes.length
 
   return (
     <section className="plan" aria-label="План сцены">
@@ -109,34 +121,42 @@ export function ScenePlan({
         </button>
       </div>
       <div className="pp-body">
-        <Field
-          inputRef={goalRef}
-          value={scene.goal}
-          placeholder="Зачем эта сцена? Что в ней меняется?"
-          onSave={(goal) => void patch<Scene>('scenes', scene.id, { goal })}
-        />
+        {empty && <p className="pp-explain">План пустой — это нормально. Добавь, только если хочется.</p>}
 
-        <div className="pp-section">
-          <h4>По пунктам</h4>
-          <Beats beats={scene.beats} onChange={(fn) => void updateBeats(scene.id, fn)} />
-        </div>
+        {show('goal') && (
+          <div className="pp-section">
+            <h4>Зачем эта сцена</h4>
+            <Field inputRef={goalRef} value={scene.goal} placeholder="Что в ней меняется?" onSave={(goal) => void patch<Scene>('scenes', scene.id, { goal })} />
+          </div>
+        )}
 
-        <div className="pp-section">
-          <h4>Маячки</h4>
-          <p className="pp-explain">Деталь, которую закладываешь сейчас, чтобы раскрыть потом.{hotkey(' В тексте — ⌘/Ctrl + M.')}</p>
-          <MarkerRows title="Раскрыть здесь" icon="◎" list={toPay} data={data} onOpen={onOpenMarker} />
-          <MarkerRows title="Заложить в этой главе" icon="✦" list={toPlant} data={data} onOpen={onOpenMarker} />
-          <MarkerRows title="Заложены здесь" icon="✦" list={planted} data={data} onOpen={onOpenMarker} />
-          <MarkerAdd data={data} scene={scene} />
-        </div>
+        {show('beats') && (
+          <div className="pp-section">
+            <h4>По пунктам</h4>
+            <Beats beats={scene.beats} onChange={(fn) => void updateBeats(scene.id, fn)} autoFocus={!filled.beats} />
+          </div>
+        )}
 
-        <div className="pp-section">
-          <h4>Кто в сцене</h4>
-          <RefChips data={data} sceneId={scene.id} field="characterIds" selected={people} />
-          {quotes.length > 0 && <Quotes data={data} scene={scene} editor={editor} quotes={quotes} />}
-        </div>
+        {show('markers') && (
+          <div className="pp-section">
+            <h4>Маячки</h4>
+            {!filled.markers && <p className="pp-explain">Деталь, которую закладываешь сейчас, чтобы раскрыть потом.{hotkey(' В тексте — ⌘/Ctrl + M.')}</p>}
+            <MarkerRows title="Раскрыть здесь" icon="◎" list={toPay} data={data} onOpen={onOpenMarker} />
+            <MarkerRows title="Заложить в этой главе" icon="✦" list={toPlant} data={data} onOpen={onOpenMarker} />
+            <MarkerRows title="Заложены здесь" icon="✦" list={planted} data={data} onOpen={onOpenMarker} />
+            <MarkerAdd data={data} scene={scene} />
+          </div>
+        )}
 
-        <SceneLore data={data} scene={scene} />
+        {show('people') && (
+          <div className="pp-section">
+            <h4>Кто в сцене</h4>
+            <RefChips data={data} sceneId={scene.id} field="characterIds" selected={people} />
+            {quotes.length > 0 && <Quotes data={data} scene={scene} editor={editor} quotes={quotes} />}
+          </div>
+        )}
+
+        <SceneLore data={data} scene={scene} forceOpen={opened.has('lore')} />
 
         {notes.length > 0 && (
           <div className="pp-section">
@@ -152,16 +172,37 @@ export function ScenePlan({
           </div>
         )}
 
+        <div className="pp-add">
+          <span className="muted small">+ добавить:</span>
+          {(
+            [
+              ['goal', 'зачем сцена'],
+              ['beats', 'по пунктам'],
+              ['markers', 'маячок'],
+              ['people', 'кто в сцене'],
+              ['lore', 'матчасть'],
+            ] as [PlanPart, string][]
+          )
+            .filter(([p]) => !show(p))
+            .map(([p, label]) => (
+              <button key={p} className="pp-add-btn" onClick={() => open(p)}>
+                {label}
+              </button>
+            ))}
+        </div>
+
         <More data={data} scene={scene} editor={editor} />
       </div>
     </section>
   )
 }
 
+type PlanPart = 'goal' | 'beats' | 'markers' | 'people' | 'lore'
+
 const WHY: Record<LoreReason, string> = { scene: 'прикреплено к сцене', chapter: 'к главе', hero: 'к герою', mention: 'упомянуто в тексте' }
 
 /** Матчасть for this scene: pinned to it, its chapter or its people, or mentioned in the text. */
-function SceneLore({ data, scene }: { data: ProjectData; scene: Scene }) {
+function SceneLore({ data, scene, forceOpen }: { data: ProjectData; scene: Scene; forceOpen?: boolean }) {
   const text = useLiveQuery(() => (data.lore.length ? db.texts.get(scene.id) : undefined), [scene.id, data.lore.length])
   const found = useMemo(
     () => loreForScene(data.lore, scene, text ? [scene.title, scene.goal, ...docParagraphs(text.content)].join('\n') : ''),
@@ -170,6 +211,7 @@ function SceneLore({ data, scene }: { data: ProjectData; scene: Scene }) {
   const others = data.lore.filter((n) => !found.some((f) => f.note.id === n.id))
   const pin = (n: Note) => void patch<Note>('notes', n.id, { sceneIds: [...new Set([...(n.sceneIds ?? []), scene.id])] })
   const unpin = (n: Note) => void patch<Note>('notes', n.id, { sceneIds: (n.sceneIds ?? []).filter((id) => id !== scene.id) })
+  if (!found.length && !forceOpen) return null
   return (
     <div className="pp-section">
       <h4>Матчасть</h4>
@@ -367,7 +409,7 @@ function Field({ value, placeholder, onSave, inputRef }: { value: string; placeh
   )
 }
 
-function Beats({ beats, onChange }: { beats: Beat[]; onChange: (fn: (b: Beat[]) => Beat[]) => void }) {
+function Beats({ beats, onChange, autoFocus }: { beats: Beat[]; onChange: (fn: (b: Beat[]) => Beat[]) => void; autoFocus?: boolean }) {
   const [draft, setDraft] = useState('')
   const update = (id: string, changes: Partial<Beat>) => onChange((all) => all.map((b) => (b.id === id ? { ...b, ...changes } : b)))
   const drop = (id: string) => onChange((all) => all.filter((x) => x.id !== id))
@@ -384,6 +426,7 @@ function Beats({ beats, onChange }: { beats: Beat[]; onChange: (fn: (b: Beat[]) 
       ))}
       <input
         className="quick-add small"
+        autoFocus={autoFocus}
         placeholder={beats.length ? '+ ещё пункт плана' : '+ что должно произойти (по пунктам)'}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}

@@ -10,6 +10,8 @@ import type { ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { InlineEdit, toast } from '../lib/ui'
 import { WorldNav } from './LoreView'
+import { useWhereFound, WhereFound } from '../components/WhereFound'
+import type { Found } from '../lib/mentions'
 
 /** People of the story: a few free lines about each, their own story line, their quotes. */
 export function CharactersView({ data }: { data: ProjectData }) {
@@ -23,6 +25,7 @@ export function CharactersView({ data }: { data: ProjectData }) {
   const known = new Set(data.characters.map((c) => norm(c.name)))
   const suggested = heroesFromDescription(data.project.description).filter((n) => !known.has(norm(n)))
   const [tagging, setTagging] = useState(false)
+  const found = useWhereFound(data)
 
   return (
     <div>
@@ -54,7 +57,7 @@ export function CharactersView({ data }: { data: ProjectData }) {
       {tagging && <TagScenes data={data} onClose={() => setTagging(false)} />}
       <div className="people">
         {data.characters.map((c) => (
-          <Person key={c.id} data={data} c={c} />
+          <Person key={c.id} data={data} c={c} found={found?.get(c.id) ?? (found ? [] : undefined)} />
         ))}
         <div className="person add">
           <input
@@ -73,9 +76,8 @@ export function CharactersView({ data }: { data: ProjectData }) {
   )
 }
 
-function Person({ data, c }: { data: ProjectData; c: Character }) {
+function Person({ data, c, found }: { data: ProjectData; c: Character; found?: Found[] }) {
   const [quote, setQuote] = useState('')
-  const scenes = data.scenes.filter((s) => s.characterIds?.includes(c.id))
   const line = data.lines.find((l) => l.name === c.name)
   const lines = data.notes.filter((n) => (n.kind === 'quote' || n.kind === 'dialogue') && n.characterIds?.includes(c.id) && !n.archived)
   const set = (changes: Partial<Character>) => void patch<Character>('characters', c.id, changes)
@@ -120,8 +122,9 @@ function Person({ data, c }: { data: ProjectData; c: Character }) {
         value={c.about}
         onSave={(about) => set({ about })}
       />
+      <InlineEdit className="aliases" value={c.aliases ?? ''} placeholder="другие имена: фамилия, прозвище…" onSave={(aliases) => set({ aliases: aliases.trim() || undefined })} />
+      <WhereFound data={data} found={found} onNotThis={(sid) => set({ ignoreSceneIds: [...(c.ignoreSceneIds ?? []), sid] })} />
       <div className="person-meta">
-        <span>{scenes.length ? `в ${scenes.length} сц.` : 'пока ни в одной сцене'}</span>
         {line ? (
           <span className="chip" style={{ color: line.color }}>
             ● ветка «{line.name}»
