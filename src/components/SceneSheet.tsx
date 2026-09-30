@@ -28,6 +28,8 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
   const inPool = scene.chapterId === data.pool.chapter?.id
   const siblings = inPool ? data.pool.scenes : data.scenes.filter((s) => s.chapterId === scene.chapterId)
   const canMerge = !inPool && siblings.indexOf(scene) > 0
+  const [opened, setOpened] = useState<Set<'lines' | 'people'>>(new Set())
+  const show = (k: 'lines' | 'people') => opened.has(k) || (k === 'lines' ? (scene.lineIds ?? []).length > 0 : (scene.characterIds ?? []).length > 0)
   const place = async (to: string) => {
     if (to === 'pool') {
       const pool = await ensurePool(data.project.id)
@@ -67,6 +69,9 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
           onChange={(e) => setGoal(e.target.value)}
           onBlur={() => goal !== scene.goal && set({ goal })}
         />
+        <button className="btn primary" onClick={() => go({ view: 'write', sceneId: scene.id })}>
+          Писать эту сцену →
+        </button>
         <div className="sheet-plot">
           <button className={`chip-toggle ${scene.node ? 'on' : ''}`} onClick={() => set({ node: !scene.node })} title="Крупная веха сюжета — остальные сцены встают между такими">
             ◆ Узловая точка
@@ -76,62 +81,76 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
             <Heat scene={scene} large />
           </span>
         </div>
-        <label className="sheet-where">
-          <span className="muted small">Где</span>
-          <select className="select" value={inPool ? 'pool' : scene.chapterId} onChange={(e) => void place(e.target.value)}>
-            <option value="pool">Пока без места</option>
-            {data.chapters.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        {canMerge && (
-          <button
-            className="btn sm"
-            style={{ alignSelf: 'flex-start' }}
-            title="Эта сцена и все после неё в главе уходят в новую главу"
-            onClick={async () => {
-              const at = data.chapters.findIndex((c) => c.id === scene.chapterId)
-              await splitChapterAt(scene.id, `Глава ${at + 2}`)
-              toast('Новая глава начинается с этой сцены. Название можно поменять на доске')
-            }}
-          >
-            ✂ Новая глава отсюда
-          </button>
-        )}
-        <button className="btn primary" onClick={() => go({ view: 'write', sceneId: scene.id })}>
-          Писать эту сцену →
-        </button>
 
-        <section className="sheet-section">
-          <h3>Ветки</h3>
-          <RefChips data={data} sceneId={scene.id} field="lineIds" selected={scene.lineIds ?? []} />
-        </section>
-        <section className="sheet-section">
-          <h3>Герои в сцене</h3>
-          <RefChips data={data} sceneId={scene.id} field="characterIds" selected={scene.characterIds ?? []} />
-        </section>
-        <section className="sheet-section">
-          <h3>Маячки</h3>
-          <div className="stack" style={{ gap: 8 }}>
-            {markers.map((m) => (
-              <MarkerCard key={m.id} data={data} marker={m} />
-            ))}
-            <button
-              className="btn sm"
-              style={{ alignSelf: 'flex-start' }}
-              onClick={() => void createMarker(data.project.id, { title: 'Новый маячок', setupSceneId: scene.id, setupChapterId: scene.chapterId })}
-            >
-              + маячок в этой сцене
+        {show('lines') && (
+          <section className="sheet-section">
+            <h3>Ветки</h3>
+            <RefChips data={data} sceneId={scene.id} field="lineIds" selected={scene.lineIds ?? []} />
+          </section>
+        )}
+        {show('people') && (
+          <section className="sheet-section">
+            <h3>Герои в сцене</h3>
+            <RefChips data={data} sceneId={scene.id} field="characterIds" selected={scene.characterIds ?? []} />
+          </section>
+        )}
+        {markers.length > 0 && (
+          <section className="sheet-section">
+            <h3>Маячки</h3>
+            <div className="stack" style={{ gap: 8 }}>
+              {markers.map((m) => (
+                <MarkerCard key={m.id} data={data} marker={m} />
+              ))}
+            </div>
+          </section>
+        )}
+        <div className="pp-add">
+          <span className="muted small">+ добавить:</span>
+          {!show('people') && (
+            <button className="pp-add-btn" onClick={() => setOpened((o) => new Set(o).add('people'))}>
+              кто в сцене
             </button>
-          </div>
-        </section>
+          )}
+          {!show('lines') && (
+            <button className="pp-add-btn" onClick={() => setOpened((o) => new Set(o).add('lines'))}>
+              ветку
+            </button>
+          )}
+          <button
+            className="pp-add-btn"
+            onClick={() => void createMarker(data.project.id, { title: 'Новый маячок', setupSceneId: scene.id, setupChapterId: scene.chapterId })}
+          >
+            маячок
+          </button>
+        </div>
 
         <details className="sheet-more">
           <summary>Ещё</summary>
           <div className="stack" style={{ gap: 12, marginTop: 12 }}>
+            <label className="sheet-where">
+              <span className="field-label">Перенести в</span>
+              <select className="select" value={inPool ? 'pool' : scene.chapterId} onChange={(e) => void place(e.target.value)}>
+                <option value="pool">Пока без места</option>
+                {data.chapters.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {canMerge && (
+              <button
+                className="btn"
+                title="Эта сцена и все после неё в главе уходят в новую главу"
+                onClick={async () => {
+                  const at = data.chapters.findIndex((c) => c.id === scene.chapterId)
+                  await splitChapterAt(scene.id, `Глава ${at + 2}`)
+                  toast('Новая глава начинается с этой сцены. Название можно поменять на доске')
+                }}
+              >
+                ✂ Новая глава отсюда
+              </button>
+            )}
             <label>
               <span className="field-label">Состояние</span>
               <select className="select" value={scene.status} onChange={(e) => set({ status: e.target.value as Scene['status'] })}>

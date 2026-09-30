@@ -36,7 +36,7 @@ export function Welcome({ onCreated, sync }: { onCreated: (id: string) => void; 
           <input
             id="ptitle"
             className="input"
-            placeholder="Например, Геката Сотейра"
+            placeholder="Название — его всегда можно поменять"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void create()}
