@@ -5396,3 +5396,128 @@ button.deadline {
 .navi-chapter.here .navi-dot {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-2) 28%, transparent);
 }
+
+/* =====================================================================
+   «Линия истории»: the board as one line — height is a scene's heat.
+   ===================================================================== */
+.board-view button {
+  font-size: 13px;
+}
+.story-line {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 8px 0 0;
+  margin-right: 48px;
+}
+.sl-scroll {
+  overflow-x: auto;
+  padding: 0 24px;
+}
+.sl-scroll svg {
+  display: block;
+}
+.sl-band {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.sl-base {
+  stroke: var(--line);
+  stroke-dasharray: 2 6;
+}
+.sl-chapter {
+  font-family: var(--text-font);
+  font-style: italic;
+  font-size: 15px;
+  fill: var(--ink-2);
+}
+.sl-curve {
+  fill: none;
+  stroke: var(--accent-2);
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+.sl-arc {
+  fill: none;
+  stroke: var(--st-style);
+  stroke-width: 1.4;
+  stroke-dasharray: 3 5;
+  opacity: 0.8;
+}
+.sl-arc.done {
+  stroke: var(--ink-3);
+  opacity: 0.35;
+}
+.sl-scene {
+  cursor: pointer;
+  outline: none;
+}
+.sl-hit {
+  fill: transparent;
+}
+.sl-dot {
+  fill: var(--ink);
+  transition: r 0.15s;
+}
+.sl-scene.unset .sl-dot {
+  fill: var(--surface);
+  stroke: var(--ink-3);
+  stroke-width: 1.5;
+}
+.sl-node {
+  fill: var(--accent-2);
+}
+.sl-scene.here .sl-dot {
+  fill: var(--surface);
+  stroke: var(--accent-2);
+  stroke-width: 3;
+}
+.sl-scene:hover .sl-dot,
+.sl-scene:focus-visible .sl-dot {
+  stroke: var(--ink);
+  stroke-width: 6;
+  stroke-opacity: 0.15;
+}
+.sl-scene.dim {
+  opacity: 0.2;
+}
+.sl-label {
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  fill: var(--ink);
+}
+.sl-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 24px;
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  color: var(--ink-3);
+}
+.sl-pool {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.sl-pool-k {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-right: 4px;
+}
+.sl-chip {
+  border: 0;
+  background: var(--fill);
+  border-radius: 999px;
+  padding: 5px 11px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  cursor: pointer;
+}

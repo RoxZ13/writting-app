@@ -32,6 +32,7 @@ import {
 import { MarkerCard } from '../components/MarkerCard'
 import { Arc, Essence } from '../components/Plot'
 import { SceneSheet } from '../components/SceneSheet'
+import { StoryLine } from '../components/StoryLine'
 import { markerPayoffChapter, markerQuiet, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
 import { MARKER_STATES, statusOf } from '../lib/status'
 import { InlineEdit, Modal, toast } from '../lib/ui'
@@ -42,6 +43,8 @@ import { db } from '../db/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { go } from '../lib/router'
 
+const VIEW_KEY = 'manuscript.boardView'
+
 type Lens = { kind: 'all' } | { kind: 'line'; id: string } | { kind: 'markers' }
 
 export function BoardView({ data }: { data: ProjectData }) {
@@ -51,6 +54,21 @@ export function BoardView({ data }: { data: ProjectData }) {
     return wanted === 'markers' ? { kind: 'markers' } : { kind: 'all' }
   })
   const [newLine, setNewLine] = useState<string | null>(null)
+  const [view, setViewState] = useState<'columns' | 'line'>(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === 'line' ? 'line' : 'columns'
+    } catch {
+      return 'columns'
+    }
+  })
+  const setView = (v: 'columns' | 'line') => {
+    setViewState(v)
+    try {
+      localStorage.setItem(VIEW_KEY, v)
+    } catch {
+      /* ignore */
+    }
+  }
 
   // Open on "ты здесь", not wherever the previous screen was scrolled to. On the phone the page
   // is the story's home and starts at the top: «Продолжить» already leads there.
@@ -130,6 +148,16 @@ export function BoardView({ data }: { data: ProjectData }) {
         ) : (
           <h1>Доска</h1>
         )}
+        {!phone && (
+          <div className="seg board-view" role="group" aria-label="Вид доски">
+            <button aria-pressed={view === 'columns'} onClick={() => setView('columns')}>
+              Колонки
+            </button>
+            <button aria-pressed={view === 'line'} onClick={() => setView('line')}>
+              Линия
+            </button>
+          </div>
+        )}
         {/* Filters only once there is something to filter; «+ ветка» is always there. */}
         {filters && <span className="lens-label hide-sm">Показать:</span>}
         <div className={`seg lens ${filters ? '' : 'bare'}`}>
@@ -200,6 +228,15 @@ export function BoardView({ data }: { data: ProjectData }) {
       {phone && <ContinueCard data={data} />}
       {phone ? (
         <Timeline data={data} lens={lens} onOpenScene={setOpenScene} onOpenMarker={setOpenMarker} />
+      ) : view === 'line' ? (
+        <StoryLine
+          data={data}
+          onOpenScene={setOpenScene}
+          dim={(s) =>
+            (lens.kind === 'line' && !s.lineIds?.includes(lens.id)) ||
+            (lens.kind === 'markers' && !data.markers.some((m) => m.setupSceneId === s.id || m.payoffSceneId === s.id))
+          }
+        />
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <div className="board">
