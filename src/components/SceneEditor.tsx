@@ -61,7 +61,8 @@ export function SceneEditor({
     ],
     content: initial.content as object,
     editorProps: {
-      attributes: { spellcheck: 'true', lang: 'ru', 'aria-label': 'Текст сцены' },
+      // Spelling underlines follow the setting: while writing they only distract.
+      attributes: () => ({ spellcheck: spellOn() ? 'true' : 'false', lang: 'ru', 'aria-label': 'Текст сцены' }),
       handleClickOn: (_view, _pos, _node, _nodePos, event) => {
         const target = event.target as HTMLElement
         const note = target.closest('[data-comment]')
@@ -201,4 +202,9 @@ function keepLineCentered(editor: Editor) {
   const { top } = editor.view.coordsAtPos(editor.state.selection.head)
   const delta = top - window.innerHeight * 0.42
   if (Math.abs(delta) > 6) window.scrollBy({ top: delta })
+}
+
+function spellOn() {
+  const { spell = 'edit', writemode } = document.documentElement.dataset
+  return spell === 'always' || (spell === 'edit' && writemode === 'edit')
 }

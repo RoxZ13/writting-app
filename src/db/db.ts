@@ -110,6 +110,10 @@ export interface Character extends Base {
   /** Free-form notes: who they are, what they want, what they hide. */
   about: string
   order: number
+  /** Other names the text uses: «Реддл, Лорд». Found in the text like the main name. */
+  aliases?: string
+  /** Scenes where a found name turned out to be someone else («не то»). */
+  ignoreSceneIds?: string[]
 }
 
 /**
@@ -149,6 +153,10 @@ export interface Note extends Base {
   /** Матчасть pinned to places in the book; heroes go in characterIds. */
   sceneIds?: string[]
   chapterIds?: string[]
+  /** Матчасть: other names for the same thing. */
+  aliases?: string
+  /** Scenes where a match turned out to be something else («не то»). */
+  ignoreSceneIds?: string[]
 }
 
 /** A scene's text, stored apart from its card so plan edits and writing never collide. id = scene id. */

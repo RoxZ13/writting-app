@@ -61,13 +61,6 @@ export function QuickCapture({ data, onClose }: { data: ProjectData; onClose: ()
   return (
     <Modal onClose={onClose} label="Быстрая запись">
       <div className="stack">
-        <div className="seg" role="group" aria-label="Что это">
-          {KINDS.map((k) => (
-            <button key={k.id} aria-pressed={kind === k.id} onClick={() => pick(k.id)}>
-              {k.label}
-            </button>
-          ))}
-        </div>
         <textarea
           ref={input}
           className="capture-text"
@@ -94,6 +87,13 @@ export function QuickCapture({ data, onClose }: { data: ProjectData; onClose: ()
             }
           }}
         />
+        <div className="seg capture-kinds" role="group" aria-label="Что это — можно не выбирать">
+          {KINDS.map((k) => (
+            <button key={k.id} aria-pressed={kind === k.id} onClick={() => pick(k.id)}>
+              {k.label}
+            </button>
+          ))}
+        </div>
         {withPeople && (
           <div className="chips">
             {data.characters.map((c) => {

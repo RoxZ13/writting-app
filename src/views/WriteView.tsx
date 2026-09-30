@@ -97,6 +97,15 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
   })
   const [hintCounts, setHintCounts] = useState<ReturnType<typeof countHints> | null>(null)
 
+  // The mode is read by the editor for spelling underlines; a setting change re-applies them.
+  useEffect(() => {
+    document.documentElement.dataset.writemode = mode
+    if (!editor) return
+    const refresh = () => editor.view.dispatch(editor.state.tr)
+    window.addEventListener('manuscript:typo', refresh)
+    return () => window.removeEventListener('manuscript:typo', refresh)
+  }, [editor, mode])
+
   // «Править»: repeats, long sentences and filler words are underlined while the hints are on.
   useEffect(() => {
     if (!editor) return

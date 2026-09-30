@@ -104,6 +104,17 @@ export function TypoControls() {
         ]}
       />
       <Choice
+        label="Орфография"
+        k="spell"
+        t={t}
+        set={set}
+        options={[
+          ['edit', 'Только при правке'],
+          ['always', 'Всегда'],
+          ['never', 'Выкл'],
+        ]}
+      />
+      <Choice
         label="Строка"
         k="typewriter"
         t={t}
