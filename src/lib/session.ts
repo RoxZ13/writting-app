@@ -33,9 +33,9 @@ const THEME_KEY = 'manuscript.theme'
 export type Theme = 'auto' | 'light' | 'dark' | 'paper'
 export function getTheme(): Theme {
   try {
-    return (localStorage.getItem(THEME_KEY) as Theme) || 'auto'
+    return (localStorage.getItem(THEME_KEY) as Theme) || 'light'
   } catch {
-    return 'auto'
+    return 'light'
   }
 }
 export function applyTheme(t: Theme) {

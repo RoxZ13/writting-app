@@ -2,7 +2,7 @@ import type { Editor } from '@tiptap/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useState } from 'react'
 import { db, type Marker, type Note, type Project, type Scene, type SceneText } from '../db/db'
-import { createMarker, createNote, patch, save, snapshotScene } from '../db/repo'
+import { createMarker, createNote, createScene, patch, save, snapshotScene } from '../db/repo'
 import { SceneNow, ScenePlan, sceneMarkers } from '../components/ScenePlan'
 import { Icon } from '../components/Icon'
 import { TypoControls } from '../components/TypoControls'
@@ -17,8 +17,8 @@ import { go } from '../lib/router'
 import { hotkey, session } from '../lib/session'
 import { clock, useSprint } from '../lib/sprint'
 import { endFocus, FocusStart } from '../components/Focus'
-import { dayKey, wordsOn } from '../lib/pace'
-import { MARKER_STATES, statusOf } from '../lib/status'
+import { chapterProgress, dayKey, totalWords, wordsOn } from '../lib/pace'
+import { MARKER_STATES } from '../lib/status'
 import { docParagraphs, emptyDoc, formatWords, lastSentences } from '../lib/text'
 import { loadTypo } from '../lib/typography'
 import { diffParagraphs } from '../lib/diff'
@@ -34,9 +34,8 @@ function loadPanels(): { nav: boolean; plan: boolean } {
   try {
     const saved = JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}')
     // Side panels only stay open between visits on a wide screen; on a phone they cover the text.
-    // In the quiet view (as in Calmly) the page starts alone; the structure opens on request.
-    const calm = document.documentElement.dataset.calm === 'on'
-    return wide ? { nav: !calm, plan: false, ...(calm ? {} : saved) } : { nav: false, plan: false }
+    // The navigator is there by default (where am I in the book); in the quiet view it hides with the header.
+    return wide ? { nav: true, plan: false, ...saved } : { nav: false, plan: false }
   } catch {
     return { nav: wide, plan: false }
   }
@@ -493,46 +492,93 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
 }
 
 /** Chapters and scenes of the book; the current one is highlighted. */
+/**
+ * The navigator (as in Ulysses): where I am in the book, always. Chapters with a readiness dot,
+ * the one being written open with its scenes; the rest of the book one tap away below.
+ */
 function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: string; onPick: () => void }) {
   const current = data.sceneById.get(sceneId)
-  const [closed, setClosed] = useState<Set<string>>(
-    () => new Set(data.chapters.filter((c) => c.id !== current?.chapterId).map((c) => c.id)),
-  )
+  const [open, setOpen] = useState<Set<string>>(() => new Set(current ? [current.chapterId] : []))
   const toggle = (id: string) =>
-    setClosed((prev) => {
+    setOpen((prev) => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id)
       else next.add(id)
       return next
     })
+  const cp = chapterProgress(data.project, data.chapters, data.scenes)
+  const words = totalWords([...data.scenes, ...data.pool.scenes])
+  const inbox = data.notes.filter((n) => !n.archived && !n.sceneId && !n.used && !(n.characterIds ?? []).length).length
+  const addScene = async (chapterId: string) => {
+    const s = await createScene(data.project.id, chapterId, '')
+    go({ view: 'text', sceneId: s.id })
+    onPick()
+  }
+  const groups = [...data.outline, ...(data.pool.scenes.length && data.pool.chapter ? [{ chapter: data.pool.chapter, scenes: data.pool.scenes }] : [])]
   return (
-    <>
-      <div className="eyebrow" style={{ margin: '4px 8px 10px' }}>
-        Структура
-      </div>
-      {[...data.outline, ...(data.pool.scenes.length && data.pool.chapter ? [{ chapter: data.pool.chapter, scenes: data.pool.scenes }] : [])].map(({ chapter, scenes }) => (
-        <div key={chapter.id} className={chapter.pool ? 'nav-pool' : undefined}>
-          <button className="nav-chapter" onClick={() => toggle(chapter.id)}>
-            <span className="caret">{closed.has(chapter.id) ? '▸' : '▾'}</span>
-            {chapter.title}
-          </button>
-          {!closed.has(chapter.id) &&
-            scenes.map((s) => (
-              <button
-                key={s.id}
-                className={`nav-scene ${s.id === sceneId ? 'active' : ''}`}
-                onClick={() => {
-                  go({ view: 'text', sceneId: s.id })
-                  onPick()
-                }}
-              >
-                <span className="dot" style={{ background: statusOf(s.status).color }} />
-                <span className="nav-scene-title">{sceneName(data, s)}</span>
-              </button>
-            ))}
+    <nav className="navi" aria-label="Главы и сцены">
+      <div className="navi-head">
+        <div className="navi-book">{data.project.title}</div>
+        <div className="navi-sub">
+          {cp.written} из {cp.total} {cp.total === 1 ? 'главы' : 'глав'} · {formatWords(words)}
         </div>
-      ))}
-    </>
+      </div>
+      <div className="navi-label">Главы</div>
+      {groups.map(({ chapter, scenes }) => {
+        const here = chapter.id === current?.chapterId
+        const isOpen = open.has(chapter.id)
+        const tone = chapter.pool
+          ? 'var(--line-2)'
+          : here
+            ? 'var(--accent-2)'
+            : scenes.length && scenes.every((s) => s.status === 'done')
+              ? 'var(--st-done)'
+              : scenes.some((s) => s.wordCount > 0)
+                ? 'var(--st-draft)'
+                : 'var(--line-2)'
+        return (
+          <div key={chapter.id} className={`navi-chapter ${here ? 'here' : ''} ${chapter.pool ? 'pool' : ''}`}>
+            <button className="navi-row" aria-expanded={isOpen} onClick={() => toggle(chapter.id)}>
+              <span className="navi-dot" style={{ background: tone }} />
+              <span className="navi-title">{chapter.pool ? 'Без места' : chapter.title}</span>
+              {!isOpen && scenes.length > 0 && <span className="navi-count">{scenes.length}</span>}
+            </button>
+            {isOpen && (
+              <div className="navi-scenes">
+                {scenes.map((s) => (
+                  <button
+                    key={s.id}
+                    className={`navi-scene ${s.id === sceneId ? 'active' : ''}`}
+                    onClick={() => {
+                      go({ view: 'text', sceneId: s.id })
+                      onPick()
+                    }}
+                  >
+                    {sceneName(data, s)}
+                  </button>
+                ))}
+                {!chapter.pool && (
+                  <button className="navi-scene add" onClick={() => void addScene(chapter.id)}>
+                    + сцена
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+      <div className="navi-foot">
+        <button className="navi-row" onClick={() => go({ view: 'board' })}>
+          Доска
+        </button>
+        <button className="navi-row" onClick={() => go({ view: 'characters' })}>
+          Герои и матчасть
+        </button>
+        <button className="navi-row" onClick={() => go({ view: 'inbox' })}>
+          Входящие{inbox > 0 && <span className="navi-count">{inbox}</span>}
+        </button>
+      </div>
+    </nav>
   )
 }
 

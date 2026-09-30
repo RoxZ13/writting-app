@@ -347,7 +347,7 @@ function useReveal(active: boolean) {
     if (!active || !matchMedia('(pointer: fine)').matches) return
     let timer: ReturnType<typeof setTimeout> | undefined
     const onMove = (e: MouseEvent) => {
-      const near = e.clientY < 100 || !!(e.target as HTMLElement | null)?.closest?.('.app-header, .write-top')
+      const near = e.clientY < 100 || !!(e.target as HTMLElement | null)?.closest?.('.app-header, .write-top, .write-side')
       clearTimeout(timer)
       if (near) setReveal(true)
       else timer = setTimeout(() => setReveal(false), 700)

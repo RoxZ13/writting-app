@@ -36,7 +36,11 @@ import { markerPayoffChapter, markerQuiet, markerSetupChapter, markerStatus, sce
 import { MARKER_STATES, statusOf } from '../lib/status'
 import { InlineEdit, Modal, toast } from '../lib/ui'
 import { deadlineText } from '../lib/stories'
-import { formatScenes } from '../lib/text'
+import { formatScenes, formatWords, lastSentences } from '../lib/text'
+import { chapterProgress, totalWords } from '../lib/pace'
+import { db } from '../db/db'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { go } from '../lib/router'
 
 type Lens = { kind: 'all' } | { kind: 'line'; id: string } | { kind: 'markers' }
 
@@ -48,10 +52,12 @@ export function BoardView({ data }: { data: ProjectData }) {
   })
   const [newLine, setNewLine] = useState<string | null>(null)
 
-  // Open on "ты здесь", not wherever the previous screen was scrolled to.
+  // Open on "ты здесь", not wherever the previous screen was scrolled to. On the phone the page
+  // is the story's home and starts at the top: «Продолжить» already leads there.
   const phone = usePhone()
   useEffect(() => {
     window.scrollTo(0, 0)
+    if (phone) return
     requestAnimationFrame(() =>
       document
         .querySelector('.card-scene.current, .tl-scene.current')
@@ -113,7 +119,17 @@ export function BoardView({ data }: { data: ProjectData }) {
   return (
     <div className="board-page">
       <div className="board-bar">
-        <h1>Доска</h1>
+        {phone ? (
+          <div className="story-home-head">
+            <h1>{data.project.title}</h1>
+            <div className="muted small">
+              {chapterProgress(data.project, data.chapters, data.scenes).written} из {chapterProgress(data.project, data.chapters, data.scenes).total} глав ·{' '}
+              {formatWords(totalWords([...data.scenes, ...data.pool.scenes]))}
+            </div>
+          </div>
+        ) : (
+          <h1>Доска</h1>
+        )}
         {/* Filters only once there is something to filter; «+ ветка» is always there. */}
         {filters && <span className="lens-label hide-sm">Показать:</span>}
         <div className={`seg lens ${filters ? '' : 'bare'}`}>
@@ -181,6 +197,7 @@ export function BoardView({ data }: { data: ProjectData }) {
       )}
       {lens.kind === 'line' && data.lineById.get(lens.id) && <LineNote data={data} lineId={lens.id} onGone={() => setLens({ kind: 'all' })} />}
 
+      {phone && <ContinueCard data={data} />}
       {phone ? (
         <Timeline data={data} lens={lens} onOpenScene={setOpenScene} onOpenMarker={setOpenMarker} />
       ) : (
@@ -544,6 +561,28 @@ function Card({ data, scene, lens, overlay }: { data: ProjectData; scene: Scene;
 }
 
 /** Phones: a horizontal board does not fit, so chapters become a quiet vertical list of scenes. */
+/** On the phone this page is the story's home: one big way back into the text, then the chapters. */
+function ContinueCard({ data }: { data: ProjectData }) {
+  const scene = (data.project.lastSceneId && data.sceneById.get(data.project.lastSceneId)) || data.scenes[0]
+  const text = useLiveQuery(() => (scene ? db.texts.get(scene.id) : undefined), [scene?.id])
+  if (!scene) return null
+  const tail = text ? lastSentences(text.content, 2) : ''
+  return (
+    <a
+      className="continue-card"
+      href={`#/text/${scene.id}`}
+      onClick={(e) => {
+        e.preventDefault()
+        go({ view: 'text', sceneId: scene.id })
+      }}
+    >
+      <span className="continue-k">{tail ? 'Продолжить' : 'Начать писать'}</span>
+      <span className="continue-t">{sceneName(data, scene)}</span>
+      {tail && <span className="continue-x">…{tail}</span>}
+    </a>
+  )
+}
+
 function usePhone() {
   const query = '(max-width: 760px)'
   const [phone, setPhone] = useState(() => matchMedia(query).matches)
