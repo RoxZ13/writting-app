@@ -39,7 +39,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
+  :root:not([data-theme='light']):not([data-theme='paper']) {
     --bg: #0c0c0e;
     --side: #111113;
     --paper: #121214;
@@ -73,6 +73,24 @@
   --focus: #f4f4f5;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
   color-scheme: dark;
+}
+/* «Бумага»: low contrast, warm grey — easy on the eyes for long sessions. */
+:root[data-theme='paper'] {
+  --bg: #e4e4df;
+  --side: #e9e9e4;
+  --paper: #ecece8;
+  --surface: #f1f1ed;
+  --fill: #dfdfda;
+  --ink: #232326;
+  --ink-2: #4f4f55;
+  --ink-3: #85858b;
+  --line: #d9d9d3;
+  --line-2: #cdcdc6;
+  --accent: #232326;
+  --accent-soft: #dadad4;
+  --focus: #232326;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 8px 30px rgba(0, 0, 0, 0.04);
+  color-scheme: light;
 }
 
 * {
@@ -2464,21 +2482,46 @@ main.page {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.last-time {
-  margin: 8px auto 0;
-  width: min(720px, calc(100% - 32px));
+.resume {
+  /* Pinned to the bottom of the screen: the editor may open scrolled to where the author stopped. */
+  position: fixed;
+  z-index: 30;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: min(var(--measure, 660px), calc(100% - 32px));
+  box-shadow: var(--shadow), 0 0 0 1px var(--line);
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
-  padding: 8px 8px 8px 14px;
-  border-radius: 12px;
-  background: var(--fill);
+  padding: 14px 14px 10px 18px;
+  border-radius: 14px;
+  background: var(--surface);
   font-size: 14px;
+  animation: resume-in 0.25s ease-out;
 }
-.last-time .icon-btn {
-  margin-left: auto;
-  width: 26px;
-  height: 26px;
+.resume-note {
+  color: var(--ink-2);
+}
+.resume-tail {
+  font-family: var(--text-font);
+  font-size: calc(var(--text-size) - 3px);
+  line-height: 1.55;
+  color: var(--ink-2);
+  font-style: italic;
+}
+.resume .row {
+  align-items: center;
+}
+.resume .icon-btn {
+  width: 28px;
+  height: 28px;
+}
+@keyframes resume-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
 }
 .editor-area {
   display: flex;
@@ -2786,9 +2829,6 @@ main.page {
   width: min(calc(var(--measure) + 112px), calc(100% - 32px));
 }
 .compass,
-.last-time {
-  width: min(var(--measure), calc(100% - 32px));
-}
 .old-body {
   font-size: calc(var(--text-size) - 3px);
 }
@@ -4333,6 +4373,10 @@ main.page {
 .pace-forecast {
   font-size: 15px;
 }
+.pace-bank {
+  font-size: 15px;
+  font-weight: 500;
+}
 .num-input {
   width: 160px;
 }
@@ -4695,7 +4739,7 @@ button.deadline {
   transition: opacity 0.3s;
 }
 [data-focuspara='on'] .write .ProseMirror.ProseMirror-focused > *:not(.has-focus) {
-  opacity: 0.28;
+  opacity: 0.4;
 }
 .typo-pop {
   max-height: calc(100dvh - 150px);
@@ -4841,4 +4885,47 @@ button.deadline {
 .column-head .column-title {
   flex: 1;
   min-width: 0;
+}
+
+/* Marker «эхо»: the scenes in between where it flickers again. */
+.mk-echoes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.mk-echoes .select {
+  flex: 1 1 100%;
+}
+.chip-x {
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+}
+.mk-echo-count {
+  color: var(--ink-3);
+}
+
+/* «Что изменилось» in rewrite mode: calm, no red and green. */
+.old-seg button {
+  font-size: 12px;
+  padding: 3px 10px;
+}
+.old-body del {
+  color: var(--ink-3);
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-3);
+}
+.old-body ins {
+  text-decoration: none;
+  color: var(--ink);
+  border-bottom: 1.5px solid var(--line-2);
+}
+@media (max-width: 760px) {
+  .resume {
+    bottom: calc(env(safe-area-inset-bottom) + 76px);
+  }
 }

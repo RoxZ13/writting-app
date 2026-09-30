@@ -65,3 +65,19 @@ export const formatWords = (n: number) => {
         : 'слов'
   return `${n.toLocaleString('ru-RU')} ${word}`
 }
+
+/** The last `n` sentences of a scene: enough to pick up the thread without scrolling. */
+export function lastSentences(doc: unknown, n = 2): string {
+  const paras = docParagraphs(doc)
+    .map((p) => p.trim())
+    .filter(Boolean)
+  const out: string[] = []
+  for (let i = paras.length - 1; i >= 0 && out.length < n; i--) {
+    const parts = paras[i].match(/[^.!?…]+(?:[.!?…]+[»"”)]*|$)/gu) ?? [paras[i]]
+    for (let j = parts.length - 1; j >= 0 && out.length < n; j--) {
+      const s = parts[j].trim()
+      if (s) out.unshift(s)
+    }
+  }
+  return out.join(' ')
+}

@@ -28,4 +28,8 @@ export const Typography = Extension.create({
       replace(/([^\s([«—-])"$/, (m) => `${m[1]}»`),
     ]
   },
+  addKeyboardShortcuts() {
+    // Right after a replacement, undo gives back what was typed (--- instead of —); otherwise a normal undo.
+    return { 'Mod-z': () => this.editor.commands.undoInputRule() }
+  },
 })

@@ -5,7 +5,7 @@ import StarterKit from '@tiptap/starter-kit'
 import { Focus, Placeholder } from '@tiptap/extensions'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useRef } from 'react'
-import { db, type Scene, type SceneText } from '../db/db'
+import { db, type Note, type Scene, type SceneText } from '../db/db'
 import { patch, save } from '../db/repo'
 import { docParagraphs, docWordCount } from '../lib/text'
 import { makeExcerpt } from '../lib/importer'
@@ -14,6 +14,8 @@ import { MarkerMark } from './MarkerMark'
 import { EditHints } from './EditHints'
 import { Typography } from './Typography'
 import { CommentMark } from './CommentMark'
+import { InlineNote } from './InlineNote'
+import { toast } from '../lib/ui'
 import { findInEditor } from '../lib/search'
 
 export interface SelectionAction {
@@ -60,6 +62,13 @@ export function SceneEditor({
       EditHints,
       CommentMark,
       Typography,
+      InlineNote.configure({
+        onNote: (id, text) => {
+          const now = Date.now()
+          void save<Note>('notes', { id, text, kind: 'note', projectId: scene.projectId, sceneId: scene.id, archived: false, createdAt: now, updatedAt: now })
+          toast('Ушло на поля')
+        },
+      }),
     ],
     // Only our own typing shortcuts and **bold** / *italic*: a dash or «>» at the start of a line stays text,
     // it never turns into a list or a quote block (dialogue starts with a dash).

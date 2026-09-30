@@ -1,7 +1,8 @@
 import type { Chapter, Project } from '../db/db'
 import { patch } from '../db/repo'
 import type { ProjectData } from '../lib/hooks'
-import { dayKey, pace, totalWords } from '../lib/pace'
+import { bank, dayKey, pace, totalWords } from '../lib/pace'
+import { formatWords } from '../lib/text'
 
 const DAY = 86400000
 const date = (d: Date | string) =>
@@ -54,6 +55,7 @@ export function PaceSection({ data }: { data: ProjectData }) {
               ))}
               {p.dailyGoal ? <b className="pace-goal" style={{ bottom: `${Math.round((p.dailyGoal / max) * 100)}%` }} /> : null}
             </div>
+            <BankLine project={p} />
             <div className="pace-forecast">{forecastText(p, pc)}</div>
           </>
         ) : (
@@ -72,6 +74,18 @@ export function PaceSection({ data }: { data: ProjectData }) {
       </div>
     </details>
   )
+}
+
+/** Only what is already done: words this month, weeks in a row. Nothing about days missed. */
+function BankLine({ project }: { project: Project }) {
+  const b = bank(project)
+  const parts = [
+    b.monthWords > 0 && `За ${b.monthName} — ${formatWords(b.monthWords)}`,
+    b.weeks >= 2 && `возвращаешься к тексту ${b.weeks}-ю неделю`,
+  ].filter(Boolean) as string[]
+  if (!parts.length) return null
+  const line = parts.join(' · ')
+  return <div className="pace-bank">{line[0].toUpperCase() + line.slice(1)}</div>
 }
 
 function forecastText(p: Project, pc: ReturnType<typeof pace>): string {

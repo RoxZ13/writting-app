@@ -30,7 +30,7 @@ import {
 import { MarkerCard } from '../components/MarkerCard'
 import { Arc, Essence } from '../components/Plot'
 import { SceneSheet } from '../components/SceneSheet'
-import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
+import { markerPayoffChapter, markerQuiet, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
 import { MARKER_STATES, statusOf } from '../lib/status'
 import { InlineEdit, Modal, toast } from '../lib/ui'
 import { deadlineText } from '../lib/stories'
@@ -89,6 +89,7 @@ export function BoardView({ data }: { data: ProjectData }) {
 
   const showArc = [...data.scenes, ...data.pool.scenes].some((s) => s.heat)
   const hanging = data.markers.filter((m) => ['hanging', 'late'].includes(markerStatus(m, data)))
+  const quiet = data.markers.filter((m) => markerQuiet(m, data))
   const lineName = lens.kind === 'line' ? data.lineById.get(lens.id)?.name : undefined
 
   const addChapterAfter = async (i: number) => {
@@ -160,16 +161,13 @@ export function BoardView({ data }: { data: ProjectData }) {
             'Все маячки на месте: у каждого есть глава, где он раскроется.'
           ) : (
             <>
-              <strong>{hanging.length} без места раскрытия или пропущены:</strong>{' '}
-              {hanging.map((m, i) => (
-                <span key={m.id}>
-                  {i > 0 && ' · '}
-                  <button className="link" onClick={() => setOpenMarker(m.id)}>
-                    {m.title || 'без названия'}
-                  </button>
-                </span>
-              ))}
+              <strong>{hanging.length} без места раскрытия или пропущены:</strong> <MarkerLinks list={hanging} onOpen={setOpenMarker} />
             </>
+          )}
+          {quiet.length > 0 && (
+            <div>
+              <strong>Давно не мелькали — читатель мог забыть:</strong> <MarkerLinks list={quiet} onOpen={setOpenMarker} />
+            </div>
           )}
         </div>
       )}
@@ -391,6 +389,21 @@ function EmptyChapterHint() {
 }
 
 /** "Пока без места": scenes from the author's head, jotted down before they have a chapter. */
+function MarkerLinks({ list, onOpen }: { list: Marker[]; onOpen: (id: string) => void }) {
+  return (
+    <>
+      {list.map((m, i) => (
+        <span key={m.id}>
+          {i > 0 && ' · '}
+          <button className="link" onClick={() => onOpen(m.id)}>
+            {m.title || 'без названия'}
+          </button>
+        </span>
+      ))}
+    </>
+  )
+}
+
 function PoolColumn({ data, lens, onOpenScene }: { data: ProjectData; lens: Lens; onOpenScene: (id: string) => void }) {
   const { setNodeRef, isOver } = useDroppable({ id: 'col:pool' })
   const [draft, setDraft] = useState('')
