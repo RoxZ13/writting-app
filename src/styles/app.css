@@ -5670,3 +5670,127 @@ button.avatar {
 .book-page > .essence {
   margin-bottom: 20px;
 }
+
+/* «Линия истории» as a metro map: branches run side by side and meet at nodes. */
+.sl-body {
+  display: flex;
+}
+.sl-lanes {
+  position: relative;
+  flex: 0 0 150px;
+  border-right: 1px solid var(--line);
+}
+.sl-lane-name {
+  position: absolute;
+  left: 20px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sl-lane-name.muted {
+  font-weight: 500;
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.sl-lane-name .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex: none;
+}
+.sl-scroll {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+}
+.sl-lane {
+  fill: none;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
+}
+.sl-scene {
+  cursor: pointer;
+  touch-action: auto;
+}
+.sl-scene .sl-dot {
+  fill: var(--surface);
+  stroke-width: 3;
+}
+.sl-scene.here .sl-dot {
+  fill: var(--ink);
+}
+.sl-junction {
+  fill: var(--surface);
+  stroke: var(--ink);
+  stroke-width: 3.5;
+}
+.sl-scene:hover .sl-dot,
+.sl-scene:hover .sl-junction,
+.sl-scene:focus-visible .sl-dot,
+.sl-scene:focus-visible .sl-junction {
+  stroke-width: 5;
+}
+.sl-label {
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+.sl-label.hover {
+  opacity: 0;
+}
+.sl-scene:hover .sl-label.hover,
+.sl-scene:focus-visible .sl-label.hover {
+  opacity: 1;
+}
+.sl-heat {
+  fill: var(--accent-2);
+  opacity: 0.45;
+}
+.sl-arc {
+  opacity: 0.6;
+}
+/* Hero and branch chips carry their own colour dot: tap it to recolour. */
+.ref-chip-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.ref-chip-wrap > .color-dot-wrap {
+  position: absolute;
+  left: 9px;
+  z-index: 1;
+}
+.chip-dot {
+  width: 12px;
+  height: 12px;
+  border-width: 1.5px;
+  box-shadow: none;
+}
+.ref-chip-wrap .ref-chip {
+  padding-left: 28px;
+}
+.person-delete {
+  align-self: flex-start;
+  margin-top: 6px;
+  color: var(--ink-3);
+}
+.sheet-node {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--fill);
+}

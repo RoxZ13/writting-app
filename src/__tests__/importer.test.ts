@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { blocksToChapters, isChapterTitle, isEpigraph, parseBook, parseTaggedRuns, textToBlocks } from '../lib/importer'
-import { chapterToFicbook, chapterToRich } from '../lib/exporter'
+import { chapterToFicbook, chapterToRich, tidyTypography } from '../lib/exporter'
 import type { Chapter, Scene } from '../db/db'
 
 describe('import', () => {
@@ -96,5 +96,12 @@ describe('rich export (Author.Today, Литнет, AO3)', () => {
     const { html, text } = chapterToRich({ chapter: {} as Chapter, scenes })
     expect(html).toBe('<p>Он сказал <em>тихо</em> &amp; 1 &lt; 2.</p>\n<p style="text-align:center">* * *</p>\n<p>Вторая <strong>сцена</strong>.</p>')
     expect(text).toBe('Он сказал тихо & 1 < 2.\n\n* * *\n\nВторая сцена.')
+  })
+})
+
+describe('typography on export', () => {
+  it('fixes dashes, quotes and dots that came in from elsewhere, leaving tags and hyphenated words', () => {
+    expect(tidyTypography('- Ты правда думаешь - так лучше? - спросила она...')).toBe('— Ты правда думаешь — так лучше? — спросила она…')
+    expect(tidyTypography('<i>- Кто-то "там"</i> -- ушёл')).toBe('<i>— Кто-то «там»</i> — ушёл')
   })
 })

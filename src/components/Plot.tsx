@@ -28,7 +28,7 @@ export function Heat({ scene, large }: { scene: Scene; large?: boolean }) {
 }
 
 /** The emotional arc of a chapter: one bar per scene, key points drawn dark. Side by side, the columns show the whole book. */
-export function Arc({ scenes }: { scenes: Scene[] }) {
+export function Arc({ scenes, isNode }: { scenes: Scene[]; isNode: (s: Scene) => boolean }) {
   if (!scenes.length) return null
   return (
     <div
@@ -40,7 +40,7 @@ export function Arc({ scenes }: { scenes: Scene[] }) {
       {scenes.map((s) => (
         <span
           key={s.id}
-          className={`arc-bar ${s.node ? 'node' : ''} ${s.heat ? '' : 'unset'}`}
+          className={`arc-bar ${isNode(s) ? 'node' : ''} ${s.heat ? '' : 'unset'}`}
           style={{ height: `${s.heat ? 4 + s.heat * 5 : 3}px` }}
           title={s.heat ? `Накал ${s.heat} из 5` : 'Накал не отмечен'}
         />
