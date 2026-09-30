@@ -12,6 +12,8 @@
   --accent: #0b0b0c;
   --accent-soft: #ececef;
   --focus: #0b0b0c;
+  /* The one colour accent: where you are now. */
+  --accent-2: #2563eb;
 
   --st-idea: #b4b4bb;
   --st-draft: #e3a857;
@@ -28,7 +30,7 @@
   --radius: 22px;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 8px 30px rgba(0, 0, 0, 0.05);
   --serif: 'Literata Variable', 'Literata', Georgia, 'Times New Roman', serif;
-  --sans: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --sans: 'Manrope Variable', 'Manrope', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
   --text-font: var(--serif);
   --text-size: 20px;
@@ -5088,4 +5090,196 @@ button.deadline {
     height: auto;
     align-self: stretch;
   }
+}
+
+/* =====================================================================
+   Navigator (design «Тишина»): where I am in the book, always.
+   ===================================================================== */
+.write-side {
+  background: var(--side);
+}
+.navi {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 100%;
+  font-family: var(--sans);
+}
+.navi-head {
+  padding: 6px 10px 18px;
+}
+.navi-book {
+  font-weight: 800;
+  font-size: 16px;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  color: var(--ink);
+}
+.navi-sub {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-top: 3px;
+}
+.navi-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 0 10px 6px;
+}
+.navi-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 7px 10px;
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13.5px;
+  color: var(--ink-2);
+  text-align: left;
+  cursor: pointer;
+}
+.navi-row:hover {
+  background: var(--fill);
+}
+.navi-chapter.here > .navi-row {
+  color: var(--ink);
+  font-weight: 700;
+}
+.navi-chapter.pool > .navi-row {
+  color: var(--ink-3);
+}
+.navi-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex: none;
+}
+.navi-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.navi-count {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-3);
+}
+.navi-scenes {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 2px 0 6px 23px;
+  padding-left: 6px;
+  border-left: 1px solid var(--line-2);
+}
+.navi-scene {
+  border: 0;
+  background: none;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-2);
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.navi-scene:hover {
+  background: var(--fill);
+}
+.navi-scene.active {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+.navi-scene.add {
+  color: var(--ink-3);
+}
+.navi-foot {
+  margin-top: auto;
+  padding-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+@media (pointer: fine) {
+  /* Quiet view: the navigator floats over the margin and shows with the header, so the text never moves. */
+  [data-calm='on'] .app-text .write.nav-open {
+    grid-template-columns: 0 minmax(0, 1fr) 0;
+  }
+  [data-calm='on'] .app-text .write.nav-open.brief-open {
+    grid-template-columns: 0 minmax(0, 1fr) 360px;
+  }
+  /* The floating navigator leaves the grid, so the page keeps its own column. */
+  [data-calm='on'] .app-text .write-center {
+    grid-column: 2;
+  }
+  [data-calm='on'] .app-text .write-brief {
+    grid-column: 3;
+  }
+  [data-calm='on'] .app-text .write-side {
+    position: fixed;
+    left: 0;
+    width: 280px;
+    z-index: 20;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+  }
+  [data-calm='on'] .app-text.reveal .write.nav-open .write-side {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* Phone: the board page doubles as the story's home. */
+.story-home-head h1 {
+  font-size: 28px;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin: 0 0 2px;
+}
+.continue-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 18px;
+  padding: 18px;
+  border-radius: 18px;
+  background: var(--ink);
+  color: var(--bg);
+  text-decoration: none;
+}
+.continue-k {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.6;
+}
+.continue-t {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+.continue-x {
+  font-family: var(--text-font);
+  font-size: 14.5px;
+  line-height: 1.5;
+  opacity: 0.8;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
