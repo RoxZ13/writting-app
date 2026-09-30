@@ -52,7 +52,7 @@ export function CoverPicker({ projectId }: { projectId: string }) {
       <button
         className="btn sm"
         onClick={() => {
-          const url = prompt('Ссылка на картинку обложки (на Фикбуке: правый клик по обложке → «Копировать адрес изображения»)')
+          const url = prompt('Ссылка на картинку обложки (на сайте: правый клик по обложке → «Копировать адрес изображения»)')
           if (!url) return
           void (async () => {
             try {

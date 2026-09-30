@@ -6,7 +6,8 @@ import { DateChip } from '../components/DateChip'
 import { useCover } from '../lib/cover'
 import { NumberField, PaceSection, PublishSection } from '../components/BookSections'
 import { chapterProgress } from '../lib/pace'
-import { chapterToFicbook, download, exportDocx, type ExportChapter } from '../lib/exporter'
+import { chapterToFicbook, chapterToRich, download, exportDocx, type ExportChapter } from '../lib/exporter'
+import { platformOf } from '../lib/platforms'
 import type { ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { COVERS, STAGES } from '../lib/stories'
@@ -31,14 +32,26 @@ export function BookView({ data }: { data: ProjectData }) {
   const cp = chapterProgress(p, data.chapters, data.scenes)
 
   const exportWord = async () => download(await exportDocx(p.title, await loadChapters(data)), `${p.title}.docx`)
-  const copyFicbook = async (chapterId: string) => {
+  const platform = platformOf(p)
+  const copyChapter = async (chapterId: string) => {
     const [ch] = await loadChapters(data, chapterId)
     if (!ch) return
-    const text = chapterToFicbook(ch)
+    const where = platform.id === 'other' ? 'в редактор сайта' : `в редактор ${platform.for.replace(/^для /, '')}`
     try {
-      await navigator.clipboard.writeText(text)
-      toast(`«${ch.chapter.title}» скопирована — вставь её в редактор Фикбука`)
+      if (platform.copy === 'tags') {
+        await navigator.clipboard.writeText(chapterToFicbook(ch))
+      } else {
+        const { html, text } = chapterToRich(ch)
+        // Formatting travels as HTML; editors that only take plain text get the text.
+        if (typeof ClipboardItem !== 'undefined' && navigator.clipboard.write) {
+          await navigator.clipboard.write([
+            new ClipboardItem({ 'text/html': new Blob([html], { type: 'text/html' }), 'text/plain': new Blob([text], { type: 'text/plain' }) }),
+          ])
+        } else await navigator.clipboard.writeText(text)
+      }
+      toast(`«${ch.chapter.title}» скопирована — вставь её ${where}`)
     } catch {
+      const text = platform.copy === 'tags' ? chapterToFicbook(ch) : chapterToRich(ch).text
       download(new Blob([text], { type: 'text/plain;charset=utf-8' }), `${ch.chapter.title}.txt`)
     }
   }
@@ -95,7 +108,7 @@ export function BookView({ data }: { data: ProjectData }) {
         </div>
       </div>
 
-      <PublishSection data={data} onCopy={(id) => void copyFicbook(id)} />
+      <PublishSection data={data} onCopy={(id) => void copyChapter(id)} />
 
       <PaceSection data={data} />
 
@@ -138,4 +151,3 @@ export function BookView({ data }: { data: ProjectData }) {
   )
 }
 
-/** The author's own cover: from a file, a copied picture, or a link — the usual story with a Ficbook cover. */

@@ -36,6 +36,7 @@ export function TypoControls() {
         options={[
           ['serif', 'С засечками'],
           ['sans', 'Без засечек'],
+          ['easy', 'Лёгкий'],
           ['mono', 'Машинка'],
         ]}
       />

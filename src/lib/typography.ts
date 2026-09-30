@@ -1,6 +1,7 @@
 /** How the manuscript text looks. Per device: a phone and a big monitor want different settings. */
 export interface Typo {
-  font: 'serif' | 'sans' | 'mono'
+  /** «Лёгкий» — Onest: wide, open letters, easier on tired eyes. */
+  font: 'serif' | 'sans' | 'easy' | 'mono'
   size: number
   width: 'narrow' | 'medium' | 'wide'
   leading: 'tight' | 'normal' | 'loose'
@@ -22,7 +23,7 @@ export const DEFAULT_TYPO: Typo = { font: 'serif', size: 18, width: 'medium', le
 const KEY = 'manuscript.typo'
 const WIDTH = { narrow: '560px', medium: '660px', wide: '800px' }
 const LEADING = { tight: '1.5', normal: '1.7', loose: '1.95' }
-const FONT = { serif: 'var(--serif)', sans: 'var(--sans)', mono: 'var(--mono)' }
+const FONT = { serif: 'var(--serif)', sans: 'var(--sans)', easy: "'Onest Variable', var(--sans)", mono: 'var(--mono)' }
 
 export function loadTypo(): Typo {
   try {

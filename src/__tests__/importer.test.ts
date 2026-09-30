@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { blocksToChapters, isChapterTitle, isEpigraph, parseBook, parseTaggedRuns, textToBlocks } from '../lib/importer'
-import { chapterToFicbook } from '../lib/exporter'
+import { chapterToFicbook, chapterToRich } from '../lib/exporter'
 import type { Chapter, Scene } from '../db/db'
 
 describe('import', () => {
@@ -86,5 +86,15 @@ describe('ficbook export', () => {
     const scenes = ch.scenes.map((s, i) => ({ id: String(i), content: s.doc }) as unknown as Scene & { content: unknown })
     const out = chapterToFicbook({ chapter: {} as Chapter, scenes })
     expect(out).toBe('Он сказал <i>тихо</i>.\n\n<center>* * *</center>\n\nВторая <b>сцена</b>.')
+  })
+})
+
+describe('rich export (Author.Today, Литнет, AO3)', () => {
+  it('gives HTML with formatting and plain text, escaping what looks like tags', () => {
+    const [ch] = blocksToChapters(textToBlocks('Глава 1\nОн сказал <i>тихо</i> & 1 < 2.\n***\nВторая <b>сцена</b>.'))
+    const scenes = ch.scenes.map((s, i) => ({ id: String(i), content: s.doc }) as unknown as Scene & { content: unknown })
+    const { html, text } = chapterToRich({ chapter: {} as Chapter, scenes })
+    expect(html).toBe('<p>Он сказал <em>тихо</em> &amp; 1 &lt; 2.</p>\n<p style="text-align:center">* * *</p>\n<p>Вторая <strong>сцена</strong>.</p>')
+    expect(text).toBe('Он сказал тихо & 1 < 2.\n\n* * *\n\nВторая сцена.')
   })
 })

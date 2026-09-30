@@ -1,4 +1,5 @@
 import Dexie, { type Table } from 'dexie'
+import type { PlatformId } from '../lib/platforms'
 
 /** Every synced record carries these fields. `updatedAt` is client time in ms. */
 export interface Base {
@@ -37,9 +38,11 @@ export interface Project extends Base {
   targetWords?: number
   /** How many chapters the book will have — a landmark besides the deadline. */
   targetChapters?: number
-  /** Ficbook: a new chapter every N days. */
+  /** Where the book goes up; Фикбук when not chosen. */
+  platform?: PlatformId
+  /** A new chapter every N days. */
   publishEvery?: number
-  /** The work's page on Ficbook; when empty, taken from the imported header. */
+  /** The work's page on that site (the name stayed from when only Ficbook was known); for Ficbook, taken from the imported header when empty. */
   ficbookUrl?: string
 }
 
