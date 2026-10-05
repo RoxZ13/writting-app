@@ -42,3 +42,25 @@ export function countMentions(text: string, re: RegExp): number {
   re.lastIndex = 0
   return text.match(re)?.length ?? 0
 }
+
+/**
+ * «Ветки из героев»: the scenes that would make up each hero's branch — where the hero is marked,
+ * or named in the text at least twice (a name dropped once in passing does not make it their scene).
+ */
+export function heroScenes(
+  scenes: { id: string; characterIds?: string[] }[],
+  texts: Map<string, string>,
+  characters: Pick<Character, 'id' | 'name' | 'ignoreSceneIds'>[],
+): Map<string, string[]> {
+  const patterns = mentionPatterns(characters)
+  const out = new Map(characters.map((c) => [c.id, [] as string[]]))
+  for (const s of scenes) {
+    const text = texts.get(s.id) ?? ''
+    for (const c of characters) {
+      if (c.ignoreSceneIds?.includes(s.id)) continue
+      const re = patterns.get(c.id)
+      if (s.characterIds?.includes(c.id) || (re && countMentions(text, re) >= 2)) out.get(c.id)!.push(s.id)
+    }
+  }
+  return out
+}

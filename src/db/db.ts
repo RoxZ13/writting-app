@@ -36,8 +36,10 @@ export interface Project extends Base {
   dailyGoal?: number
   /** Planned length of the whole book, in words. */
   targetWords?: number
-  /** How many chapters the book will have — a landmark besides the deadline. */
+  /** How many chapters the book will have — a landmark besides the deadline. 0 = «не знаю» (shown as «?»). */
   targetChapters?: number
+  /** The «lock the written chapters?» question after an import was asked, whatever the answer. */
+  lockAsked?: boolean
   /** Where the book goes up; Фикбук when not chosen. */
   platform?: PlatformId
   /** A new chapter every N days. */
@@ -58,6 +60,8 @@ export interface Chapter extends Base {
   pool?: boolean
   /** Date the chapter went up on Ficbook, YYYY-MM-DD. */
   publishedAt?: string
+  /** Fixed in place: its scenes are not moved, added or removed by accident. The text stays editable. */
+  locked?: boolean
 }
 
 export type SceneStatus = 'idea' | 'draft' | 'written' | 'logic' | 'style' | 'done'

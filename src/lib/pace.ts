@@ -91,6 +91,7 @@ export const totalWords = (scenes: { wordCount: number }[]) => scenes.reduce((n,
 /**
  * Chapters as a landmark: a chapter counts as written when every scene in it has text.
  * The total is the author's planned number, or the chapters that exist so far.
+ * `targetChapters: 0` means the author said «не знаю»: the total is shown as «?».
  */
 export function chapterProgress(
   project: Project,
@@ -103,14 +104,15 @@ export function chapterProgress(
     const own = scenes.filter((s) => s.chapterId === c.id)
     return own.length > 0 && own.every((s) => s.wordCount > 0)
   }).length
-  const total = Math.max(project.targetChapters ?? real.length, written)
-  const left = total - written
+  const unknown = project.targetChapters === 0
+  const total = Math.max(project.targetChapters || real.length, written)
+  const left = unknown ? 0 : total - written
   let daysPerChapter: number | undefined
   if (project.deadline && left > 0) {
     const days = Math.ceil((new Date(project.deadline + 'T23:59:59').getTime() - now) / 86400000)
     if (days > 0) daysPerChapter = Math.max(1, Math.floor(days / left))
   }
-  return { written, total, left, planned: !!project.targetChapters, daysPerChapter }
+  return { written, total, of: unknown ? '?' : String(total), unknown, left, planned: !!project.targetChapters, daysPerChapter }
 }
 
 /**

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { db, type Project } from '../db/db'
-import { alive, createChapter, createScene, save } from '../db/repo'
+import { alive, createChapter, createScene, patch, save } from '../db/repo'
 import {
   parseBook,
   htmlToBlocks,
@@ -31,6 +31,8 @@ export async function importChapters(projectId: string, chapters: ImportedBook['
       firstScene ??= scene.id
     }
   }
+  // Written chapters came in: the board asks once whether to fix them in place.
+  if (chapters.length > 1) await patch<Project>('projects', projectId, { lockAsked: false })
   return firstScene
 }
 

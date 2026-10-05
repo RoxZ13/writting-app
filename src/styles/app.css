@@ -5923,3 +5923,143 @@ button.avatar {
 :root {
   accent-color: var(--brand);
 }
+
+/* A chapter fixed in place: pale and quiet, so the chapters still to write stand out bright white. */
+.column.locked .card-scene {
+  background: color-mix(in srgb, var(--fill) 70%, var(--surface));
+  box-shadow: none;
+  cursor: pointer;
+}
+.column.locked .card-title,
+.column.locked .card-goal,
+.column.locked .card-excerpt {
+  color: var(--ink-3);
+}
+.column.locked .column-title {
+  color: var(--ink-2);
+}
+.lock-mark {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-3);
+  flex: none;
+}
+.tl-chapter.locked .tl-title,
+.tl-chapter.locked .tl-scene {
+  color: var(--ink-3);
+}
+.plan-lock {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-3);
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.plan-lock:hover {
+  background: var(--fill);
+  color: var(--ink);
+}
+.plan-lock.on {
+  color: var(--ink-2);
+  background: var(--fill);
+}
+.ask-lock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ask-lock > span:first-of-type {
+  flex: 1 1 320px;
+}
+.sl-locked {
+  fill: color-mix(in srgb, var(--fill) 70%, transparent);
+}
+.sl-lock {
+  fill: none;
+  stroke: var(--ink-3);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sl-chapter.locked {
+  fill: var(--ink-3);
+}
+.sheet-where {
+  flex-wrap: wrap;
+}
+.sheet-where .small {
+  flex: 1 1 100%;
+  margin-top: -2px;
+}
+@media (max-width: 760px) {
+  .ask-lock > svg {
+    display: none;
+  }
+}
+
+/* «Что осталось дописать» */
+.ltw-title {
+  margin: 0 0 14px;
+}
+.ltw {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-height: 65vh;
+  overflow-y: auto;
+}
+.ltw h3 {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 6px;
+}
+.ltw-chapter + .ltw-chapter {
+  margin-top: 8px;
+}
+.ltw-k {
+  display: block;
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+.ltw-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  padding: 6px 10px;
+  margin: 0 -10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.ltw-row:hover {
+  background: var(--fill);
+}
+.ltw-row.static {
+  cursor: default;
+}
+.ltw-row.static:hover {
+  background: none;
+}
+.ltw-open {
+  display: inline-block;
+  margin-top: 8px;
+}
+.chapters-unknown {
+  color: var(--ink);
+  font-size: 15px;
+}

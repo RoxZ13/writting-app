@@ -14,7 +14,7 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useEffect, useState } from 'react'
-import type { Chapter, Line, Marker, Scene } from '../db/db'
+import type { Chapter, Line, Marker, Project, Scene } from '../db/db'
 import {
   createChapter,
   createLine,
@@ -33,7 +33,9 @@ import { MarkerCard } from '../components/MarkerCard'
 import { Arc, Essence } from '../components/Plot'
 import { SceneSheet } from '../components/SceneSheet'
 import { StoryLine } from '../components/StoryLine'
-import { isNode, markerPayoffChapter, markerQuiet, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
+import { HeroBranches } from '../components/HeroBranches'
+import { Icon } from '../components/Icon'
+import { isLocked, isNode, isPlaceholder, markerPayoffChapter, markerQuiet, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
 import { MARKER_STATES, statusOf } from '../lib/status'
 import { InlineEdit, Modal, toast } from '../lib/ui'
 import { deadlineText } from '../lib/stories'
@@ -54,6 +56,7 @@ export function BoardView({ data }: { data: ProjectData }) {
     return wanted === 'markers' ? { kind: 'markers' } : { kind: 'all' }
   })
   const [newLine, setNewLine] = useState<string | null>(null)
+  const [fromHeroes, setFromHeroes] = useState(false)
   const [view, setViewState] = useState<'columns' | 'line'>(() => {
     try {
       return localStorage.getItem(VIEW_KEY) === 'line' ? 'line' : 'columns'
@@ -97,6 +100,9 @@ export function BoardView({ data }: { data: ProjectData }) {
     const over = e.over?.id ? String(e.over.id) : null
     if (!over || over === e.active.id) return
     const sceneId = String(e.active.id)
+    const from = data.sceneById.get(sceneId)?.chapterId
+    const to = over === 'col:pool' ? undefined : over.startsWith('col:') ? over.slice(4) : data.sceneById.get(over)?.chapterId
+    if (isLocked(data, from) || isLocked(data, to)) return void toast('Глава зафиксирована — сцены в ней не двигаются. Открепить можно в ⋯ у главы')
     const scenesOf = (chapterId: string) =>
       chapterId === data.pool.chapter?.id ? data.pool.scenes : data.scenes.filter((s) => s.chapterId === chapterId)
     if (over === 'col:pool') {
@@ -130,6 +136,7 @@ export function BoardView({ data }: { data: ProjectData }) {
     const ids = data.chapters.map((c) => c.id)
     const j = i + dir
     if (j < 0 || j >= ids.length) return
+    if (data.chapters[i].locked || data.chapters[j].locked) return void toast('Зафиксированная глава стоит на своём месте')
     ;[ids[i], ids[j]] = [ids[j], ids[i]]
     void reorderChapters(ids)
   }
@@ -141,7 +148,7 @@ export function BoardView({ data }: { data: ProjectData }) {
           <div className="story-home-head">
             <h1>{data.project.title}</h1>
             <div className="muted small">
-              {chapterProgress(data.project, data.chapters, data.scenes).written} из {chapterProgress(data.project, data.chapters, data.scenes).total} глав ·{' '}
+              {chapterProgress(data.project, data.chapters, data.scenes).written} из {chapterProgress(data.project, data.chapters, data.scenes).of} глав ·{' '}
               {formatWords(totalWords([...data.scenes, ...data.pool.scenes]))}
             </div>
           </div>
@@ -181,9 +188,17 @@ export function BoardView({ data }: { data: ProjectData }) {
             </button>
           ))}
           {newLine === null ? (
-            <button className="lens-add" title="Новая ветка — например, линия второстепенного героя" onClick={() => setNewLine('')}>
-              + ветка
-            </button>
+            <>
+              <button className="lens-add" title="Новая ветка — например, линия второстепенного героя" onClick={() => setNewLine('')}>
+                + ветка
+              </button>
+              {/* A written book already has its branches: the heroes' scenes. */}
+              {!data.lines.length && data.characters.length > 0 && (
+                <button className="lens-add" title="Каждый главный герой — своя ветка через его сцены" onClick={() => setFromHeroes(true)}>
+                  ветки из героев
+                </button>
+              )}
+            </>
           ) : (
             <input
               className="ref-input"
@@ -203,8 +218,11 @@ export function BoardView({ data }: { data: ProjectData }) {
             />
           )}
         </div>
+        <PlanLock data={data} />
       </div>
 
+      <AskLock data={data} />
+      {fromHeroes && <HeroBranches data={data} onClose={() => setFromHeroes(false)} />}
       <Essence project={data.project} />
 
       {lens.kind === 'markers' && (
@@ -299,7 +317,8 @@ function Column({
   onOpenScene: (id: string) => void
   onOpenMarker: (id: string) => void
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: `col:${chapter.id}` })
+  const locked = !!chapter.locked
+  const { setNodeRef, isOver } = useDroppable({ id: `col:${chapter.id}`, disabled: locked })
   const [draft, setDraft] = useState('')
   const [markerDraft, setMarkerDraft] = useState('')
   const [markerSide, setMarkerSide] = useState<'setup' | 'payoff'>('setup')
@@ -307,6 +326,8 @@ function Column({
   const pay = data.markers.filter((m) => markerPayoffChapter(m, data) === chapter.id)
   const lineMissing = lens.kind === 'line' && !scenes.some((s) => s.lineIds?.includes(lens.id))
   const hasCurrent = scenes.some((s) => s.id === data.project.lastSceneId)
+  // The untouched «Первая сцена» of a new story is not shown: it only stands in the way of planning.
+  const shown = scenes.filter((s) => !isPlaceholder(s, data))
   // On phones chapters are a list; only the chapter you are in starts unfolded.
   const [folded, setFolded] = useState(!hasCurrent && !isFirst)
 
@@ -324,15 +345,20 @@ function Column({
   }
 
   return (
-    <section ref={setNodeRef} className={`column ${isOver ? 'over' : ''} ${folded ? 'folded' : ''}`}>
+    <section ref={setNodeRef} className={`column ${isOver ? 'over' : ''} ${folded ? 'folded' : ''} ${locked ? 'locked' : ''}`}>
       <header className="column-head">
         <div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}>
           <button className="fold-btn" aria-label={folded ? 'Развернуть главу' : 'Свернуть главу'} onClick={() => setFolded(!folded)}>
             {folded ? '▸' : '▾'}
           </button>
           <InlineEdit className="column-title" value={chapter.title} onSave={(title) => void patch<Chapter>('chapters', chapter.id, { title })} />
+          {locked && (
+            <span className="lock-mark" title="Глава зафиксирована: сцены не двигаются, текст править можно">
+              <Icon name="lock" size={14} />
+            </span>
+          )}
           <span className="column-count">
-            {formatScenes(scenes.length)}
+            {formatScenes(shown.length)}
             {chapter.publishedAt && (
               <span className="published" title="Выложена">
                 ✓ {new Date(chapter.publishedAt + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
@@ -353,20 +379,29 @@ function Column({
                   onChange={(e) => void patch<Chapter>('chapters', chapter.id, { deadline: e.target.value || undefined })}
                 />
               </label>
+              <button onClick={() => void patch<Chapter>('chapters', chapter.id, { locked: !locked || undefined })}>
+                {locked ? 'Открепить главу' : 'Зафиксировать главу'}
+              </button>
               <button onClick={onAddAfter}>+ Новая глава после этой</button>
-              <button onClick={() => onMove(-1)}>← Сдвинуть левее</button>
-              <button onClick={() => onMove(1)}>Сдвинуть правее →</button>
-              {!isFirst && (
+              {!locked && (
+                <>
+                  <button onClick={() => onMove(-1)}>← Сдвинуть левее</button>
+                  <button onClick={() => onMove(1)}>Сдвинуть правее →</button>
+                </>
+              )}
+              {!isFirst && !locked && !data.chapters[data.chapterIndex.get(chapter.id)! - 1]?.locked && (
                 <button onClick={() => void mergeIntoPrevious(chapter.id).then(() => toast('Сцены перенесены в предыдущую главу'))}>
                   Склеить с предыдущей главой
                 </button>
               )}
-              <button
-                className="danger"
-                onClick={() => confirm(`Удалить «${chapter.title}» вместе со сценами (${scenes.length})?`) && void deleteChapter(chapter.id)}
-              >
-                Удалить главу
-              </button>
+              {!locked && (
+                <button
+                  className="danger"
+                  onClick={() => confirm(`Удалить «${chapter.title}» вместе со сценами (${scenes.length})?`) && void deleteChapter(chapter.id)}
+                >
+                  Удалить главу
+                </button>
+              )}
             </div>
           </details>
         </div>
@@ -386,24 +421,26 @@ function Column({
         {showArc && scenes.some((s) => s.heat || isNode(s, data)) && <Arc scenes={scenes} isNode={(s) => isNode(s, data)} />}
       </header>
 
-      <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
+      <SortableContext items={shown.map((s) => s.id)} strategy={verticalListSortingStrategy}>
         <div className="cards">
-          {scenes.map((s) => (
-            <SortableCard key={s.id} data={data} scene={s} lens={lens} onOpen={() => onOpenScene(s.id)} />
+          {shown.map((s) => (
+            <SortableCard key={s.id} data={data} scene={s} lens={lens} locked={locked} onOpen={() => onOpenScene(s.id)} />
           ))}
           {lineMissing && <div className="gap-slot">нет сцен этой ветки</div>}
-          {!scenes.length && !lineMissing && <EmptyChapterHint />}
+          {!shown.length && !lineMissing && !locked && <EmptyChapterHint />}
         </div>
       </SortableContext>
 
-      <input
-        className="quick-add"
-        placeholder="+ сцена: кратко, что происходит"
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && void addScene()}
-        onBlur={() => void addScene()}
-      />
+      {!locked && (
+        <input
+          className="quick-add"
+          placeholder="+ сцена: кратко, что происходит"
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && void addScene()}
+          onBlur={() => void addScene()}
+        />
+      )}
 
       {lens.kind === 'markers' && (
         <div className="column-markers">
@@ -483,6 +520,60 @@ function LineNote({ data, lineId, onGone }: { data: ProjectData; lineId: string;
   )
 }
 
+/**
+ * «План зафиксирован»: every chapter stays in place with its scenes, so nothing moves by accident.
+ * One tap fixes the whole plan, one more frees it. The text can be edited either way.
+ */
+function PlanLock({ data }: { data: ProjectData }) {
+  const placed = data.scenes.some((s) => !isPlaceholder(s, data))
+  if (data.chapters.length < 2 && !placed) return null
+  const locked = data.chapters.filter((c) => c.locked).length
+  const all = locked === data.chapters.length
+  const setAll = async (on: boolean) => {
+    for (const c of data.chapters) if (!!c.locked !== on) await patch<Chapter>('chapters', c.id, { locked: on || undefined })
+    toast(on ? 'План зафиксирован: главы и сцены стоят на местах. Текст править можно' : 'План снова можно двигать')
+  }
+  return (
+    <button
+      className={`plan-lock ${all ? 'on' : ''}`}
+      aria-pressed={all}
+      title={all ? 'Главы и сцены стоят на местах. Нажми, чтобы снова двигать' : 'Главы и сцены перестанут двигаться — только текст'}
+      onClick={() => void setAll(!all)}
+    >
+      <Icon name="lock" size={14} />
+      {all ? 'План зафиксирован' : locked ? 'Зафиксировать остальные главы' : 'Зафиксировать план'}
+    </button>
+  )
+}
+
+/** Asked once, right after a written book is imported: fix its chapters in place? */
+function AskLock({ data }: { data: ProjectData }) {
+  if (data.project.lockAsked !== false) return null
+  const written = data.outline.filter(({ chapter, scenes }) => !chapter.locked && scenes.length > 0 && scenes.every((s) => s.wordCount > 0))
+  if (written.length < 2) return null
+  const answer = async (lock: boolean) => {
+    if (lock) for (const { chapter } of written) await patch<Chapter>('chapters', chapter.id, { locked: true })
+    await patch<Project>('projects', data.project.id, { lockAsked: true })
+  }
+  return (
+    <div className="lens-note ask-lock">
+      <Icon name="lock" size={16} />
+      <span>
+        <strong>Эти главы уже написаны ({written.length}). Зафиксировать их?</strong> Сцены в них перестанут случайно сдвигаться, текст
+        править можно. Новые главы останутся свободными.
+      </span>
+      <span className="row" style={{ gap: 8, flexWrap: 'nowrap' }}>
+        <button className="btn sm primary" onClick={() => void answer(true)}>
+          Зафиксировать
+        </button>
+        <button className="btn sm ghost" onClick={() => void answer(false)}>
+          Не надо
+        </button>
+      </span>
+    </div>
+  )
+}
+
 /** Nothing written anywhere yet: the «you are here» marks and the like mean nothing so far. */
 const storyEmpty = (data: ProjectData) => ![...data.scenes, ...data.pool.scenes].some((s) => s.wordCount > 0)
 
@@ -547,13 +638,15 @@ function MarkerPill({ data, marker, side, onOpen }: { data: ProjectData; marker:
   )
 }
 
-function SortableCard({ data, scene, lens, onOpen }: { data: ProjectData; scene: Scene; lens: Lens; onOpen: () => void }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: scene.id })
+function SortableCard({ data, scene, lens, locked, onOpen }: { data: ProjectData; scene: Scene; lens: Lens; locked?: boolean; onOpen: () => void }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: scene.id, disabled: locked })
   return (
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition, opacity: isDragging ? 0.3 : 1 }}
       {...attributes}
+      // Fixed in place, but still opens: not «disabled» for the reader.
+      aria-disabled={undefined}
       {...listeners}
       onClick={onOpen}
     >
@@ -680,25 +773,32 @@ function Timeline({
         const lineMissing = lens.kind === 'line' && !scenes.some((s) => s.lineIds?.includes(lens.id))
         const isOpen = open.has(chapter.id)
         return (
-          <section key={chapter.id} className={`tl-chapter ${isOpen ? 'open' : ''} ${lineMissing ? 'missing' : ''}`}>
+          <section key={chapter.id} className={`tl-chapter ${isOpen ? 'open' : ''} ${lineMissing ? 'missing' : ''} ${chapter.locked ? 'locked' : ''}`}>
             <button className="tl-head" aria-expanded={isOpen} onClick={() => toggle(chapter.id)}>
               <span className="tl-caret">{isOpen ? '▾' : '▸'}</span>
               <span className="tl-title">{chapter.title}</span>
+              {chapter.locked && (
+                <span className="lock-mark" title="Глава зафиксирована">
+                  <Icon name="lock" size={13} />
+                </span>
+              )}
               {chapter.id === here && !isOpen && !storyEmpty(data) && <span className="here">ты здесь</span>}
               <span className="spacer" />
               {pay.length > 0 && <span className="tl-mk">◎ {pay.length}</span>}
               {plant.length > 0 && <span className="tl-mk">✦ {plant.length}</span>}
-              <span className="tl-meta">{formatScenes(scenes.length)}</span>
+              <span className="tl-meta">{formatScenes(scenes.filter((s) => !isPlaceholder(s, data)).length)}</span>
             </button>
             {lineMissing && <div className="tl-gap">нет сцен этой ветки</div>}
             {isOpen && (
               <div className="tl-body">
                 {chapter.goal && <div className="tl-goal">{chapter.goal}</div>}
-                {!scenes.length && <EmptyChapterHint />}
-                {scenes.map((s) => (
-                  <TimelineScene key={s.id} data={data} scene={s} lens={lens} onOpen={() => onOpenScene(s.id)} />
-                ))}
-                <TimelineAdd data={data} chapter={chapter} lens={lens} />
+                {!scenes.some((s) => !isPlaceholder(s, data)) && !chapter.locked && <EmptyChapterHint />}
+                {scenes
+                  .filter((s) => !isPlaceholder(s, data))
+                  .map((s) => (
+                    <TimelineScene key={s.id} data={data} scene={s} lens={lens} onOpen={() => onOpenScene(s.id)} />
+                  ))}
+                {!chapter.locked && <TimelineAdd data={data} chapter={chapter} lens={lens} />}
                 {(pay.length > 0 || plant.length > 0) && (
                   <div className="column-markers">
                     {pay.map((m) => (

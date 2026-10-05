@@ -11,6 +11,7 @@ import { go } from '../lib/router'
 import { InlineEdit, toast } from '../lib/ui'
 import { WorldNav } from './LoreView'
 import { ColorDot } from '../components/ColorDot'
+import { HeroBranches } from '../components/HeroBranches'
 import { useWhereFound, WhereFound } from '../components/WhereFound'
 import type { Found } from '../lib/mentions'
 
@@ -81,6 +82,7 @@ export function CharactersView({ data }: { data: ProjectData }) {
 /** Story branches (the lines on the board): their colour, name and removal, next to the people. */
 function Branches({ data }: { data: ProjectData }) {
   const [name, setName] = useState('')
+  const [fromHeroes, setFromHeroes] = useState(false)
   const count = (id: string) => [...data.scenes, ...data.pool.scenes].filter((s) => s.lineIds?.includes(id)).length
   const del = async (id: string, title: string) => {
     if (!confirm(`Удалить ветку «${title}»? Сцены останутся, с них просто снимется отметка.`)) return
@@ -90,7 +92,15 @@ function Branches({ data }: { data: ProjectData }) {
   }
   return (
     <section className="branches card">
-      <h3>Сюжетные ветки</h3>
+      <div className="row" style={{ flexWrap: 'nowrap' }}>
+        <h3 style={{ marginRight: 'auto' }}>Сюжетные ветки</h3>
+        {data.characters.length > 0 && (
+          <button className="link small" onClick={() => setFromHeroes(true)}>
+            Ветки из героев
+          </button>
+        )}
+      </div>
+      {fromHeroes && <HeroBranches data={data} onClose={() => setFromHeroes(false)} />}
       {data.lines.map((l) => (
         <div key={l.id} className="branch-row">
           <ColorDot color={l.color} label={l.name} onChange={(color) => void patch<Line>('lines', l.id, { color })} />
