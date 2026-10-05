@@ -6,10 +6,11 @@ import './styles/app.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
-import { applyTheme, getTheme } from './lib/session'
+import { applyAccent, applyTheme, getAccent, getTheme } from './lib/session'
 import { applyTypo, loadTypo } from './lib/typography'
 
 applyTheme(getTheme())
+applyAccent(getAccent())
 applyTypo(loadTypo())
 navigator.storage?.persist?.().catch(() => {})
 
