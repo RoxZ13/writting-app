@@ -172,3 +172,34 @@ export function sceneName(data: ProjectData, scene: Scene): string {
   const n = siblings.indexOf(scene) + 1
   return `Сцена ${n || ''}`.trim()
 }
+
+/** A chapter fixed in place: its scenes are not moved, added or removed. */
+export const isLocked = (data: ProjectData, chapterId: string | undefined) => !!(chapterId && data.chapterById.get(chapterId)?.locked)
+
+/** The scene a new story starts with, still untouched: on the board it would only be in the way. */
+export function isPlaceholder(s: Scene, data: ProjectData): boolean {
+  return (
+    s.title === 'Первая сцена' &&
+    !s.wordCount &&
+    !s.goal.trim() &&
+    !s.beats.length &&
+    !s.lineIds?.length &&
+    !s.characterIds?.length &&
+    !s.heat &&
+    ![...data.scenes, ...data.pool.scenes].some((x) => x.wordCount > 0)
+  )
+}
+
+/** The scene's first phrase, shortened: a name for scenes that came without one. */
+export function firstPhrase(text: string | undefined, words = 6): string {
+  const t = (text ?? '').replace(/^[\s—–-]+/, '').trim()
+  if (!t) return ''
+  const sentence = t.split(/(?<=[.!?…])\s/)[0].replace(/[.,:;!?…]+$/, '')
+  const w = sentence.split(/\s+/)
+  return w.length > words ? `${w.slice(0, words).join(' ')}…` : sentence
+}
+
+/** Where only a name fits (the navigator, the line): the title, else the first phrase, else «Сцена N». */
+export function sceneShort(data: ProjectData, s: Scene): string {
+  return s.title.trim() || firstPhrase(s.excerpt) || sceneName(data, s)
+}

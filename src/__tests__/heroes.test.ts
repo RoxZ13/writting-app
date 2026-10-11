@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { countMentions, heroesFromDescription, mentionPatterns } from '../lib/heroes'
+import { countMentions, heroesFromDescription, heroScenes, mentionPatterns } from '../lib/heroes'
 
 describe('heroes from a Ficbook header', () => {
   it('reads names from "Пэйринг и персонажи"', () => {
@@ -19,5 +19,23 @@ describe('heroes from a Ficbook header', () => {
     expect(countMentions(text, re.get('tom')!)).toBe(1)
     expect(countMentions(text, re.get('her')!)).toBe(2)
     expect(countMentions(text, re.get('alf')!)).toBe(0)
+  })
+})
+
+describe('branches from heroes', () => {
+  it('takes scenes where the hero is marked or named twice, not once in passing', () => {
+    const chars = [
+      { id: 'her', name: 'Гермиона' },
+      { id: 'tom', name: 'Том', ignoreSceneIds: ['c'] },
+    ]
+    const scenes = [{ id: 'a' }, { id: 'b', characterIds: ['tom'] }, { id: 'c' }]
+    const texts = new Map([
+      ['a', 'Гермиона вошла. Гермионе было холодно. Том был далеко.'],
+      ['b', 'Пусто.'],
+      ['c', 'Том и Тому, и Гермиона.'],
+    ])
+    const r = heroScenes(scenes, texts, chars)
+    expect(r.get('her')).toEqual(['a'])
+    expect(r.get('tom')).toEqual(['b'])
   })
 })

@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { db, type Project } from '../db/db'
 import { patch, remove } from '../db/repo'
 import { ImportPanel } from '../components/ImportPanel'
+import { LeftToWrite } from '../components/LeftToWrite'
 import { BookCover, CoverPicker } from '../components/BookCover'
 import { Essence } from '../components/Plot'
 import { DateChip } from '../components/DateChip'
@@ -32,6 +34,7 @@ export function BookView({ data }: { data: ProjectData }) {
   const cover = useCover(p.id)
   const cp = chapterProgress(p, data.chapters, data.scenes)
   const early = words < 1000 && !data.chapters.some((c) => c.publishedAt)
+  const [left, setLeft] = useState(false)
 
   const exportWord = async () => download(await exportDocx(p.title, await loadChapters(data)), `${p.title}.docx`)
   const platform = platformOf(p)
@@ -97,22 +100,45 @@ export function BookView({ data }: { data: ProjectData }) {
               {!early && (
                 <div className="chapters-landmark">
                   <strong>
-                    {cp.written} из {cp.total}
+                    {cp.written} из {cp.of}
                   </strong>{' '}
-                  написано{cp.left > 0 ? ` · осталось ${cp.left}` : ' · все'}
+                  написано{cp.unknown ? '' : cp.left > 0 ? ` · осталось ${cp.left}` : p.targetChapters ? ' · все' : ''}
                   {cp.daysPerChapter && <span className="muted"> · к дедлайну ≈ глава в {cp.daysPerChapter} дн.</span>}
                 </div>
               )}
-              <label className="row small muted" style={{ gap: 8, marginTop: 6 }}>
-                всего будет
-                <NumberField value={p.targetChapters} placeholder={early ? 'пока не знаю' : String(data.chapters.length)} onSave={(targetChapters) => set({ targetChapters })} />
-              </label>
+              {/* «Не знаю» is an answer too: the total shows as «?» and nothing counts down. */}
+              <div className="row small muted" style={{ gap: 8, marginTop: 6 }}>
+                {p.targetChapters === 0 ? (
+                  <>
+                    всего будет <strong className="chapters-unknown">?</strong>
+                    <button className="link" onClick={() => set({ targetChapters: undefined })}>
+                      указать число
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <label className="row" style={{ gap: 8 }}>
+                      всего будет
+                      <NumberField key={p.targetChapters ?? 'none'} value={p.targetChapters} placeholder="сколько?" onSave={(targetChapters) => set({ targetChapters })} />
+                    </label>
+                    <button className="link" onClick={() => set({ targetChapters: 0 })}>
+                      не знаю
+                    </button>
+                  </>
+                )}
+              </div>
+              {!early && (
+                <button className="link small ltw-open" onClick={() => setLeft(true)}>
+                  Что осталось дописать
+                </button>
+              )}
             </div>
           </div>
         </div>
       </div>
 
       <Essence project={p} embedded />
+      {left && <LeftToWrite data={data} onClose={() => setLeft(false)} />}
 
       {/* Publishing and pace mean something from the first thousand words; on an empty book they only reproach. */}
       {!early && <PublishSection data={data} onCopy={(id) => void copyChapter(id)} />}

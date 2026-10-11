@@ -311,7 +311,7 @@ function Landmark({ data }: { data: ProjectData }) {
   return (
     <button
       className={`deadline hide-sm ${due?.late ? 'late' : ''}`}
-      title={`Написано ${cp.written} из ${cp.total} глав${cp.daysPerChapter ? ` · к дедлайну ≈ глава в ${cp.daysPerChapter} дн.` : ''}`}
+      title={`Написано ${cp.written} из ${cp.of} глав${cp.daysPerChapter ? ` · к дедлайну ≈ глава в ${cp.daysPerChapter} дн.` : ''}`}
       onClick={() => go({ view: 'book' })}
     >
       {due ? `⏳ ${due.text}` : ''}

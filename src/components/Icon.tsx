@@ -16,6 +16,7 @@ const PATHS: Record<string, string> = {
   panel: 'M4 4h16v16H4V4Zm5 0v16',
   sidebar: 'M4 4h16v16H4V4Zm11 0v16',
   focus: 'M4 8V4h4M16 4h4v4M20 16v4h-4M8 20H4v-4M12 13a1 1 0 1 0 0-2 1 1 0 0 0 0 2Z',
+  lock: 'M6 11h12v9H6v-9Zm2.5 0V8a3.5 3.5 0 0 1 7 0v3',
   spark: 'M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4L12 3Z',
 }
 

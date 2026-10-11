@@ -10,13 +10,14 @@ import {
 } from '../db/cloud'
 import { downloadBackup, readBackupFile, restoreBackup } from '../lib/backup'
 import { toast } from '../lib/ui'
-import { applyTheme, getTheme, type Theme } from '../lib/session'
+import { ACCENTS, applyAccent, applyTheme, getAccent, getTheme, type Accent, type Theme } from '../lib/session'
 import { TypoControls } from '../components/TypoControls'
 import { timeAgo } from '../lib/status'
 
 /** Settings of the app itself (not of a book): look, devices, installing, backup. */
 export function SettingsView({ sync }: { sync: SyncStatus }) {
   const [theme, setTheme] = useState<Theme>(getTheme)
+  const [accent, setAccent] = useState<Accent>(getAccent)
   const restore = async (file: File) => {
     try {
       const dump = await readBackupFile(file)
@@ -59,6 +60,27 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
                 {label}
               </button>
             ))}
+          </div>
+        </div>
+        <div className="typo-row">
+          <span className="typo-label">Акцент</span>
+          <div className="accents" role="radiogroup" aria-label="Цвет акцента">
+            {ACCENTS.map((a) => (
+              <button
+                key={a.id}
+                role="radio"
+                aria-checked={accent === a.id}
+                className="accent-swatch"
+                title={a.name}
+                aria-label={a.name}
+                style={{ background: a.swatch }}
+                onClick={() => {
+                  setAccent(a.id)
+                  applyAccent(a.id)
+                }}
+              />
+            ))}
+            <span className="small muted">{ACCENTS.find((a) => a.id === accent)?.name}</span>
           </div>
         </div>
         <TypoControls />

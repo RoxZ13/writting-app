@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { Scene } from '../db/db'
 import { createChapter, createScene, ensurePool, patch } from '../db/repo'
-import { markerPayoffChapter, markerSetupChapter, sceneName, type ProjectData } from '../lib/hooks'
+import { isPlaceholder, markerPayoffChapter, markerSetupChapter, sceneShort, type ProjectData } from '../lib/hooks'
 
 const SLOT = 64
 const GAP = 28
@@ -34,7 +34,9 @@ function path(pts: { x: number; y: number }[]): string {
  */
 export function StoryLine({ data, dim, onOpenScene }: { data: ProjectData; dim: (s: Scene) => boolean; onOpenScene: (id: string) => void }) {
   const box = useRef<HTMLDivElement>(null)
-  const all = data.outline.flatMap((o) => o.scenes)
+  // The untouched «Первая сцена» of a new story is not drawn: it is not part of any plan yet.
+  const outline = data.outline.map((o) => ({ ...o, scenes: o.scenes.filter((s) => !isPlaceholder(s, data)) }))
+  const all = outline.flatMap((o) => o.scenes)
   const hasMain = !data.lines.length || all.some((s) => !s.lineIds?.some((id) => data.lineById.has(id)))
   const lanes: Lane[] = [
     ...data.lines.map((l, i) => ({ id: l.id, name: l.name, color: l.color, y: HEAD + 30 + i * LANE })),
@@ -44,12 +46,13 @@ export function StoryLine({ data, dim, onOpenScene }: { data: ProjectData; dim: 
   const bottom = HEAD + 30 + (lanes.length - 1) * LANE + 40
   const H = bottom + STRIP + 16
 
-  const chapters: { id: string; title: string; x: number; w: number; count: number }[] = []
+  const chapters: { id: string; title: string; x: number; w: number; count: number; locked: boolean }[] = []
   const pts: Pt[] = []
-  let x = 24
-  for (const { chapter, scenes } of data.outline) {
-    const w = (scenes.length + 1) * SLOT // one extra slot: «+» for a new scene
-    chapters.push({ id: chapter.id, title: chapter.title, x, w, count: scenes.length })
+  let x = 48 // room for the first scene's name, centred on its point
+  for (const { chapter, scenes } of outline) {
+    // One extra slot for «+», a new scene — not in a chapter that is fixed in place.
+    const w = (scenes.length + (chapter.locked ? 0 : 1)) * SLOT || SLOT
+    chapters.push({ id: chapter.id, title: chapter.title, x, w, count: scenes.length, locked: !!chapter.locked })
     scenes.forEach((s, i) => {
       const own = (s.lineIds ?? []).map((id) => laneById.get(id)).filter(Boolean) as Lane[]
       const on = own.length ? own : [laneById.get(MAIN)!]
@@ -112,11 +115,17 @@ export function StoryLine({ data, dim, onOpenScene }: { data: ProjectData; dim: 
           <svg width={width} height={H} viewBox={`0 0 ${width} ${H}`} role="group" aria-label="Линия истории: ветки идут рядом, сцены на пересечении веток — узлы">
             {chapters.map((c, i) => (
               <g key={c.id}>
+                {c.locked && <rect className="sl-locked" x={c.x - GAP / 2 + 2} y={4} width={c.w + GAP - 4} height={H - 8} rx={10} />}
                 {i > 0 && <line className="sl-band" x1={c.x - GAP / 2} x2={c.x - GAP / 2} y1={8} y2={H - 8} />}
-                <text className="sl-chapter" x={c.x + 4} y={24}>
+                {c.locked && (
+                  <path className="sl-lock" transform={`translate(${c.x + 2} 12) scale(0.55)`} d="M6 11h12v9H6v-9Zm2.5 0V8a3.5 3.5 0 0 1 7 0v3">
+                    <title>Глава зафиксирована: сцены стоят на местах</title>
+                  </path>
+                )}
+                <text className={`sl-chapter ${c.locked ? 'locked' : ''}`} x={c.x + (c.locked ? 18 : 4)} y={24}>
                   {c.title}
                 </text>
-                {lanes.map((l) => (
+                {!c.locked && lanes.map((l) => (
                   <g
                     key={l.id}
                     className="sl-add"
@@ -161,7 +170,7 @@ export function StoryLine({ data, dim, onOpenScene }: { data: ProjectData; dim: 
             ))}
 
             {/* Heat: a small bar under each scene. */}
-            <line className="sl-base" x1={24} x2={width - 100} y1={bottom + STRIP} y2={bottom + STRIP} />
+            <line className="sl-base" x1={48} x2={width - 100} y1={bottom + STRIP} y2={bottom + STRIP} />
             {pts.map((p) =>
               p.scene.heat ? (
                 <rect key={p.scene.id} className="sl-heat" x={p.x - 5} width={10} y={bottom + STRIP - p.scene.heat * 7} height={p.scene.heat * 7} rx={2} />
@@ -171,7 +180,7 @@ export function StoryLine({ data, dim, onOpenScene }: { data: ProjectData; dim: 
             {pts.map(({ scene: s, x: px, y, lanes: on }) => {
               const node = on.length > 1
               const here = s.id === current
-              const label = sceneName(data, s)
+              const label = sceneShort(data, s)
               return (
                 <g
                   key={s.id}
@@ -193,7 +202,13 @@ export function StoryLine({ data, dim, onOpenScene }: { data: ProjectData; dim: 
                   ) : (
                     <circle className="sl-dot" cx={px} cy={y} r={here ? 7 : 5.5} style={{ stroke: on[0].color }} />
                   )}
-                  <text className={`sl-label ${node || here ? '' : 'hover'}`} x={px} y={y - 14} textAnchor="middle">
+                  {/* Always shown: where you are, and named nodes. The rest on hover, so names never pile up. */}
+                  <text
+                    className={`sl-label ${here || (node && s.title.trim()) ? '' : 'hover'}`}
+                    x={px < (here ? label.length + 12 : label.length) * 3.4 ? px - 10 : px}
+                    y={y - 14}
+                    textAnchor={px < (here ? label.length + 12 : label.length) * 3.4 ? 'start' : 'middle'}
+                  >
                     {here ? `${label} · ты здесь` : label}
                   </text>
                 </g>
@@ -207,7 +222,7 @@ export function StoryLine({ data, dim, onOpenScene }: { data: ProjectData; dim: 
           <span className="sl-pool-k">Пока без места</span>
           {data.pool.scenes.map((s) => (
             <button key={s.id} className="sl-chip" onClick={() => open(s.id)}>
-              {sceneName(data, s)}
+              {sceneShort(data, s)}
             </button>
           ))}
           <button className="sl-chip add" onClick={async () => void open((await createScene(data.project.id, (await ensurePool(data.project.id)).id, '', { status: 'idea' })).id)}>

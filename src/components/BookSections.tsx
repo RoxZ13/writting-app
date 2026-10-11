@@ -4,6 +4,7 @@ import type { ProjectData } from '../lib/hooks'
 import { bank, dayKey, pace, totalWords } from '../lib/pace'
 import { formatWords } from '../lib/text'
 import { PLATFORMS, platformOf } from '../lib/platforms'
+import { toast } from '../lib/ui'
 
 const DAY = 86400000
 const date = (d: Date | string) =>
@@ -151,7 +152,14 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
                 Открыть {site.at} ↗
               </a>
             )}
-            <button className="btn sm" onClick={() => setCh(next.chapter, { publishedAt: dayKey() })}>
+            <button
+              className="btn sm"
+              onClick={() => {
+                // What readers have seen does not move by accident.
+                setCh(next.chapter, { publishedAt: dayKey(), locked: true })
+                toast('Отмечено. Глава зафиксирована на доске — открепить можно в ⋯ у главы')
+              }}
+            >
               ✓ Выложила сегодня
             </button>
           </div>

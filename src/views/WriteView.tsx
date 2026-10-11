@@ -13,7 +13,7 @@ import { TitlePage } from '../components/TitlePage'
 import { MarginNotes } from '../components/MarginNotes'
 import { editHintsKey } from '../components/EditHints'
 import { countHints } from '../lib/editcheck'
-import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
+import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, sceneShort, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { hotkey, session } from '../lib/session'
 import { clock, useSprint } from '../lib/sprint'
@@ -522,7 +522,7 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
       <div className="navi-head">
         <div className="navi-book">{data.project.title}</div>
         <div className="navi-sub">
-          {cp.written} из {cp.total} {cp.total === 1 ? 'главы' : 'глав'} · {formatWords(words)}
+          {cp.written} из {cp.of} {cp.total === 1 && !cp.unknown ? 'главы' : 'глав'} · {formatWords(words)}
         </div>
       </div>
       <div className="navi-label">Главы</div>
@@ -556,10 +556,10 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
                       onPick()
                     }}
                   >
-                    {sceneName(data, s)}
+                    {sceneShort(data, s)}
                   </button>
                 ))}
-                {!chapter.pool && (
+                {!chapter.pool && !chapter.locked && (
                   <button className="navi-scene add" onClick={() => void addScene(chapter.id)}>
                     + сцена
                   </button>

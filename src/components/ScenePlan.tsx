@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { db, uid, type Beat, type Marker, type Note, type Scene, type SceneText } from '../db/db'
 import { createMarker, createNote, mergeSceneIntoPrevious, patch, remove, save, snapshotScene } from '../db/repo'
-import { markerPayoffChapter, markerStatus, unusedLines, type ProjectData } from '../lib/hooks'
+import { isLocked, markerPayoffChapter, markerStatus, unusedLines, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { MARKER_STATES, noteKind, STATUSES, timeAgo } from '../lib/status'
 import { hotkey } from '../lib/session'
@@ -365,6 +365,9 @@ function More({ data, scene, editor }: { data: ProjectData; scene: Scene; editor
           </select>
         </label>
         <Versions scene={scene} editor={editor} />
+        {isLocked(data, scene.chapterId) ? (
+          <div className="small muted">Глава зафиксирована: сцену не склеить и не удалить. Открепить можно на доске, в ⋯ у главы.</div>
+        ) : (
         <div className="row">
           {data.scenes.filter((s) => s.chapterId === scene.chapterId).indexOf(scene) > 0 && (
             <button
@@ -391,6 +394,7 @@ function More({ data, scene, editor }: { data: ProjectData; scene: Scene; editor
             Удалить сцену
           </button>
         </div>
+        )}
       </div>
     </details>
   )

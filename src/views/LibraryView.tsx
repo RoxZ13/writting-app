@@ -35,12 +35,12 @@ export function LibraryView({
   const stats = useLiveQuery(async () => {
     const scenes = alive(await db.scenes.toArray())
     const chapters = alive(await db.chapters.toArray())
-    const by: Record<string, { words: number; scenes: number; chapters: number; written: number; total: number }> = {}
+    const by: Record<string, { words: number; scenes: number; chapters: number; written: number; total: number; of: string }> = {}
     for (const p of projects) {
       const own = chapters.filter((c) => c.projectId === p.id)
       const ownScenes = scenes.filter((s) => s.projectId === p.id)
       const cp = chapterProgress(p, own, ownScenes)
-      by[p.id] = { words: 0, scenes: 0, chapters: own.filter((c) => !c.pool).length, written: cp.written, total: cp.total }
+      by[p.id] = { words: 0, scenes: 0, chapters: own.filter((c) => !c.pool).length, written: cp.written, total: cp.total, of: cp.of }
     }
     for (const s of scenes) if (by[s.projectId]) (by[s.projectId].words += s.wordCount), by[s.projectId].scenes++
     return by
@@ -84,7 +84,7 @@ function StoryCard({
 }: {
   p: Project
   current: boolean
-  stats?: { words: number; scenes: number; chapters: number; written: number; total: number }
+  stats?: { words: number; scenes: number; chapters: number; written: number; total: number; of: string }
   onOpen: () => void
 }) {
   const dl = deadlineText(p.deadline)
@@ -147,7 +147,7 @@ function StoryCard({
         </div>
         {p.genre && <div className="story-meta">{p.genre}</div>}
         <div className="story-meta">
-          {stats ? `${stats.written} из ${stats.total} гл. · ${formatWords(stats.words)}` : '…'}
+          {stats ? `${stats.written} из ${stats.of} гл. · ${formatWords(stats.words)}` : '…'}
           {' · '}
           {timeAgo(p.updatedAt)}
         </div>

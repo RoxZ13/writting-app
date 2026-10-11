@@ -45,6 +45,10 @@ describe('chapter landmark', () => {
     const r = chapterProgress(project({}), chapters, scenes, now)
     expect([r.written, r.total, r.left, r.daysPerChapter]).toEqual([1, 3, 2, undefined])
   })
+  it('«не знаю» shows the total as «?» and asks nothing of the remaining ones', () => {
+    const r = chapterProgress(project({ targetChapters: 0, deadline: '2026-10-31' }), chapters, scenes, now)
+    expect([r.written, r.of, r.unknown, r.left, r.daysPerChapter]).toEqual([1, '?', true, 0, undefined])
+  })
 })
 
 describe('bank', () => {
