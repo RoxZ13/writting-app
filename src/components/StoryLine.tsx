@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { Scene } from '../db/db'
-import { createChapter, createScene, ensurePool, patch } from '../db/repo'
+import { createChapter, createScene, ensurePool, moveScene, patch } from '../db/repo'
 import { isPlaceholder, markerPayoffChapter, markerSetupChapter, sceneShort, type ProjectData } from '../lib/hooks'
 
 const SLOT = 64
@@ -34,6 +34,9 @@ function path(pts: { x: number; y: number }[]): string {
  */
 export function StoryLine({ data, dim, onOpenScene }: { data: ProjectData; dim: (s: Scene) => boolean; onOpenScene: (id: string) => void }) {
   const box = useRef<HTMLDivElement>(null)
+  // A scene from «Пока без места» being dragged onto the line, and the spot under it.
+  const [dragging, setDragging] = useState<string | null>(null)
+  const [spot, setSpot] = useState<string | null>(null)
   // The untouched «Первая сцена» of a new story is not drawn: it is not part of any plan yet.
   const outline = data.outline.map((o) => ({ ...o, scenes: o.scenes.filter((s) => !isPlaceholder(s, data)) }))
   const all = outline.flatMap((o) => o.scenes)
@@ -96,6 +99,14 @@ export function StoryLine({ data, dim, onOpenScene }: { data: ProjectData; dim: 
     open(s.id)
   }
   const setHeat = (s: Scene, heat: number | undefined) => heat !== s.heat && void patch<Scene>('scenes', s.id, { heat })
+  // Dropped on a branch in a chapter: the scene goes to the end of that chapter, on that branch.
+  const place = async (sceneId: string, chapterId: string, laneId: string) => {
+    const s = data.sceneById.get(sceneId)
+    if (!s) return
+    const count = data.scenes.filter((x) => x.chapterId === chapterId).length
+    await moveScene(sceneId, chapterId, count)
+    if (laneId !== MAIN && !s.lineIds?.includes(laneId)) await patch<Scene>('scenes', sceneId, { lineIds: [...(s.lineIds ?? []), laneId] })
+  }
 
   return (
     <div className="story-line">
@@ -169,6 +180,41 @@ export function StoryLine({ data, dim, onOpenScene }: { data: ProjectData; dim: 
               </path>
             ))}
 
+            {/* While a scene from «Пока без места» is dragged: every branch in every free chapter is a place for it. */}
+            {dragging &&
+              chapters
+                .filter((c) => !c.locked)
+                .flatMap((c) =>
+                  lanes.map((l) => {
+                    const key = `${c.id}|${l.id}`
+                    return (
+                      <rect
+                        key={key}
+                        className={`sl-drop ${spot === key ? 'on' : ''}`}
+                        x={c.x - GAP / 2 + 2}
+                        y={l.y - LANE / 2 + 4}
+                        width={c.w + GAP - 4}
+                        height={LANE - 8}
+                        rx={10}
+                        onDragOver={(e) => {
+                          e.preventDefault()
+                          if (spot !== key) setSpot(key)
+                        }}
+                        onDragLeave={() => spot === key && setSpot(null)}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          const id = e.dataTransfer.getData('text/plain') || dragging
+                          setDragging(null)
+                          setSpot(null)
+                          if (id) void place(id, c.id, l.id)
+                        }}
+                      >
+                        <title>{`В «${c.title}»${l.id === MAIN ? '' : `, ветка «${l.name}»`}`}</title>
+                      </rect>
+                    )
+                  }),
+                )}
+
             {/* Heat: a small bar under each scene. */}
             <line className="sl-base" x1={48} x2={width - 100} y1={bottom + STRIP} y2={bottom + STRIP} />
             {pts.map((p) =>
@@ -219,9 +265,24 @@ export function StoryLine({ data, dim, onOpenScene }: { data: ProjectData; dim: 
       </div>
       <div className="sl-foot">
         <span className="sl-pool">
-          <span className="sl-pool-k">Пока без места</span>
+          <span className="sl-pool-k">{data.pool.scenes.length ? 'Пока без места — перетащи на линию' : 'Пока без места'}</span>
           {data.pool.scenes.map((s) => (
-            <button key={s.id} className="sl-chip" onClick={() => open(s.id)}>
+            <button
+              key={s.id}
+              className={`sl-chip ${dragging === s.id ? 'lifted' : ''}`}
+              draggable
+              title="Перетащи на ветку в нужной главе — или нажми, чтобы открыть"
+              onDragStart={(e) => {
+                e.dataTransfer.setData('text/plain', s.id)
+                e.dataTransfer.effectAllowed = 'move'
+                setDragging(s.id)
+              }}
+              onDragEnd={() => {
+                setDragging(null)
+                setSpot(null)
+              }}
+              onClick={() => open(s.id)}
+            >
               {sceneShort(data, s)}
             </button>
           ))}

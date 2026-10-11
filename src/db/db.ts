@@ -40,6 +40,13 @@ export interface Project extends Base {
   targetChapters?: number
   /** The «lock the written chapters?» question after an import was asked, whatever the answer. */
   lockAsked?: boolean
+  /** How long a chapter should be, in characters with spaces: the site's rule or the author's own. */
+  chapterMin?: number
+  chapterMax?: number
+  /** Characters on one page; a standard page is 1800. */
+  pageChars?: number
+  /** How the author thinks of length: in pages or in characters. */
+  lengthUnit?: 'pages' | 'chars'
   /** Where the book goes up; Фикбук when not chosen. */
   platform?: PlatformId
   /** A new chapter every N days. */
@@ -84,6 +91,8 @@ export interface Scene extends Base {
   beats: Beat[]
   /** Mirrored from the scene's text record, refreshed while writing. */
   wordCount: number
+  /** Characters with spaces, refreshed with the word count: chapter length the way sites measure it. */
+  charCount?: number
   /** Cursor position when the author last left the scene (per record, good enough across devices). */
   lastPos?: number
   /** The opening of the text, refreshed while writing — shown on cards when the scene has no title. */
