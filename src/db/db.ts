@@ -222,7 +222,8 @@ export class ManuscriptDB extends Dexie {
   outbox!: Table<OutboxEntry, string>
   meta!: Table<Meta, string>
 
-  constructor(name = 'manuscript') {
+  // The test version on /preview/ keeps its own database: it must never touch the real books.
+  constructor(name = (import.meta.env.VITE_DB_NAME as string | undefined) || 'manuscript') {
     super(name)
     this.version(1).stores({
       projects: 'id, updatedAt',

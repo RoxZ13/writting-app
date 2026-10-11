@@ -1,0 +1,19 @@
+name: Update the test version
+
+# A push to a work branch republishes GitHub Pages from main, with that branch as the test version
+# under /preview/. Pages can only be deployed from main, so this only asks main's workflow to run.
+on:
+  push:
+    branches: ['claude/**']
+
+permissions:
+  actions: write
+
+jobs:
+  dispatch:
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main -f preview="$GITHUB_REF_NAME"
+        env:
+          GH_TOKEN: ${{ github.token }}
