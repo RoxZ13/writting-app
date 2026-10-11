@@ -5,6 +5,7 @@ import { markerStatus, sceneName, type ProjectData } from '../lib/hooks'
 import { MARKER_STATES } from '../lib/status'
 import { InlineEdit } from '../lib/ui'
 import { PlacePicker } from './Refs'
+import { Icon } from './Icon'
 
 /** A marker: title and state always visible; where it is planted / pays off opens on demand. */
 export function MarkerCard({ marker, data, open: startOpen = false }: { marker: Marker; data: ProjectData; open?: boolean }) {
@@ -72,7 +73,7 @@ function Echoes({ data, marker, onChange }: { data: ProjectData; marker: Marker;
         <span key={id} className="chip">
           {sceneName(data, data.sceneById.get(id)!)}
           <button className="chip-x" aria-label="Убрать" onClick={() => set(ids.filter((x) => x !== id))}>
-            ×
+            <Icon name="close" size={15} />
           </button>
         </span>
       ))}

@@ -33,10 +33,6 @@ export function InboxView({ data }: { data: ProjectData }) {
       <div className="toolbar">
         <h1 style={{ marginRight: 'auto' }}>Входящие</h1>
       </div>
-      <p className="muted" style={{ marginTop: -8 }}>
-        Сюда падает всё, что ты быстро записала. Разбирать не обязательно сразу — когда будет настроение, привяжи к
-        сцене, превращи в маячок или пункт плана.
-      </p>
 
       <div className="card" style={{ marginBottom: 18 }}>
         <textarea

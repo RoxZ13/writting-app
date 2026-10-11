@@ -13,6 +13,7 @@ import { session } from '../lib/session'
 import { MarkerMark } from './MarkerMark'
 import { EditHints } from './EditHints'
 import { Typography } from './Typography'
+import { FindHighlight } from './FindHighlight'
 import { CommentMark } from './CommentMark'
 import { InlineNote } from './InlineNote'
 import { toast } from '../lib/ui'
@@ -62,6 +63,7 @@ export function SceneEditor({
       EditHints,
       CommentMark,
       Typography,
+      FindHighlight,
       InlineNote.configure({
         onNote: (id, text) => {
           const now = Date.now()
@@ -134,6 +136,8 @@ export function SceneEditor({
     const pos = Math.min(scene.lastPos ?? editor.state.doc.content.size, editor.state.doc.content.size - 1)
     editor.commands.setTextSelection(Math.max(1, pos))
     requestAnimationFrame(() => {
+      // The scene may already be closed (a quick jump to the next one).
+      if (editor.isDestroyed) return
       if (session.find) {
         const q = session.find
         session.find = undefined

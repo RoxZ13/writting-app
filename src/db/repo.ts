@@ -300,9 +300,28 @@ export async function toggleSceneRef(sceneId: string, field: 'lineIds' | 'charac
 }
 
 /** Move a scene to a chapter at a position (board drag and drop). */
+/** Write a new arrangement of scenes (from «Линия истории»); returns how to put everything back. */
+export async function arrangeScenes(changes: Pick<Scene, 'id' | 'chapterId' | 'order' | 'together' | 'lineIds'>[]) {
+  const before: typeof changes = []
+  for (const c of changes) {
+    const s = await db.scenes.get(c.id)
+    if (!s) continue
+    before.push({ id: s.id, chapterId: s.chapterId, order: s.order, together: s.together, lineIds: s.lineIds })
+    await save<Scene>('scenes', { ...s, ...c })
+  }
+  return () => arrangeScenes(before)
+}
+
 export async function moveScene(sceneId: string, chapterId: string, index: number) {
   const scene = await db.scenes.get(sceneId)
   if (!scene) return
+  // Moved in reading order, the scene leaves its moment of story time; whoever shared it stays put.
+  if (scene.together) await save<Scene>('scenes', { ...scene, together: undefined })
+  else {
+    const old = alive(await db.scenes.where('chapterId').equals(scene.chapterId).toArray()).sort((a, b) => a.order - b.order)
+    const next = old[old.findIndex((s) => s.id === sceneId) + 1]
+    if (next?.together) await save<Scene>('scenes', { ...next, together: undefined })
+  }
   const siblings = alive(await db.scenes.where('chapterId').equals(chapterId).toArray())
     .filter((s) => s.id !== sceneId)
     .sort((a, b) => a.order - b.order)

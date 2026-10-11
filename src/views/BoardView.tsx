@@ -30,10 +30,10 @@ import {
   reorderChapters,
 } from '../db/repo'
 import { MarkerCard } from '../components/MarkerCard'
-import { Arc, Essence } from '../components/Plot'
+import { Essence } from '../components/Plot'
 import { SceneSheet } from '../components/SceneSheet'
 import { StoryLine } from '../components/StoryLine'
-import { isNode, markerPayoffChapter, markerQuiet, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
+import { markerPayoffChapter, markerQuiet, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
 import { MARKER_STATES, statusOf } from '../lib/status'
 import { InlineEdit, Modal, toast } from '../lib/ui'
 import { deadlineText } from '../lib/stories'
@@ -42,10 +42,18 @@ import { chapterProgress, totalWords } from '../lib/pace'
 import { db } from '../db/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { go } from '../lib/router'
+import { getBoardLayout } from '../lib/session'
+import { Icon } from '../components/Icon'
 
-const VIEW_KEY = 'manuscript.boardView'
+type Lens = { kind: 'all' } | { kind: 'line'; id: string } | { kind: 'markers' } | { kind: 'hero'; id: string }
 
-type Lens = { kind: 'all' } | { kind: 'line'; id: string } | { kind: 'markers' }
+/** Whether a scene steps back under the chosen lens: another line, no markers, or the hero is not in it. */
+function dims(lens: Lens, scene: Scene, data: ProjectData) {
+  if (lens.kind === 'line') return !scene.lineIds?.includes(lens.id)
+  if (lens.kind === 'hero') return !scene.characterIds?.includes(lens.id)
+  if (lens.kind === 'markers') return !data.markers.some((m) => m.setupSceneId === scene.id || m.payoffSceneId === scene.id)
+  return false
+}
 
 export function BoardView({ data }: { data: ProjectData }) {
   const [lens, setLens] = useState<Lens>(() => {
@@ -54,21 +62,8 @@ export function BoardView({ data }: { data: ProjectData }) {
     return wanted === 'markers' ? { kind: 'markers' } : { kind: 'all' }
   })
   const [newLine, setNewLine] = useState<string | null>(null)
-  const [view, setViewState] = useState<'columns' | 'line'>(() => {
-    try {
-      return localStorage.getItem(VIEW_KEY) === 'line' ? 'line' : 'columns'
-    } catch {
-      return 'columns'
-    }
-  })
-  const setView = (v: 'columns' | 'line') => {
-    setViewState(v)
-    try {
-      localStorage.setItem(VIEW_KEY, v)
-    } catch {
-      /* ignore */
-    }
-  }
+  // The layout is chosen in Settings → «Как планировать», so the board keeps one row of controls.
+  const [view] = useState(getBoardLayout)
 
   // Open on "ты здесь", not wherever the previous screen was scrolled to. On the phone the page
   // is the story's home and starts at the top: «Продолжить» already leads there.
@@ -114,10 +109,9 @@ export function BoardView({ data }: { data: ProjectData }) {
     void moveScene(sceneId, target.chapterId, scenesOf(target.chapterId).indexOf(target))
   }
 
-  const showArc = [...data.scenes, ...data.pool.scenes].some((s) => s.heat)
   const hanging = data.markers.filter((m) => ['hanging', 'late'].includes(markerStatus(m, data)))
   const quiet = data.markers.filter((m) => markerQuiet(m, data))
-  const filters = data.markers.length > 0 || data.lines.length > 0 || lens.kind !== 'all'
+  const filters = data.markers.length > 0 || data.lines.length > 0 || data.characters.length > 0 || lens.kind !== 'all'
 
   const addChapterAfter = async (i: number) => {
     const c = await createChapter(data.project.id, `Глава ${i + 2}`)
@@ -148,17 +142,7 @@ export function BoardView({ data }: { data: ProjectData }) {
         ) : (
           <h1>Доска</h1>
         )}
-        {!phone && (
-          <div className="seg board-view" role="group" aria-label="Вид доски">
-            <button aria-pressed={view === 'columns'} onClick={() => setView('columns')}>
-              Колонки
-            </button>
-            <button aria-pressed={view === 'line'} onClick={() => setView('line')}>
-              Линия
-            </button>
-          </div>
-        )}
-        {/* Filters only once there is something to filter; «+ ветка» is always there. */}
+        {/* Filters only once there is something to filter; «+ линия» is always there. */}
         {filters && <span className="lens-label hide-sm">Показать:</span>}
         <div className={`seg lens ${filters ? '' : 'bare'}`}>
           {filters && (
@@ -180,9 +164,22 @@ export function BoardView({ data }: { data: ProjectData }) {
               <span className="dot" style={{ background: l.color }} /> {l.name}
             </button>
           ))}
+          {data.characters.length > 0 && <span className="lens-sep" aria-hidden="true" />}
+          {data.characters.map((c) => (
+            <button
+              key={c.id}
+              className="lens-hero"
+              aria-pressed={lens.kind === 'hero' && lens.id === c.id}
+              title={`Сцены, где есть ${c.name}`}
+              style={{ '--hero': c.color } as React.CSSProperties}
+              onClick={() => setLens(lens.kind === 'hero' && lens.id === c.id ? { kind: 'all' } : { kind: 'hero', id: c.id })}
+            >
+              {c.name.trim()[0]?.toUpperCase()}
+            </button>
+          ))}
           {newLine === null ? (
-            <button className="lens-add" title="Новая ветка — например, линия второстепенного героя" onClick={() => setNewLine('')}>
-              + ветка
+            <button className="lens-add" title="Новая линия — например, второстепенного героя" onClick={() => setNewLine('')}>
+              + линия
             </button>
           ) : (
             <input
@@ -198,7 +195,7 @@ export function BoardView({ data }: { data: ProjectData }) {
                 const l = await createLine(data.project.id, newLine.trim())
                 setNewLine(null)
                 setLens({ kind: 'line', id: l.id })
-                toast('Ветка создана. Цвет — тут же, под доской. Сцены отмечай: клик по сцене → «Ветки»')
+                toast(view === 'line' ? 'Линия создана — перетаскивай в её строку сцены' : 'Линия создана. Сцены отмечай: клик по сцене → «Линии»')
               }}
             />
           )}
@@ -232,10 +229,7 @@ export function BoardView({ data }: { data: ProjectData }) {
         <StoryLine
           data={data}
           onOpenScene={setOpenScene}
-          dim={(s) =>
-            (lens.kind === 'line' && !s.lineIds?.includes(lens.id)) ||
-            (lens.kind === 'markers' && !data.markers.some((m) => m.setupSceneId === s.id || m.payoffSceneId === s.id))
-          }
+          dim={(s) => dims(lens, s, data)}
         />
       ) : (
         <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
@@ -249,7 +243,6 @@ export function BoardView({ data }: { data: ProjectData }) {
                 scenes={scenes}
                 lens={lens}
                 isFirst={i === 0}
-                showArc={showArc}
                 onMove={(d) => moveChapter(i, d)}
                 onAddAfter={() => void addChapterAfter(i)}
                 onOpenScene={setOpenScene}
@@ -282,7 +275,6 @@ function Column({
   scenes,
   lens,
   isFirst,
-  showArc,
   onMove,
   onAddAfter,
   onOpenScene,
@@ -293,7 +285,6 @@ function Column({
   scenes: Scene[]
   lens: Lens
   isFirst: boolean
-  showArc: boolean
   onMove: (dir: -1 | 1) => void
   onAddAfter: () => void
   onOpenScene: (id: string) => void
@@ -341,7 +332,7 @@ function Column({
           </span>
           <details className="menu">
             <summary className="icon-btn" aria-label="Действия с главой">
-              ⋯
+              <Icon name="more" size={18} />
             </summary>
             <div className="menu-list card">
               <label className="menu-field" style={{ padding: '4px 10px 8px' }}>
@@ -379,11 +370,10 @@ function Column({
         />
         {deadlineText(chapter.deadline) && (
           <div className={`deadline column-deadline ${deadlineText(chapter.deadline)!.late ? 'late' : ''}`}>
-            ⏳ {deadlineText(chapter.deadline)!.text}
+            <Icon name="clock" size={13} /> {deadlineText(chapter.deadline)!.text}
             {scenes.some((x) => x.status !== 'done') && ` · не готово ${scenes.filter((x) => x.status !== 'done').length} сц.`}
           </div>
         )}
-        {showArc && scenes.some((s) => s.heat || isNode(s, data)) && <Arc scenes={scenes} isNode={(s) => isNode(s, data)} />}
       </header>
 
       <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
@@ -391,7 +381,7 @@ function Column({
           {scenes.map((s) => (
             <SortableCard key={s.id} data={data} scene={s} lens={lens} onOpen={() => onOpenScene(s.id)} />
           ))}
-          {lineMissing && <div className="gap-slot">нет сцен этой ветки</div>}
+          {lineMissing && <div className="gap-slot">нет сцен этой линии</div>}
           {!scenes.length && !lineMissing && <EmptyChapterHint />}
         </div>
       </SortableContext>
@@ -451,7 +441,7 @@ function EmptyChapterHint() {
 function LineNote({ data, lineId, onGone }: { data: ProjectData; lineId: string; onGone: () => void }) {
   const line = data.lineById.get(lineId)!
   const del = async () => {
-    if (!confirm(`Удалить ветку «${line.name}»? Сцены останутся, с них просто снимется отметка.`)) return
+    if (!confirm(`Удалить линию «${line.name}»? Сцены останутся, с них просто снимется отметка.`)) return
     for (const s of [...data.scenes, ...data.pool.scenes])
       if (s.lineIds?.includes(line.id)) await patch<Scene>('scenes', s.id, { lineIds: s.lineIds.filter((x) => x !== line.id) })
     await remove('lines', line.id)
@@ -460,8 +450,8 @@ function LineNote({ data, lineId, onGone }: { data: ProjectData; lineId: string;
   return (
     <div className="lens-note line-note">
       <div className="line-note-head">
-        <InlineEdit className="line-name" value={line.name} placeholder="Название ветки" onSave={(name) => name.trim() && void patch<Line>('lines', line.id, { name: name.trim() })} />
-        <div className="swatches" role="radiogroup" aria-label="Цвет ветки">
+        <InlineEdit className="line-name" value={line.name} placeholder="Название линии" onSave={(name) => name.trim() && void patch<Line>('lines', line.id, { name: name.trim() })} />
+        <div className="swatches" role="radiogroup" aria-label="Цвет линии">
           {PALETTE.map((c) => (
             <button
               key={c}
@@ -475,7 +465,7 @@ function LineNote({ data, lineId, onGone }: { data: ProjectData; lineId: string;
           ))}
         </div>
         <button className="link small muted" onClick={() => void del()}>
-          удалить ветку
+          удалить линию
         </button>
       </div>
       <div>Пунктир — главы, где её сцен нет. Так видно, где линия пропадает надолго.</div>
@@ -516,7 +506,7 @@ function PoolColumn({ data, lens, onOpenScene }: { data: ProjectData; lens: Lens
     <section ref={setNodeRef} className={`column pool ${isOver ? 'over' : ''}`}>
       <header className="column-head">
         <div className="column-title pool-title">Пока без места</div>
-        <div className="column-meta">{scenes.length ? `${formatScenes(scenes.length)} — перетащи в главу` : 'Сцены, которые уже крутятся в голове. Хоть одно слово на каждую — место найдёшь потом.'}</div>
+        <div className="column-meta">{scenes.length ? `${formatScenes(scenes.length)} — перетащи в главу` : 'Идеи сцен, пока без главы'}</div>
       </header>
       <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
         <div className="cards">
@@ -569,12 +559,11 @@ function SortableCard({ data, scene, lens, onOpen }: { data: ProjectData; scene:
 function Card({ data, scene, lens, overlay }: { data: ProjectData; scene: Scene; lens: Lens; overlay?: boolean }) {
   const lines = (scene.lineIds ?? []).map((id) => data.lineById.get(id)).filter(Boolean)
   const markers = data.markers.filter((m) => m.setupSceneId === scene.id || m.payoffSceneId === scene.id)
-  const dim =
-    (lens.kind === 'line' && !scene.lineIds?.includes(lens.id)) || (lens.kind === 'markers' && markers.length === 0)
+  const dim = dims(lens, scene, data)
   const current = data.project.lastSceneId === scene.id && !storyEmpty(data)
   const showMarkers = lens.kind === 'markers' && markers.length > 0
   return (
-    <article className={`card-scene ${dim ? 'dim' : ''} ${overlay ? 'overlay' : ''} ${current ? 'current' : ''} ${isNode(scene, data) ? 'node' : ''}`}>
+    <article className={`card-scene ${dim ? 'dim' : ''} ${overlay ? 'overlay' : ''} ${current ? 'current' : ''} ${scene.node ? 'node' : ''}`}>
       {lines.length > 0 && (
         <div className="line-strip">
           {lines.map((l) => (
@@ -583,7 +572,7 @@ function Card({ data, scene, lens, overlay }: { data: ProjectData; scene: Scene;
         </div>
       )}
       <div className={`card-title ${scene.title.trim() ? '' : 'untitled'}`}>
-        {isNode(scene, data) && <span title="Узел: здесь сходятся ветки">◆ </span>}
+        {scene.node && <span className="ln-key" title="Ключевая сцена" />}
         {sceneName(data, scene)}
       </div>
       {scene.goal ? <div className="card-goal">{scene.goal}</div> : scene.excerpt && <div className="card-excerpt">{scene.excerpt}</div>}
@@ -690,7 +679,7 @@ function Timeline({
               {plant.length > 0 && <span className="tl-mk">✦ {plant.length}</span>}
               <span className="tl-meta">{formatScenes(scenes.length)}</span>
             </button>
-            {lineMissing && <div className="tl-gap">нет сцен этой ветки</div>}
+            {lineMissing && <div className="tl-gap">нет сцен этой линии</div>}
             {isOpen && (
               <div className="tl-body">
                 {chapter.goal && <div className="tl-goal">{chapter.goal}</div>}
@@ -723,12 +712,12 @@ function Timeline({
 
 function TimelineScene({ data, scene, lens, onOpen }: { data: ProjectData; scene: Scene; lens: Lens; onOpen: () => void }) {
   const markers = data.markers.filter((m) => m.setupSceneId === scene.id || m.payoffSceneId === scene.id)
-  const dim = (lens.kind === 'line' && !scene.lineIds?.includes(lens.id)) || (lens.kind === 'markers' && markers.length === 0)
+  const dim = dims(lens, scene, data)
   const current = data.project.lastSceneId === scene.id
   const sub = scene.goal || scene.excerpt
   return (
-    <button className={`tl-scene ${dim ? 'dim' : ''} ${current ? 'current' : ''} ${isNode(scene, data) ? 'node' : ''}`} onClick={onOpen}>
-      {isNode(scene, data) ? <span className="tl-node">◆</span> : <span className="status-dot" style={{ background: statusOf(scene.status).color }} />}
+    <button className={`tl-scene ${dim ? 'dim' : ''} ${current ? 'current' : ''} ${scene.node ? 'node' : ''}`} onClick={onOpen}>
+      {scene.node ? <span className="ln-key" title="Ключевая сцена" /> : <span className="status-dot" style={{ background: statusOf(scene.status).color }} />}
       <span className="tl-text">
         <span className={`tl-name ${scene.title.trim() ? '' : 'untitled'}`}>{sceneName(data, scene)}</span>
         {sub && <span className="tl-sub">{sub}</span>}

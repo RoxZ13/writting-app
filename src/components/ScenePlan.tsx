@@ -11,6 +11,7 @@ import { toast } from '../lib/ui'
 import { RefChips } from './Refs'
 import { loreForScene, type LoreReason } from '../lib/lore'
 import { docParagraphs } from '../lib/text'
+import { Icon } from './Icon'
 
 /** Update beats from the freshest stored copy, so quick successive edits never overwrite each other. */
 export async function updateBeats(sceneId: string, fn: (beats: Beat[]) => Beat[]) {
@@ -118,7 +119,7 @@ export function ScenePlan({
         <span className="eyebrow">План сцены</span>
         <span className="spacer" />
         <button className="icon-btn" aria-label="Скрыть план" title="Скрыть план" onClick={onClose}>
-          ×
+          <Icon name="close" size={15} />
         </button>
       </div>
       <div className="pp-body">
@@ -182,7 +183,7 @@ export function ScenePlan({
               ['beats', 'по пунктам'],
               ['markers', 'маячок'],
               ['people', 'кто в сцене'],
-              ['lore', 'матчасть'],
+              ['lore', 'мир'],
             ] as [PlanPart, string][]
           )
             .filter(([p]) => !show(p))
@@ -216,7 +217,7 @@ function SceneLore({ data, scene, forceOpen }: { data: ProjectData; scene: Scene
   if (!found.length && !forceOpen) return null
   return (
     <div className="pp-section">
-      <h4>Матчасть</h4>
+      <h4>Мир</h4>
       {found.map(({ note: n, reason }) => (
         <details key={n.id} className="pp-lore">
           <summary>
@@ -241,14 +242,14 @@ function SceneLore({ data, scene, forceOpen }: { data: ProjectData; scene: Scene
             if (!title) return
             const n = await createNote('', 'lore', data.project.id)
             await patch<Note>('notes', n.id, { title, sceneIds: [scene.id] })
-            toast('Запись создана и прикреплена. Описание — в «Герои → Матчасть»')
+            toast('Запись создана и прикреплена. Описание — в «Герои → Мир»')
           } else {
             const n = data.lore.find((x) => x.id === v)
             if (n) pin(n)
           }
         }}
       >
-        <option value="">+ прикрепить матчасть…</option>
+        <option value="">+ прикрепить запись о мире…</option>
         {others.map((n) => (
           <option key={n.id} value={n.id}>
             {n.title}
@@ -342,10 +343,10 @@ function More({ data, scene, editor }: { data: ProjectData; scene: Scene; editor
   const chapter = data.chapterById.get(scene.chapterId)
   return (
     <details className="pp-more">
-      <summary>Ещё: ветки, глава, версии</summary>
+      <summary>Ещё: линии, глава, версии</summary>
       <div className="stack" style={{ gap: 16, marginTop: 12 }}>
         <div>
-          <h4>Ветки</h4>
+          <h4>Линии</h4>
           <RefChips data={data} sceneId={scene.id} field="lineIds" selected={scene.lineIds ?? []} />
         </div>
         {chapter && (
@@ -422,7 +423,7 @@ function Beats({ beats, onChange, autoFocus }: { beats: Beat[]; onChange: (fn: (
           <input type="checkbox" checked={b.done} onChange={(e) => update(b.id, { done: e.target.checked })} />
           <BeatText value={b.text} onSave={(text) => (text.trim() ? update(b.id, { text }) : drop(b.id))} />
           <button className="icon-btn" title="Удалить" onClick={() => drop(b.id)}>
-            ×
+            <Icon name="close" size={15} />
           </button>
         </div>
       ))}

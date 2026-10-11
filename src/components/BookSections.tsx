@@ -68,7 +68,7 @@ export function PaceSection({ data }: { data: ProjectData }) {
             <NumberField value={p.dailyGoal} placeholder="необязательно" onSave={(dailyGoal) => set({ dailyGoal })} />
           </label>
           <label>
-            <span className="field-label">Сколько слов в книге будет</span>
+            <span className="field-label">Сколько слов будет в истории</span>
             <NumberField value={p.targetWords} placeholder="необязательно" onSave={(targetWords) => set({ targetWords })} />
           </label>
         </div>
@@ -90,8 +90,8 @@ function BankLine({ project }: { project: Project }) {
 }
 
 function forecastText(p: Project, pc: ReturnType<typeof pace>): string {
-  if (!p.targetWords) return 'Укажи, сколько слов будет в книге, — и здесь появится прогноз, когда допишешь.'
-  if (pc.remaining === 0) return 'По объёму книга уже написана. Дальше — правка.'
+  if (!p.targetWords) return 'Укажи, сколько слов будет в истории, — и здесь появится прогноз, когда допишешь.'
+  if (pc.remaining === 0) return 'По объёму история уже написана. Дальше — правка.'
   const rest = `Осталось ~${num(pc.remaining!)} слов.`
   if (!pc.perDay) return `${rest} Как только появятся записанные дни, здесь будет прогноз.`
   let s = `${rest} В таком темпе допишешь к ${date(pc.finish!)}.`
@@ -106,6 +106,16 @@ export function ficbookLink(p: Project): string | undefined {
   if (p.ficbookUrl) return p.ficbookUrl
   if (platformOf(p).id !== 'ficbook') return undefined
   return p.description?.match(/https?:\/\/ficbook\.net\/readfic\/[\w-]+/)?.[0]
+}
+
+/**
+ * How ready a chapter is, in words. A written chapter is never «0%»: statuses are optional,
+ * so without them it is simply «написана»; with some scenes marked done it shows how much is proofread.
+ */
+function readiness({ ready, written }: { ready: number; written: boolean }) {
+  if (!written) return 'ещё пишется'
+  if (ready >= 100) return 'готова'
+  return ready > 0 ? `вычитано ${ready}%` : 'написана'
 }
 
 /** Where the book stands on its site: what is up, what is next and how ready it is. */
@@ -134,7 +144,7 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
       {next ? (
         <div className="publish-next">
           <div>
-            <span className="muted">Следующая:</span> <strong>{next.chapter.title}</strong> · {next.written ? `готова на ${next.ready}%` : 'ещё пишется'}
+            <span className="muted">Следующая:</span> <strong>{next.chapter.title}</strong> · {readiness(next)}
             {due && (
               <span className={daysLeft! < 0 ? 'late' : ''}>
                 {' '}
@@ -192,7 +202,7 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
           {rows.map(({ chapter, ready, written }) => (
             <div key={chapter.id} className="publish-row">
               <span className="publish-title">{chapter.title}</span>
-              <span className="small muted">{written ? `${ready}%` : 'пишется'}</span>
+              <span className="small muted">{readiness({ ready, written })}</span>
               <input
                 className="input sm"
                 type="date"

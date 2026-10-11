@@ -1,24 +1,37 @@
 import { useEffect, useState, type ReactNode } from 'react'
 
-let pushToast: ((msg: string) => void) | null = null
-export const toast = (msg: string) => pushToast?.(msg)
+type Undo = () => unknown
+let pushToast: ((msg: string, undo?: Undo) => void) | null = null
+/** A short note at the bottom. With `undo`, it stays a little longer and offers «Отменить». */
+export const toast = (msg: string, undo?: Undo) => pushToast?.(msg, undo)
 
 export function Toaster() {
-  const [msg, setMsg] = useState<string | null>(null)
+  const [msg, setMsg] = useState<{ text: string; undo?: Undo } | null>(null)
   useEffect(() => {
     let t: ReturnType<typeof setTimeout>
-    pushToast = (m) => {
-      setMsg(m)
+    pushToast = (text, undo) => {
+      setMsg({ text, undo })
       clearTimeout(t)
-      t = setTimeout(() => setMsg(null), 2200)
+      t = setTimeout(() => setMsg(null), undo ? 6000 : 2200)
     }
     return () => {
       pushToast = null
     }
   }, [])
   return msg ? (
-    <div className="toast" role="status">
-      {msg}
+    <div className={`toast ${msg.undo ? 'has-undo' : ''}`} role="status">
+      {msg.text}
+      {msg.undo && (
+        <button
+          className="toast-undo"
+          onClick={() => {
+            void msg.undo!()
+            setMsg(null)
+          }}
+        >
+          Отменить
+        </button>
+      )}
     </div>
   ) : null
 }

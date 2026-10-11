@@ -10,13 +10,14 @@ import {
 } from '../db/cloud'
 import { downloadBackup, readBackupFile, restoreBackup } from '../lib/backup'
 import { toast } from '../lib/ui'
-import { applyTheme, getTheme, type Theme } from '../lib/session'
+import { applyTheme, getBoardLayout, getTheme, setBoardLayout, type BoardLayout, type Theme } from '../lib/session'
 import { TypoControls } from '../components/TypoControls'
 import { timeAgo } from '../lib/status'
 
 /** Settings of the app itself (not of a book): look, devices, installing, backup. */
 export function SettingsView({ sync }: { sync: SyncStatus }) {
   const [theme, setTheme] = useState<Theme>(getTheme)
+  const [board, setBoard] = useState<BoardLayout>(getBoardLayout)
   const restore = async (file: File) => {
     try {
       const dump = await readBackupFile(file)
@@ -62,6 +63,32 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
           </div>
         </div>
         <TypoControls />
+      </section>
+
+      <section className="card settings-section stack">
+        <h3>Как планировать</h3>
+        <div className="typo-row">
+          <span className="typo-label">Доска</span>
+          <div className="seg">
+            {(
+              [
+                ['columns', 'Главы колонками'],
+                ['line', 'Сюжетные линии'],
+              ] as [BoardLayout, string][]
+            ).map(([v, label]) => (
+              <button
+                key={v}
+                aria-pressed={board === v}
+                onClick={() => {
+                  setBoard(v)
+                  setBoardLayout(v)
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
       </section>
 
       <SyncSection sync={sync} />

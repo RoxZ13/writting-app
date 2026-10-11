@@ -51,3 +51,21 @@ export function applyTheme(t: Theme) {
 /** Keyboard shortcut hints only make sense where there is a keyboard. */
 export const isTouch = () => typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches
 export const hotkey = (hint: string) => (isTouch() ? '' : hint)
+
+/** How the board plans the story: chapters as columns, or plot lines with scenes on them. Chosen in Settings. */
+export type BoardLayout = 'columns' | 'line'
+const BOARD_KEY = 'manuscript.boardView'
+export function getBoardLayout(): BoardLayout {
+  try {
+    return localStorage.getItem(BOARD_KEY) === 'line' ? 'line' : 'columns'
+  } catch {
+    return 'columns'
+  }
+}
+export function setBoardLayout(v: BoardLayout) {
+  try {
+    localStorage.setItem(BOARD_KEY, v)
+  } catch {
+    /* ignore */
+  }
+}

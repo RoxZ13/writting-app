@@ -53,19 +53,7 @@ export function TypoControls() {
           <span className="small muted">{t.size}</span>
         </div>
       </div>
-      <div className="typo-cheat">
-        <span className="field-label">Пишешь — и оформляется само</span>
-        <div>
-          <code>*слово*</code> → <em>курсив</em> · <code>**слово**</code> → <strong>жирный</strong>
-        </div>
-        <div>
-          <code>---</code> → — · <code>-</code> и пробел в начале строки → «— » · <code>...</code> → … · <code>"</code> → « »
-        </div>
-        <div>
-          <code>// заметка</code> и Enter → уходит на поля
-        </div>
-        <div className="muted">{hotkey('⌘/Ctrl + I — курсив, ⌘/Ctrl + B — жирный: можно нажать и печатать дальше')}</div>
-      </div>
+      {hotkey('x') && <div className="typo-cheat muted">Автозамены и клавиши — ⌘/Ctrl + / в тексте</div>}
       <details className="typo-more">
         <summary>Больше настроек</summary>
         <div className="typo">

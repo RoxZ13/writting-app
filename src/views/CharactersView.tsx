@@ -13,6 +13,7 @@ import { WorldNav } from './LoreView'
 import { ColorDot } from '../components/ColorDot'
 import { useWhereFound, WhereFound } from '../components/WhereFound'
 import type { Found } from '../lib/mentions'
+import { Icon } from '../components/Icon'
 
 /** People of the story: a few free lines about each, their own story line, their quotes. */
 export function CharactersView({ data }: { data: ProjectData }) {
@@ -42,7 +43,7 @@ export function CharactersView({ data }: { data: ProjectData }) {
       {suggested.length > 0 && (
         <div className="card suggest">
           <div>
-            <strong>В описании книги нашлись герои:</strong> {suggested.join(', ')}
+            <strong>В описании истории нашлись герои:</strong> {suggested.join(', ')}
           </div>
           <button
             className="btn primary"
@@ -68,9 +69,6 @@ export function CharactersView({ data }: { data: ProjectData }) {
             onChange={(e) => setName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void add()}
           />
-          <p className="small muted" style={{ margin: '4px 12px' }}>
-            Отмечай героев в сценах — тогда в главах, где они есть, всплывут их неиспользованные цитаты и диалоги.
-          </p>
         </div>
       </div>
       <Branches data={data} />
@@ -83,27 +81,27 @@ function Branches({ data }: { data: ProjectData }) {
   const [name, setName] = useState('')
   const count = (id: string) => [...data.scenes, ...data.pool.scenes].filter((s) => s.lineIds?.includes(id)).length
   const del = async (id: string, title: string) => {
-    if (!confirm(`Удалить ветку «${title}»? Сцены останутся, с них просто снимется отметка.`)) return
+    if (!confirm(`Удалить линию «${title}»? Сцены останутся, с них просто снимется отметка.`)) return
     for (const s of [...data.scenes, ...data.pool.scenes])
       if (s.lineIds?.includes(id)) await patch<Scene>('scenes', s.id, { lineIds: s.lineIds.filter((x) => x !== id) })
     await remove('lines', id)
   }
   return (
     <section className="branches card">
-      <h3>Сюжетные ветки</h3>
+      <h3>Сюжетные линии</h3>
       {data.lines.map((l) => (
         <div key={l.id} className="branch-row">
           <ColorDot color={l.color} label={l.name} onChange={(color) => void patch<Line>('lines', l.id, { color })} />
           <InlineEdit className="branch-name" value={l.name} onSave={(n) => n.trim() && void patch<Line>('lines', l.id, { name: n.trim() })} />
           <span className="small muted">{count(l.id)} сц.</span>
-          <button className="icon-btn" aria-label={`Удалить ветку «${l.name}»`} title="Удалить ветку" onClick={() => void del(l.id, l.name)}>
-            ×
+          <button className="icon-btn" aria-label={`Удалить линию «${l.name}»`} title="Удалить линию" onClick={() => void del(l.id, l.name)}>
+            <Icon name="close" size={15} />
           </button>
         </div>
       ))}
       <input
         className="quick-add"
-        placeholder="+ ветка — например, линия второго героя"
+        placeholder="+ линия — например, второго героя"
         value={name}
         onChange={(e) => setName(e.target.value)}
         onKeyDown={async (e) => {
@@ -147,7 +145,7 @@ function Person({ data, c, found }: { data: ProjectData; c: Character; found?: F
         <InlineEdit className="person-name" value={c.name} onSave={(name) => set({ name })} />
         <details className="menu">
           <summary className="icon-btn" aria-label="Действия">
-            ⋯
+            <Icon name="more" size={18} />
           </summary>
           <div className="menu-list card">
             {data.characters.length > 1 && <div className="menu-label">Это тот же человек, что…</div>}
@@ -165,6 +163,16 @@ function Person({ data, c, found }: { data: ProjectData; c: Character; found?: F
                   ⇢ {o.name}
                 </button>
               ))}
+            {!line && (
+              <button
+                onClick={async () => {
+                  await createLine(data.project.id, c.name)
+                  toast(`Линия «${c.name}» создана — отмечай её сцены на доске`)
+                }}
+              >
+                Своя сюжетная линия
+              </button>
+            )}
             <button className="danger" onClick={() => void delHero()}>
               Удалить героя
             </button>
@@ -180,23 +188,13 @@ function Person({ data, c, found }: { data: ProjectData; c: Character; found?: F
       />
       <InlineEdit className="aliases" value={c.aliases ?? ''} placeholder="другие имена: фамилия, прозвище…" onSave={(aliases) => set({ aliases: aliases.trim() || undefined })} />
       <WhereFound data={data} found={found} onNotThis={(sid) => set({ ignoreSceneIds: [...(c.ignoreSceneIds ?? []), sid] })} />
-      <div className="person-meta">
-        {line ? (
+      {line && (
+        <div className="person-meta">
           <span className="chip" style={{ color: line.color }}>
-            ● ветка «{line.name}»
+            ● линия «{line.name}»
           </span>
-        ) : (
-          <button
-            className="link small"
-            onClick={async () => {
-              await createLine(data.project.id, c.name)
-              toast(`Ветка «${c.name}» создана — отмечай её сцены на доске`)
-            }}
-          >
-            + своя сюжетная ветка
-          </button>
-        )}
-      </div>
+        </div>
+      )}
       <div className="person-quotes">
         {lines.map((n) => (
           <QuoteRow key={n.id} n={n} data={data} />
@@ -214,9 +212,6 @@ function Person({ data, c, found }: { data: ProjectData; c: Character; found?: F
           }}
         />
       </div>
-      <button className="link small muted person-delete" onClick={() => void delHero()}>
-        удалить героя
-      </button>
     </article>
   )
 }
@@ -286,7 +281,7 @@ function TagScenes({ data, onClose }: { data: ProjectData; onClose: () => void }
       <div className="stack">
         <h2>Где кто появляется</h2>
         {!found ? (
-          <div className="muted">Читаю книгу…</div>
+          <div className="muted">Читаю историю…</div>
         ) : (
           <>
             <div className="small muted">Сцена отмечается, если имя встречается в ней хотя бы дважды. Уже отмеченное не снимается.</div>

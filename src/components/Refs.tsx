@@ -4,7 +4,7 @@ import { createLine, findOrCreateCharacter, patch, toggleSceneRef } from '../db/
 import { ColorDot } from './ColorDot'
 import { sceneName, type ProjectData } from '../lib/hooks'
 
-/** Toggleable chips for a scene's story lines (ветки) or characters, with inline "+ new". */
+/** Toggleable chips for a scene's story lines (линии) or characters, with inline "+ new". */
 export function RefChips({
   data,
   sceneId,
@@ -54,7 +54,7 @@ export function RefChips({
         <input
           className="ref-input"
           autoFocus
-          placeholder={field === 'lineIds' ? 'Название ветки' : 'Имя героя'}
+          placeholder={field === 'lineIds' ? 'Название линии' : 'Имя героя'}
           value={name}
           onChange={(e) => setName(e.target.value)}
           onBlur={() => void add()}
@@ -65,7 +65,7 @@ export function RefChips({
         />
       ) : (
         <button className="ref-chip add" onClick={() => setAdding(true)}>
-          + {field === 'lineIds' ? 'ветка' : 'герой'}
+          + {field === 'lineIds' ? 'линия' : 'герой'}
         </button>
       )}
     </div>

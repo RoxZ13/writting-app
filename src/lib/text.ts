@@ -88,3 +88,24 @@ export const formatScenes = (n: number) => {
   const m100 = n % 100
   return `${n} ${m10 === 1 && m100 !== 11 ? 'сцена' : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 'сцены' : 'сцен'}`
 }
+
+/** An «авторский лист» — what Russian publishers and contests count in: 40 000 characters with spaces. */
+export const SHEET_CHARS = 40_000
+
+/** Words, characters with spaces and reading minutes of a piece of text (paragraphs joined by line breaks). */
+export function textStats(text: string) {
+  const words = countWords(text)
+  const chars = text.replace(/\n/g, '').length
+  return { words, chars, sheets: chars / SHEET_CHARS, minutes: Math.max(1, Math.round(words / 180)) }
+}
+
+/** «12 345 знаков». */
+export const formatChars = (n: number) => {
+  const m10 = n % 10
+  const m100 = n % 100
+  return `${n.toLocaleString('ru-RU')} ${m10 === 1 && m100 !== 11 ? 'знак' : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 'знака' : 'знаков'}`
+}
+
+/** «0,3 а. л.» — to one decimal, at least a hundredth for a short scene. */
+export const formatSheets = (s: number) =>
+  s > 0 && s < 0.01 ? 'меньше 0,01 а. л.' : `${s.toLocaleString('ru-RU', { maximumFractionDigits: s < 0.1 ? 2 : 1 })} а. л.`
