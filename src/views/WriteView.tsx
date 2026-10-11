@@ -100,6 +100,14 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   const [typoOpen, setTypoOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const { sprint, left } = useSprint()
+  // Focus, as in Ulysses: while the timer runs only the text is on screen; the bars come back at the top edge.
+  const focusRun = !!sprint && sprint.projectId === data.project.id && left > 0
+  useEffect(() => {
+    document.documentElement.dataset.focusrun = focusRun ? 'on' : 'off'
+    return () => {
+      document.documentElement.dataset.focusrun = 'off'
+    }
+  }, [focusRun])
   const [focusOpen, setFocusOpen] = useState(false)
   const [find, setFind] = useState<{ replace: boolean } | null>(null)
   const [keysOpen, setKeysOpen] = useState(false)
@@ -436,7 +444,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
           {rewriting && <RewriteOld scene={scene} editor={editor} onDone={() => setModeState('write')} />}
           <div className="editor-wrap">
             {text && !rewriting && storyEmpty && <TitlePage key={`title-${scene.id}`} project={data.project} editor={editor} empty />}
-            {text && !rewriting && !storyEmpty && (
+            {text && !rewriting && (
               <header className="scene-head">
                 <div className="scene-head-chapter">{chapter?.title}</div>
                 <InlineEdit

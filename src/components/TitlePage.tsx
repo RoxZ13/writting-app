@@ -2,31 +2,18 @@ import type { Editor } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
 import type { Project } from '../db/db'
 import { patch } from '../db/repo'
-import { UNTITLED } from '../lib/stories'
 
 const setFresh = (on: boolean) => {
   window.dispatchEvent(new CustomEvent('manuscript:fresh', { detail: on }))
 }
 
-/** The first words of the first phrase, as a working title: «Он вернул ключи, не глядя…». */
-export function titleFromText(text: string): string | undefined {
-  // A line of dialogue starts with a dash; the title does not need it.
-  const words = text.trim().replace(/^[—–-]\s*/, '').split(/\s+/).filter(Boolean)
-  if (words.length < 3) return undefined
-  const cut = words.slice(0, 6).join(' ').replace(/[\s,;:—–-]+$/, '')
-  return words.length > 6 ? `${cut.replace(/[.!?…]+$/, '')}…` : cut.replace(/\.$/, '')
-}
-
 /**
- * The title page of a brand-new story: its name and what it is about, on the page itself, above
- * the text — no form to fill before writing. Both are optional. Below them, a quiet door to the
- * board for those who plan first; it fades with the first letter. Shown only when the story is
- * empty on opening, so the page never jumps while the author types.
+ * A brand-new story opening: nothing on the page but the scene and the cursor. The story keeps
+ * whatever name the author gives it in the header — it is never taken from the text. The first
+ * words move the story from «идея» to «пишу».
  */
 export function TitlePage({ project, editor, empty }: { project: Project; editor: Editor | null; empty: boolean }) {
   const [shown] = useState(empty)
-  const [title, setTitle] = useState(project.title === UNTITLED ? '' : project.title)
-  const named = useRef(project.title !== UNTITLED)
   const started = useRef(false)
 
   useEffect(() => {
@@ -45,17 +32,6 @@ export function TitlePage({ project, editor, empty }: { project: Project; editor
         started.current = true
         void patch<Project>('projects', project.id, { stage: 'writing' })
       }
-      // No name given: the first phrase becomes a working title, changeable right here.
-      if (!named.current) {
-        const first = editor.state.doc.firstChild?.textContent ?? ''
-        const done = /[.!?…]\s*$/.test(first) || editor.state.doc.childCount > 1
-        const t = done ? titleFromText(first) : undefined
-        if (t) {
-          named.current = true
-          setTitle(t)
-          void patch<Project>('projects', project.id, { title: t })
-        }
-      }
     }
     editor.on('update', onUpdate)
     return () => {
@@ -63,30 +39,5 @@ export function TitlePage({ project, editor, empty }: { project: Project; editor
     }
   }, [shown, editor, project.id, project.stage])
 
-  if (!shown) return null
-  const saveTitle = () => {
-    const t = title.trim()
-    if (t) named.current = true
-    if ((t || UNTITLED) !== project.title) void patch<Project>('projects', project.id, { title: t || UNTITLED })
-  }
-  const toText = (e: React.KeyboardEvent) => {
-    if (e.key !== 'Enter' && e.key !== 'ArrowDown') return
-    e.preventDefault()
-    ;(e.target as HTMLInputElement).blur()
-    editor?.commands.focus('end')
-  }
-
-  return (
-    <div className="title-page">
-      <input
-        className="tp-title"
-        aria-label="Название истории"
-        placeholder="Название"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onBlur={saveTitle}
-        onKeyDown={toText}
-      />
-    </div>
-  )
+  return null
 }

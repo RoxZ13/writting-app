@@ -6086,3 +6086,54 @@ button.avatar {
 .title-page .tp-title::placeholder {
   color: var(--line-2);
 }
+
+/* =====================================================================
+   Focus, as in Ulysses: while the timer runs there is only the text.
+   The bars come back when the mouse goes to the top edge (or on Esc).
+   ===================================================================== */
+[data-focusrun='on'] .app-text {
+  --header-h: 0px;
+}
+[data-focusrun='on'] .app-text .app-header {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 50;
+  opacity: 0;
+  transform: translateY(-100%);
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+}
+[data-focusrun='on'] .app-text .write-top {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s, transform 0.25s;
+}
+[data-focusrun='on'] .app-text.reveal .app-header {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+[data-focusrun='on'] .app-text.reveal .write-top {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(64px);
+}
+[data-focusrun='on'] .text-stats,
+[data-focusrun='on'] .resume,
+[data-focusrun='on'] .fab {
+  display: none;
+}
+
+/* While typing, the header fades with the toolbar: when you write, you write. */
+.app-header {
+  transition: opacity 0.4s;
+}
+.app-text:has(.write.typing) .app-header {
+  opacity: 0;
+}
+.app-text:has(.write.typing) .fab {
+  opacity: 0;
+  pointer-events: none;
+}
