@@ -14,6 +14,8 @@ jobs:
     if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     steps:
-      - run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main -f preview="$GITHUB_REF_NAME"
+      # No inputs passed: pages.yml publishes its default work branch, and an older pages.yml without
+      # that input (before this change is merged) is still started instead of refusing.
+      - run: gh workflow run pages.yml --repo "$GITHUB_REPOSITORY" --ref main
         env:
           GH_TOKEN: ${{ github.token }}
