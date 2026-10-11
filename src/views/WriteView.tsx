@@ -18,6 +18,8 @@ import { go } from '../lib/router'
 import { hotkey, session } from '../lib/session'
 import { clock, useSprint } from '../lib/sprint'
 import { endFocus, FocusStart } from '../components/Focus'
+import { lengthText, pages, sumChars } from '../lib/length'
+import { ChapterMeter } from '../components/ChapterMeter'
 import { chapterProgress, dayKey, totalWords, wordsOn } from '../lib/pace'
 import { MARKER_STATES } from '../lib/status'
 import { docParagraphs, emptyDoc, formatWords, lastSentences } from '../lib/text'
@@ -79,6 +81,7 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
   const [panels, setPanels] = useState(loadPanels)
   const [mode, setModeState] = useState<Mode>(loadMode)
   const [words, setWords] = useState<number | null>(null)
+  const [live, setLive] = useState<{ id: string; chars: number } | null>(null)
   const [editor, setEditor] = useState<Editor | null>(null)
   const [action, setAction] = useState<SelectionAction | null>(null)
   const [openMarker, setOpenMarker] = useState<string | null>(null)
@@ -207,7 +210,13 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
     }
   }
 
-  const onWords = useCallback((n: number) => setWords(n), [])
+  const onWords = useCallback(
+    (n: number, chars: number) => {
+      setWords(n)
+      setLive({ id: sceneId, chars })
+    },
+    [sceneId],
+  )
   const onReady = useCallback((ed: Editor) => setEditor(ed), [])
 
   if (!scene) return null
@@ -226,6 +235,10 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
   const chapter = data.chapterById.get(scene.chapterId)
   const due = sceneMarkers(data, scene).toPay.length
   const beatsDone = scene.beats.filter((b) => b.done).length
+  // The chapter's length right now: the other scenes as saved, this one as typed.
+  const chapterChars =
+    sumChars(data.scenes.filter((s) => s.chapterId === scene.chapterId && s.id !== scene.id)) +
+    (live?.id === scene.id ? live.chars : (scene.charCount ?? 0))
 
   return (
     <div className={cls}>
@@ -395,7 +408,8 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
                     </span>
                   </button>
                   <div className="small muted" style={{ padding: '8px 10px 2px' }}>
-                    {formatWords(words ?? scene.wordCount)} в сцене · сегодня +{wordsOn(data.project, dayKey()).toLocaleString('ru-RU')}
+                    {formatWords(words ?? scene.wordCount)} в сцене · глава {pages(data.project, chapterChars)} · сегодня +
+                    {wordsOn(data.project, dayKey()).toLocaleString('ru-RU')}
                   </div>
                 </div>
               </>
@@ -419,6 +433,9 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
           <SceneNow data={data} scene={scene} onOpenPlan={openPlan} />
         </div>
 
+        {chapter && !chapter.pool && (
+          <ChapterMeter project={data.project} scene={scene} chars={chapterChars} editor={editor} locked={!!chapter.locked} />
+        )}
         <div className="editor-area">
           {rewriting && <RewriteOld scene={scene} editor={editor} onDone={() => setModeState('write')} />}
           <div className="editor-wrap">
@@ -442,7 +459,7 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
       </div>
 
       <div className="calm-count" aria-hidden="true">
-        {formatWords(words ?? scene.wordCount)}
+        {formatWords(words ?? scene.wordCount)} · глава {lengthText(data.project, chapterChars)}
       </div>
 
       <aside className="write-brief" aria-label="План сцены">

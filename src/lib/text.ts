@@ -47,6 +47,11 @@ export function docWordCount(doc: unknown): number {
   return docParagraphs(doc).reduce((sum, p) => sum + countWords(p), 0)
 }
 
+/** Characters with spaces, as sites count them: the text of every paragraph, line breaks not counted. */
+export function docCharCount(doc: unknown): number {
+  return docParagraphs(doc).reduce((sum, p) => sum + p.trim().length, 0)
+}
+
 /** The last non-empty paragraph(s) — shown on the "Continue" screen. */
 export function lastParagraphs(doc: unknown, n = 2): string[] {
   return docParagraphs(doc)

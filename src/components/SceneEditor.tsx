@@ -7,7 +7,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useRef } from 'react'
 import { db, type Note, type Scene, type SceneText } from '../db/db'
 import { patch, save } from '../db/repo'
-import { docParagraphs, docWordCount } from '../lib/text'
+import { docCharCount, docParagraphs, docWordCount } from '../lib/text'
 import { makeExcerpt } from '../lib/importer'
 import { session } from '../lib/session'
 import { MarkerMark } from './MarkerMark'
@@ -41,7 +41,7 @@ export function SceneEditor({
   scene: Scene
   initial: SceneText
   onReady: (editor: Editor) => void
-  onWords: (n: number) => void
+  onWords: (n: number, chars: number) => void
   onSelectionAction: (a: SelectionAction) => void
   onMarkerClick: (markerId: string) => void
   onCommentClick?: (noteId: string) => void
@@ -110,19 +110,23 @@ export function SceneEditor({
     saving.current = true
     const content = state.doc.toJSON()
     const wordCount = docWordCount(content)
+    const charCount = docCharCount(content)
     try {
       const saved = await save<SceneText>('texts', { ...initial, content, wordCount })
       lastSavedAt.current = saved.updatedAt
     } finally {
       saving.current = false
     }
-    onWords(wordCount)
+    onWords(wordCount, charCount)
     const current = await db.scenes.get(scene.id)
     const paras = docParagraphs(content).map((p) => p.trim()).filter(Boolean)
     const excerpt = makeExcerpt(current?.epigraph && paras[0] === current.epigraph ? paras.slice(1) : paras)
     if (current) recordWords(current.projectId, wordCount - current.wordCount)
-    if (current && (current.wordCount !== wordCount || current.lastPos !== state.selection.from || current.excerpt !== excerpt)) {
-      await patch<Scene>('scenes', scene.id, { wordCount, lastPos: state.selection.from, excerpt })
+    if (
+      current &&
+      (current.wordCount !== wordCount || current.charCount !== charCount || current.lastPos !== state.selection.from || current.excerpt !== excerpt)
+    ) {
+      await patch<Scene>('scenes', scene.id, { wordCount, charCount, lastPos: state.selection.from, excerpt })
     }
   }
 
@@ -169,7 +173,7 @@ export function SceneEditor({
       editor.commands.setContent(remote.content as object, { emitUpdate: false })
       editor.commands.setTextSelection(Math.min(from, editor.state.doc.content.size - 1))
       latest.current = editor.state
-      onWords(remote.wordCount)
+      onWords(remote.wordCount, docCharCount(remote.content))
     }
   }, [remote, editor, onWords])
 

@@ -5,21 +5,24 @@ import { bank, dayKey, pace, totalWords } from '../lib/pace'
 import { formatWords } from '../lib/text'
 import { PLATFORMS, platformOf } from '../lib/platforms'
 import { toast } from '../lib/ui'
+import { chapterLength, hasNorm, lengthText, normText, PAGE, pageSize, sumChars } from '../lib/length'
+import { useState } from 'react'
 
 const DAY = 86400000
 const date = (d: Date | string) =>
   (typeof d === 'string' ? new Date(d + 'T12:00:00') : d).toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
 const num = (n: number) => n.toLocaleString('ru-RU')
 
-export function NumberField({ value, placeholder, onSave }: { value?: number; placeholder: string; onSave: (v?: number) => void }) {
+export function NumberField({ value, placeholder, onSave, decimal }: { value?: number; placeholder: string; onSave: (v?: number) => void; decimal?: boolean }) {
   return (
     <input
       className="input num-input"
-      inputMode="numeric"
+      inputMode={decimal ? 'decimal' : 'numeric'}
       placeholder={placeholder}
       defaultValue={value ?? ''}
       onBlur={(e) => {
-        const v = parseInt(e.target.value.replace(/\D/g, ''), 10)
+        const raw = e.target.value.replace(/\s/g, '')
+        const v = decimal ? parseFloat(raw.replace(',', '.')) : parseInt(raw.replace(/\D/g, ''), 10)
         onSave(Number.isFinite(v) && v > 0 ? v : undefined)
       }}
     />
@@ -117,6 +120,7 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
     chapter,
     ready: scenes.length ? Math.round((scenes.filter((s) => s.status === 'done').length / scenes.length) * 100) : 0,
     written: scenes.length > 0 && scenes.every((s) => s.wordCount > 0),
+    chars: sumChars(scenes),
   }))
   const lastUp = [...rows].reverse().find((r) => r.chapter.publishedAt)
   const next = rows.find((r) => !r.chapter.publishedAt)
@@ -197,9 +201,15 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
           </label>
         </div>
         <div className="publish-list">
-          {rows.map(({ chapter, ready, written }) => (
+          {rows.map(({ chapter, ready, written, chars }) => (
             <div key={chapter.id} className="publish-row">
               <span className="publish-title">{chapter.title}</span>
+              {/* Length before going up: the site's rule is easier to keep when it is in sight. */}
+              {chars > 0 && (
+                <span className={`small len-tag ${chapterLength(p, chars).state}`} title={hasNorm(p) ? `норма ${normText(p)}` : undefined}>
+                  {lengthText(p, chars)}
+                </span>
+              )}
               <span className="small muted">{written ? `${ready}%` : 'пишется'}</span>
               <input
                 className="input sm"
@@ -216,5 +226,73 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
         </div>
       </details>
     </section>
+  )
+}
+
+/**
+ * «Длина главы»: the site's rule or the author's own, from–to, in pages or characters.
+ * While writing, a thin line at the top of the page fills up against it.
+ */
+export function LengthNorm({ project }: { project: Project }) {
+  const p = project
+  const [open, setOpen] = useState(false)
+  const set = (changes: Partial<Project>) => void patch<Project>('projects', p.id, changes)
+  const inPages = p.lengthUnit !== 'chars'
+  const page = pageSize(p)
+  // Fields show the author's unit; the norm is kept in characters.
+  const shown = (chars?: number) => (chars ? (inPages ? Math.round((chars / page) * 10) / 10 : chars) : undefined)
+  const toChars = (v?: number) => (v ? Math.round(inPages ? v * page : v) : undefined)
+  if (!open)
+    return (
+      <div className="small muted" style={{ marginTop: 6 }}>
+        {hasNorm(p) ? (
+          <>
+            глава: <strong className="norm-v">{normText(p)}</strong>{' '}
+            <button className="link" onClick={() => setOpen(true)}>
+              изменить
+            </button>
+          </>
+        ) : (
+          <button className="link" onClick={() => setOpen(true)}>
+            + длина главы
+          </button>
+        )}
+      </div>
+    )
+  return (
+    <div className="length-norm">
+      <div className="seg sm">
+        <button aria-pressed={inPages} onClick={() => set({ lengthUnit: 'pages' })}>
+          страницы
+        </button>
+        <button aria-pressed={!inPages} onClick={() => set({ lengthUnit: 'chars' })}>
+          знаки
+        </button>
+      </div>
+      <label className="row small" style={{ gap: 6 }}>
+        от
+        <NumberField key={`min${p.lengthUnit}`} value={shown(p.chapterMin)} decimal={inPages} placeholder="—" onSave={(v) => set({ chapterMin: toChars(v) })} />
+        до
+        <NumberField key={`max${p.lengthUnit}`} value={shown(p.chapterMax)} decimal={inPages} placeholder="—" onSave={(v) => set({ chapterMax: toChars(v) })} />
+        {inPages ? 'стр.' : 'знаков'}
+      </label>
+      {inPages && (
+        <label className="row small muted" style={{ gap: 6 }}>
+          на странице
+          <NumberField value={p.pageChars} placeholder={String(PAGE)} onSave={(pageChars) => set({ pageChars })} />
+          знаков с пробелами
+        </label>
+      )}
+      <div className="row small" style={{ gap: 12 }}>
+        <button className="link" onClick={() => setOpen(false)}>
+          готово
+        </button>
+        {hasNorm(p) && (
+          <button className="link muted" onClick={() => set({ chapterMin: undefined, chapterMax: undefined })}>
+            без нормы
+          </button>
+        )}
+      </div>
+    </div>
   )
 }

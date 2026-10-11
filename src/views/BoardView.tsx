@@ -41,6 +41,7 @@ import { InlineEdit, Modal, toast } from '../lib/ui'
 import { deadlineText } from '../lib/stories'
 import { formatScenes, formatWords, lastSentences } from '../lib/text'
 import { chapterProgress, totalWords } from '../lib/pace'
+import { chapterLength, lengthText, normText, sumChars } from '../lib/length'
 import { db } from '../db/db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { go } from '../lib/router'
@@ -359,6 +360,7 @@ function Column({
           )}
           <span className="column-count">
             {formatScenes(shown.length)}
+            <LenTag data={data} chars={sumChars(scenes)} />
             {chapter.publishedAt && (
               <span className="published" title="Выложена">
                 ✓ {new Date(chapter.publishedAt + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
@@ -574,6 +576,19 @@ function AskLock({ data }: { data: ProjectData }) {
   )
 }
 
+/** The chapter's length on the board, only once the author has a norm: in norm, close to the bound, over it. */
+function LenTag({ data, chars }: { data: ProjectData; chars: number }) {
+  const L = chapterLength(data.project, chars)
+  if (L.state === 'none' || !chars) return null
+  const say = { short: 'короче нормы', ok: 'в норме', near: 'почти у верхней границы', over: 'длиннее нормы' }[L.state]
+  return (
+    <span className={`len-tag ${L.state}`} title={`${say}: ${normText(data.project)}`}>
+      {' · '}
+      {lengthText(data.project, chars)}
+    </span>
+  )
+}
+
 /** Nothing written anywhere yet: the «you are here» marks and the like mean nothing so far. */
 const storyEmpty = (data: ProjectData) => ![...data.scenes, ...data.pool.scenes].some((s) => s.wordCount > 0)
 
@@ -608,6 +623,7 @@ function PoolColumn({ data, lens, onOpenScene }: { data: ProjectData; lens: Lens
       <header className="column-head">
         <div className="column-title pool-title">Пока без места</div>
         <div className="column-meta">{scenes.length ? `${formatScenes(scenes.length)} — перетащи в главу` : 'Сцены, которые уже крутятся в голове. Хоть одно слово на каждую — место найдёшь потом.'}</div>
+        <ThreeParts data={data} />
       </header>
       <SortableContext items={scenes.map((s) => s.id)} strategy={verticalListSortingStrategy}>
         <div className="cards">
@@ -625,6 +641,30 @@ function PoolColumn({ data, lens, onOpenScene }: { data: ProjectData; lens: Lens
         onBlur={() => void add()}
       />
     </section>
+  )
+}
+
+/**
+ * Only scenes so far, no chapters yet: three big parts are easier to sort into than chapters.
+ * The empty starter chapter becomes «Начало»; the parts can be split into chapters later.
+ */
+function ThreeParts({ data }: { data: ProjectData }) {
+  const planned = data.scenes.some((s) => !isPlaceholder(s, data))
+  if (data.pool.scenes.length < 2 || planned || data.chapters.length > 1) return null
+  const make = async () => {
+    const first = data.chapters[0]
+    if (first) await patch<Chapter>('chapters', first.id, { title: 'Начало', goal: first.goal || 'Кто они и что сдвигает историю с места' })
+    else await createChapter(data.project.id, 'Начало')
+    const mid = await createChapter(data.project.id, 'Середина')
+    await patch<Chapter>('chapters', mid.id, { goal: 'Всё усложняется, ставки растут' })
+    const end = await createChapter(data.project.id, 'Финал')
+    await patch<Chapter>('chapters', end.id, { goal: 'Развязка: чем всё кончится' })
+    toast('Перетащи сцены в части. Порядок внутри — тоже перетаскиванием. Потом часть можно разделить на главы')
+  }
+  return (
+    <button className="link small three-parts" onClick={() => void make()}>
+      Разложить по частям: Начало · Середина · Финал
+    </button>
   )
 }
 
@@ -764,6 +804,7 @@ function Timeline({
               <TimelineScene key={s.id} data={data} scene={s} lens={lens} onOpen={() => onOpenScene(s.id)} />
             ))}
             <TimelineAdd data={data} lens={lens} />
+            <ThreeParts data={data} />
           </div>
         )}
       </section>
@@ -786,7 +827,10 @@ function Timeline({
               <span className="spacer" />
               {pay.length > 0 && <span className="tl-mk">◎ {pay.length}</span>}
               {plant.length > 0 && <span className="tl-mk">✦ {plant.length}</span>}
-              <span className="tl-meta">{formatScenes(scenes.filter((s) => !isPlaceholder(s, data)).length)}</span>
+              <span className="tl-meta">
+                {formatScenes(scenes.filter((s) => !isPlaceholder(s, data)).length)}
+                <LenTag data={data} chars={sumChars(scenes)} />
+              </span>
             </button>
             {lineMissing && <div className="tl-gap">нет сцен этой ветки</div>}
             {isOpen && (
