@@ -249,6 +249,9 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   }
 
   const onWords = useCallback((n: number) => setWords(n), [])
+  const [saved, setSaved] = useState(true)
+  // Whether the story was empty when the page opened: then its title page stands above the text, otherwise the scene's heading.
+  const [storyEmpty] = useState(() => [...data.scenes, ...data.pool.scenes].every((s) => !s.wordCount))
   const onReady = useCallback((ed: Editor) => setEditor(ed), [])
 
   if (!scene) return null
@@ -286,7 +289,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
             <span className="hide-sm" style={{ whiteSpace: 'nowrap' }}>
               {chapter?.title} ›
             </span>
-            <InlineEdit value={scene.title} placeholder={sceneName(data, scene)} onSave={(title) => void patch<Scene>('scenes', scene.id, { title })} />
+            <span className="crumb-scene">{sceneName(data, scene)}</span>
             {mode !== 'write' && <span className="mode-chip">{mode === 'edit' ? 'правка' : 'переписываю'}</span>}
           </div>
           {mode === 'edit' && (
@@ -304,6 +307,10 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
             </span>
           )}
           <span className="spacer" />
+          <span className={`save-state ${saved ? '' : 'busy'}`} aria-live="polite" title="Текст сохраняется на устройстве сразу, пока печатаешь">
+            {saved ? <Icon name="check" size={14} /> : null}
+            {saved ? 'Сохранено' : 'Сохраняю…'}
+          </span>
           {sprint && sprint.projectId === data.project.id && left > 0 && (
             <button className="tool sprint-pill" title="Фокус идёт. Нажми, чтобы остановить" onClick={() => confirm('Остановить фокус?') && endFocus()}>
               <Icon name="clock" size={14} /> {clock(left)}
@@ -416,6 +423,40 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
             }}
           />
         )}
+        <div className="passport-wrap">
+          <SceneNow data={data} scene={scene} onOpenPlan={openPlan} />
+        </div>
+
+        <div className="editor-area">
+          {rewriting && <RewriteOld scene={scene} editor={editor} onDone={() => setModeState('write')} />}
+          <div className="editor-wrap">
+            {text && !rewriting && storyEmpty && <TitlePage key={`title-${scene.id}`} project={data.project} editor={editor} empty />}
+            {text && !rewriting && !storyEmpty && (
+              <header className="scene-head">
+                <div className="scene-head-chapter">{chapter?.title}</div>
+                <InlineEdit
+                  className="scene-head-title"
+                  value={scene.title}
+                  placeholder={sceneName(data, scene)}
+                  onSave={(title) => void patch<Scene>('scenes', scene.id, { title })}
+                />
+              </header>
+            )}
+            {text && (
+              <SceneEditor
+                scene={scene}
+                initial={text}
+                onReady={onReady}
+                onWords={onWords}
+                onSaved={setSaved}
+                onSelectionAction={setAction}
+                onMarkerClick={setOpenMarker}
+                onCommentClick={setOpenComment}
+              />
+            )}
+            {text && !rewriting && <MarginNotes key={`notes-${scene.id}`} data={data} editor={editor} onOpen={setOpenComment} />}
+          </div>
+        </div>
         {text && editor && !rewriting && (
           <Resume
             key={scene.id}
@@ -428,30 +469,6 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
             }}
           />
         )}
-        <div className="passport-wrap">
-          <SceneNow data={data} scene={scene} onOpenPlan={openPlan} />
-        </div>
-
-        <div className="editor-area">
-          {rewriting && <RewriteOld scene={scene} editor={editor} onDone={() => setModeState('write')} />}
-          <div className="editor-wrap">
-            {text && !rewriting && (
-              <TitlePage key={`title-${scene.id}`} project={data.project} editor={editor} empty={[...data.scenes, ...data.pool.scenes].every((s) => !s.wordCount)} />
-            )}
-            {text && (
-              <SceneEditor
-                scene={scene}
-                initial={text}
-                onReady={onReady}
-                onWords={onWords}
-                onSelectionAction={setAction}
-                onMarkerClick={setOpenMarker}
-                onCommentClick={setOpenComment}
-              />
-            )}
-            {text && !rewriting && <MarginNotes key={`notes-${scene.id}`} data={data} editor={editor} onOpen={setOpenComment} />}
-          </div>
-        </div>
       </div>
 
       <TextStats

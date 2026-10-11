@@ -35,6 +35,7 @@ export function SceneEditor({
   initial,
   onReady,
   onWords,
+  onSaved,
   onSelectionAction,
   onMarkerClick,
   onCommentClick,
@@ -43,6 +44,8 @@ export function SceneEditor({
   initial: SceneText
   onReady: (editor: Editor) => void
   onWords: (n: number) => void
+  /** False while there are unsaved changes, true once they are on the device. */
+  onSaved?: (saved: boolean) => void
   onSelectionAction: (a: SelectionAction) => void
   onMarkerClick: (markerId: string) => void
   onCommentClick?: (noteId: string) => void
@@ -98,6 +101,7 @@ export function SceneEditor({
     onUpdate: ({ editor }) => {
       latest.current = editor.state
       keepLineCentered(editor)
+      if (!dirty.current) onSaved?.(false)
       dirty.current = true
       clearTimeout(pending.current)
       pending.current = setTimeout(() => void flush(editor), 800)
@@ -118,6 +122,7 @@ export function SceneEditor({
     } finally {
       saving.current = false
     }
+    if (!dirty.current) onSaved?.(true)
     onWords(wordCount)
     const current = await db.scenes.get(scene.id)
     const paras = docParagraphs(content).map((p) => p.trim()).filter(Boolean)

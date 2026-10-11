@@ -18,16 +18,23 @@ export interface Typo {
   resume: 'on' | 'off'
 }
 
-export const DEFAULT_TYPO: Typo = { font: 'serif', size: 18, width: 'medium', leading: 'normal', para: 'gap', typewriter: 'off', calm: 'on', focusPara: 'off', spell: 'edit', resume: 'on' }
+export const DEFAULT_TYPO: Typo = { font: 'serif', size: 18, width: 'medium', leading: 'normal', para: 'gap', typewriter: 'off', calm: 'off', focusPara: 'off', spell: 'edit', resume: 'on' }
 
 const KEY = 'manuscript.typo'
+const CALM_DEFAULT_KEY = 'manuscript.calmDefault2'
 const WIDTH = { narrow: '560px', medium: '660px', wide: '800px' }
 const LEADING = { tight: '1.5', normal: '1.7', loose: '1.95' }
 const FONT = { serif: 'var(--serif)', sans: 'var(--sans)', easy: "'Onest Variable', var(--sans)", mono: 'var(--mono)' }
 
 export function loadTypo(): Typo {
   try {
-    return { ...DEFAULT_TYPO, ...JSON.parse(localStorage.getItem(KEY) ?? '{}') }
+    const saved = JSON.parse(localStorage.getItem(KEY) ?? '{}')
+    // Once: the quiet view used to be on by default and made the page look unfinished — start with the bars visible.
+    if (!localStorage.getItem(CALM_DEFAULT_KEY)) {
+      delete saved.calm
+      localStorage.setItem(CALM_DEFAULT_KEY, '1')
+    }
+    return { ...DEFAULT_TYPO, ...saved }
   } catch {
     return DEFAULT_TYPO
   }

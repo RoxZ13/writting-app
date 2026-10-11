@@ -5967,3 +5967,87 @@ button.avatar {
   background: var(--hero);
   color: #fff;
 }
+
+/* The scene's heading on the page: where I am, said once, quietly. The name is edited right here. */
+.scene-head {
+  margin: 8px 0 28px;
+}
+.scene-head-chapter {
+  font-family: var(--sans);
+  font-size: var(--fs-sm);
+  color: var(--ink-3);
+  margin-bottom: 4px;
+}
+.scene-head .scene-head-title {
+  width: 100%;
+  font-family: var(--text-font);
+  font-size: calc(var(--text-size) * 1.45);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.scene-head .scene-head-title::placeholder {
+  color: var(--ink);
+}
+.scene-head .scene-head-title:focus::placeholder {
+  color: var(--ink-3);
+}
+.crumb-scene {
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* «Сохранено»: the one sign that the text is safe. Quiet when saved, a word while saving. */
+.save-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 6px;
+  font-size: var(--fs-sm);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.save-state .ico {
+  color: var(--st-done);
+}
+.write.typing .save-state {
+  opacity: 0.5;
+}
+@media (max-width: 600px) {
+  .save-state {
+    font-size: 0;
+    gap: 0;
+  }
+  .save-state.busy::after {
+    content: '…';
+    font-size: var(--fs-sm);
+  }
+}
+
+@media (pointer: fine) {
+  /* Quiet view with both panels: the navigator has its own column, so it stays visible instead of leaving a grey gap. */
+  [data-calm='on'] .app-text .write.nav-open.brief-open .write-side {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* «В прошлый раз» sits at the end of the text column and sticks to the bottom of the screen, centred on the text. */
+.resume {
+  position: sticky;
+  left: auto;
+  transform: none;
+  bottom: calc(env(safe-area-inset-bottom) + 20px);
+  margin: 0 auto;
+  width: min(calc(var(--measure) + 32px), calc(100% - 32px));
+  max-width: none;
+  animation: none;
+}
+@media (max-width: 760px) {
+  .resume {
+    bottom: calc(env(safe-area-inset-bottom) + 84px);
+  }
+}
