@@ -31,16 +31,22 @@ import { Shortcuts } from '../components/Shortcuts'
 
 type Mode = 'write' | 'edit' | 'rewrite'
 const PANELS_KEY = 'manuscript.panels'
+const PANELS_RESET_KEY = 'manuscript.panelsReset2'
 const MODE_KEY = 'manuscript.mode'
 const HINTS_KEY = 'manuscript.hints'
 
 function loadPanels(): { nav: boolean; plan: boolean } {
   const wide = typeof matchMedia !== 'undefined' && matchMedia('(min-width: 1101px)').matches
   try {
+    // Once: panels used to open by default — start everyone from a clean page.
+    if (!localStorage.getItem(PANELS_RESET_KEY)) {
+      localStorage.removeItem(PANELS_KEY)
+      localStorage.setItem(PANELS_RESET_KEY, '1')
+    }
     const saved = JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}')
     // Side panels only stay open between visits on a wide screen; on a phone they cover the text.
     // The navigator is there by default (where am I in the book); in the quiet view it hides with the header.
-    return wide ? { nav: true, plan: false, ...saved } : { nav: false, plan: false }
+    return wide ? { nav: false, plan: false, ...saved } : { nav: false, plan: false }
   } catch {
     return { nav: wide, plan: false }
   }
@@ -307,9 +313,8 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
             </span>
           )}
           <span className="spacer" />
-          <span className={`save-state ${saved ? '' : 'busy'}`} aria-live="polite" title="Текст сохраняется на устройстве сразу, пока печатаешь">
-            {saved ? <Icon name="check" size={14} /> : null}
-            {saved ? 'Сохранено' : 'Сохраняю…'}
+          <span className={`save-state ${saved ? '' : 'busy'}`} aria-live="polite" title={saved ? 'Сохранено на этом устройстве' : 'Сохраняю…'}>
+            {saved ? <Icon name="check" size={15} /> : 'Сохраняю…'}
           </span>
           {sprint && sprint.projectId === data.project.id && left > 0 && (
             <button className="tool sprint-pill" title="Фокус идёт. Нажми, чтобы остановить" onClick={() => confirm('Остановить фокус?') && endFocus()}>

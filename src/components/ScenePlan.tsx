@@ -111,7 +111,6 @@ export function ScenePlan({
     setOpened((prev) => new Set(prev).add(p))
     if (p === 'goal') requestAnimationFrame(() => goalRef.current?.focus())
   }
-  const empty = !Object.values(filled).some(Boolean) && !notes.length
 
   return (
     <section className="plan" aria-label="План сцены">
@@ -123,8 +122,6 @@ export function ScenePlan({
         </button>
       </div>
       <div className="pp-body">
-        {empty && <p className="pp-explain">План пустой — это нормально. Добавь, только если хочется.</p>}
-
         {show('goal') && (
           <div className="pp-section">
             <h4>Зачем эта сцена</h4>

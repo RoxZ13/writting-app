@@ -6051,3 +6051,38 @@ button.avatar {
     bottom: calc(env(safe-area-inset-bottom) + 84px);
   }
 }
+
+/* =====================================================================
+   Lightness: the page is for writing. Controls are icons, quiet until needed.
+   ===================================================================== */
+@media (min-width: 761px) {
+  .tabs > button[aria-current='page'] {
+    background: var(--fill);
+    color: var(--ink);
+  }
+}
+.write-top .tool-label {
+  display: none;
+}
+.write-top .tool {
+  color: var(--ink-3);
+}
+.write-top .tool:hover,
+.write-top .tool.on {
+  color: var(--ink);
+}
+.write-top .crumbs {
+  color: var(--ink-3);
+}
+.write-top .crumb-scene {
+  color: var(--ink-3);
+}
+/* A new story: its name is a quiet line above the text, not a poster. */
+.title-page .tp-title {
+  font-size: calc(var(--text-size) * 1.45);
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+.title-page .tp-title::placeholder {
+  color: var(--line-2);
+}

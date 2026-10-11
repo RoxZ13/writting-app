@@ -23,7 +23,7 @@ export function TextStats({ editor, chapterWords, bookWords, today }: { editor: 
       editor.off('transaction', update)
     }
   }, [editor])
-  if (!editor) return null
+  if (!editor || editor.isEmpty) return null
 
   const { from, to, empty } = editor.state.selection
   const scene = textStats(editor.state.doc.textBetween(0, editor.state.doc.content.size, '\n'))
