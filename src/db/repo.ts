@@ -14,7 +14,7 @@ import {
   type Character,
   type SyncedTable,
 } from './db'
-import { docParagraphs, docWordCount, emptyDoc } from '../lib/text'
+import { docParagraphs, docCharCount, docWordCount, emptyDoc } from '../lib/text'
 import { isEpigraph, makeExcerpt } from '../lib/importer'
 
 /** Write a record locally and queue it for sync. All app writes go through here. */
@@ -109,6 +109,7 @@ export async function createScene(
     goal: '',
     beats: [],
     wordCount,
+    charCount: docCharCount(content),
     updatedAt: 0,
     ...extra,
   })
@@ -349,6 +350,7 @@ export async function mergeSceneIntoPrevious(sceneId: string): Promise<string | 
   await save<Scene>('scenes', {
     ...prev,
     wordCount,
+    charCount: (prev.charCount ?? 0) + (scene.charCount ?? 0),
     beats: [...prev.beats, ...scene.beats],
     lineIds: [...new Set([...(prev.lineIds ?? []), ...(scene.lineIds ?? [])])],
     characterIds: [...new Set([...(prev.characterIds ?? []), ...(scene.characterIds ?? [])])],
@@ -432,4 +434,13 @@ export async function recountWords(projectId: string) {
     if (s.wordCount !== n) await save<Scene>('scenes', { ...s, wordCount: n })
   }
   await db.meta.put({ key: flag, value: true })
+}
+
+/** Scenes saved before characters were counted get their count once. */
+export async function recountChars(projectId: string) {
+  const scenes = alive(await db.scenes.where('projectId').equals(projectId).toArray()).filter((s) => s.charCount === undefined)
+  for (const s of scenes) {
+    const t = await db.texts.get(s.id)
+    await save<Scene>('scenes', { ...s, charCount: t ? docCharCount(t.content) : 0 })
+  }
 }

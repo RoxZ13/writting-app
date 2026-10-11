@@ -13,11 +13,13 @@ import { TitlePage } from '../components/TitlePage'
 import { MarginNotes } from '../components/MarginNotes'
 import { editHintsKey } from '../components/EditHints'
 import { countHints } from '../lib/editcheck'
-import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
+import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, sceneShort, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { hotkey, isTouch, session } from '../lib/session'
 import { clock, useSprint } from '../lib/sprint'
 import { endFocus, FocusStart } from '../components/Focus'
+import { sumChars } from '../lib/length'
+import { ChapterMeter } from '../components/ChapterMeter'
 import { chapterProgress, dayKey, totalWords, wordsOn } from '../lib/pace'
 import { MARKER_STATES } from '../lib/status'
 import { docParagraphs, emptyDoc, formatWords, lastSentences } from '../lib/text'
@@ -90,6 +92,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   const [panels, setPanels] = useState(loadPanels)
   const [mode, setModeState] = useState<Mode>(loadMode)
   const [words, setWords] = useState<number | null>(null)
+  const [live, setLive] = useState<{ id: string; chars: number } | null>(null)
   const [editor, setEditor] = useState<Editor | null>(null)
   const [action, setAction] = useState<SelectionAction | null>(null)
   const [openMarker, setOpenMarker] = useState<string | null>(null)
@@ -262,9 +265,15 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
     }
   }
 
-  const onWords = useCallback((n: number) => setWords(n), [])
+  const onWords = useCallback(
+    (n: number, chars: number) => {
+      setWords(n)
+      setLive({ id: sceneId, chars })
+    },
+    [sceneId],
+  )
   const [saved, setSaved] = useState(true)
-  // Whether the story was empty when the page opened: then its title page stands above the text, otherwise the scene's heading.
+  // Whether the story was empty when the page opened.
   const [storyEmpty] = useState(() => [...data.scenes, ...data.pool.scenes].every((s) => !s.wordCount))
   const onReady = useCallback((ed: Editor) => setEditor(ed), [])
 
@@ -284,6 +293,10 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   const chapter = data.chapterById.get(scene.chapterId)
   const due = sceneMarkers(data, scene).toPay.length
   const beatsDone = scene.beats.filter((b) => b.done).length
+  // The chapter's length right now: the other scenes as saved, this one as typed.
+  const chapterChars =
+    sumChars(data.scenes.filter((s) => s.chapterId === scene.chapterId && s.id !== scene.id)) +
+    (live?.id === scene.id ? live.chars : (scene.charCount ?? 0))
 
   return (
     <div className={cls}>
@@ -439,6 +452,9 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
         <div className="passport-wrap">
           <SceneNow data={data} scene={scene} onOpenPlan={openPlan} />
         </div>
+        {chapter && !chapter.pool && (
+          <ChapterMeter project={data.project} scene={scene} chars={chapterChars} editor={editor} locked={!!chapter.locked} />
+        )}
 
         <div className="editor-area">
           {rewriting && <RewriteOld scene={scene} editor={editor} onDone={() => setModeState('write')} />}
@@ -570,7 +586,7 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
       <div className="navi-head">
         <div className="navi-book">{data.project.title}</div>
         <div className="navi-sub">
-          {cp.written} из {cp.total} {cp.total === 1 ? 'главы' : 'глав'} · {formatWords(words)}
+          {cp.written} из {cp.of} {cp.total === 1 && !cp.unknown ? 'главы' : 'глав'} · {formatWords(words)}
         </div>
       </div>
       <div className="navi-label">Главы</div>
@@ -604,10 +620,10 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
                       onPick()
                     }}
                   >
-                    {sceneName(data, s)}
+                    {sceneShort(data, s)}
                   </button>
                 ))}
-                {!chapter.pool && (
+                {!chapter.pool && !chapter.locked && (
                   <button className="navi-scene add" onClick={() => void addScene(chapter.id)}>
                     + сцена
                   </button>

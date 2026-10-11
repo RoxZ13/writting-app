@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { Scene } from '../db/db'
 import { createMarker, ensurePool, mergeSceneIntoPrevious, moveScene, patch, remove, splitChapterAt } from '../db/repo'
 import { go } from '../lib/router'
-import { sceneName, type ProjectData } from '../lib/hooks'
+import { isLocked, sceneName, type ProjectData } from '../lib/hooks'
 import { STATUSES } from '../lib/status'
 import { toast } from '../lib/ui'
 import { MarkerCard } from './MarkerCard'
@@ -26,10 +26,28 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
   const set = (changes: Partial<Scene>) => void patch<Scene>('scenes', scene.id, changes)
   const markers = data.markers.filter((m) => m.setupSceneId === scene.id || m.payoffSceneId === scene.id)
   const inPool = scene.chapterId === data.pool.chapter?.id
-  const siblings = inPool ? data.pool.scenes : (data.outline.find((o) => o.chapter.id === scene.chapterId)?.scenes ?? [])
-  const canMerge = !inPool && siblings.indexOf(scene) > 0
+  const siblings = inPool ? data.pool.scenes : data.scenes.filter((s) => s.chapterId === scene.chapterId)
+  const locked = isLocked(data, scene.chapterId)
+  const canMerge = !inPool && !locked && siblings.indexOf(scene) > 0
+  // No dragging on a phone: there the way to move a scene is right in sight, not under «Ещё».
+  const phone = typeof matchMedia !== 'undefined' && matchMedia('(max-width: 760px)').matches
   const [opened, setOpened] = useState<Set<'lines' | 'people'>>(new Set())
   const show = (k: 'lines' | 'people') => opened.has(k) || (k === 'lines' ? (scene.lineIds ?? []).length > 0 : (scene.characterIds ?? []).length > 0)
+  const where = (
+    <label className="sheet-where">
+      <span className="field-label">{phone ? 'Где стоит' : 'Перенести в'}</span>
+      <select className="select" value={inPool ? 'pool' : scene.chapterId} disabled={locked} onChange={(e) => void place(e.target.value)}>
+        <option value="pool">Пока без места</option>
+        {data.chapters.map((c) => (
+          <option key={c.id} value={c.id} disabled={c.locked && c.id !== scene.chapterId}>
+            {c.title}
+            {c.locked ? ' · зафиксирована' : ''}
+          </option>
+        ))}
+      </select>
+      {locked && <span className="small muted">Глава зафиксирована — сцена стоит на месте. Открепить можно на доске, в ⋯ у главы.</span>}
+    </label>
+  )
   const place = async (to: string) => {
     if (to === 'pool') {
       const pool = await ensurePool(data.project.id)
@@ -72,6 +90,7 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
         <button className="btn primary" onClick={() => go({ view: 'write', sceneId: scene.id })}>
           Писать эту сцену →
         </button>
+        {phone && where}
         {/* Only what stands out: pace when the scene is quiet or tense, and whether it is a key one. */}
         <div className="sheet-plot">
           <div className="seg" role="group" aria-label="Темп сцены">
@@ -136,17 +155,7 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
         <details className="sheet-more">
           <summary>Ещё</summary>
           <div className="stack" style={{ gap: 12, marginTop: 12 }}>
-            <label className="sheet-where">
-              <span className="field-label">Перенести в</span>
-              <select className="select" value={inPool ? 'pool' : scene.chapterId} onChange={(e) => void place(e.target.value)}>
-                <option value="pool">Пока без места</option>
-                {data.chapters.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.title}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {!phone && where}
             {canMerge && (
               <button
                 className="btn"
@@ -183,18 +192,20 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
                 Склеить с предыдущей сценой
               </button>
             )}
-            <button
-              className="btn ghost"
-              style={{ color: 'var(--mk-hanging)' }}
-              onClick={async () => {
-                if (!confirm(`Удалить «${sceneName(data, scene)}» вместе с текстом?`)) return
-                await remove('scenes', scene.id)
-                await remove('texts', scene.id)
-                onClose()
-              }}
-            >
-              Удалить сцену
-            </button>
+            {!locked && (
+              <button
+                className="btn ghost"
+                style={{ color: 'var(--mk-hanging)' }}
+                onClick={async () => {
+                  if (!confirm(`Удалить «${sceneName(data, scene)}» вместе с текстом?`)) return
+                  await remove('scenes', scene.id)
+                  await remove('texts', scene.id)
+                  onClose()
+                }}
+              >
+                Удалить сцену
+              </button>
+            )}
           </div>
         </details>
       </aside>

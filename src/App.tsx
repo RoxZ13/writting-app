@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSyncStatus, onSyncStatus, startCloudSync, type SyncStatus } from './db/cloud'
 import { useProjectData, useProjects, type ProjectData } from './lib/hooks'
-import { recountWords, tidyImportedScenes } from './db/repo'
+import { recountChars, recountWords, tidyImportedScenes } from './db/repo'
 import { go, useRoute, type Route } from './lib/router'
 import { getCurrentProjectId, hotkey, returnFocus, setCurrentProjectId } from './lib/session'
 import { toast, Toaster } from './lib/ui'
@@ -64,7 +64,13 @@ export function App() {
 
   const data = useProjectData(projectId)
   useEffect(() => {
-    if (projectId) void tidyImportedScenes(projectId).then(() => recountWords(projectId))
+    if (!projectId) return
+    // Each step on its own: one failing must not keep the others (the chapter lengths) from running.
+    void tidyImportedScenes(projectId)
+      .catch(() => {})
+      .then(() => recountWords(projectId))
+      .catch(() => {})
+      .then(() => recountChars(projectId))
   }, [projectId])
 
   // A story opens where it was left: the text, or the board for someone who plans first.
@@ -72,6 +78,17 @@ export function App() {
     setProjectId(id)
     setCurrentProjectId(id)
     go({ view: view ?? lastView(id) })
+  }, [])
+  // Another page can open a story (a new edition, for one) without knowing how stories are switched.
+  useEffect(() => {
+    const on = (e: Event) => {
+      const { id, sceneId } = (e as CustomEvent<{ id: string; sceneId?: string }>).detail
+      setProjectId(id)
+      setCurrentProjectId(id)
+      go(sceneId ? { view: 'text', sceneId } : { view: 'board' })
+    }
+    window.addEventListener('manuscript:open', on)
+    return () => window.removeEventListener('manuscript:open', on)
   }, [])
   useEffect(() => {
     if (projectId && (route.view === 'text' || route.view === 'board')) rememberView(projectId, route.view)

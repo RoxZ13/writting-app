@@ -14,6 +14,9 @@
   --focus: #0b0b0c;
   /* The one colour accent: where you are now. */
   --accent-2: #2563eb;
+  /* The author's own colour: buttons, the chosen tab, «ты здесь». Ink by default. */
+  --brand: var(--ink);
+  --on-brand: var(--bg);
 
   --st-idea: #b4b4bb;
   --st-draft: #e3a857;
@@ -374,9 +377,9 @@ h3 {
   transform: translateY(1px);
 }
 .btn.primary {
-  background: var(--ink);
-  color: var(--bg);
-  border-color: var(--ink);
+  background: var(--brand);
+  color: var(--on-brand);
+  border-color: var(--brand);
 }
 .btn.accent {
   background: var(--accent);
@@ -1520,12 +1523,12 @@ h2 {
 }
 .btn.primary,
 .btn.accent {
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--brand);
+  color: var(--on-brand);
 }
 .btn.primary:hover,
 .btn.accent:hover {
-  background: var(--ink);
+  background: var(--brand);
   opacity: 0.88;
 }
 .btn.ghost {
@@ -1589,8 +1592,8 @@ h2 {
   font-weight: 500;
 }
 .seg button[aria-pressed='true'] {
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--brand);
+  color: var(--on-brand);
   box-shadow: none;
 }
 .chip {
@@ -1599,12 +1602,12 @@ h2 {
 }
 .badge,
 .chip.here {
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--brand);
+  color: var(--on-brand);
 }
 .fab {
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--brand);
+  color: var(--on-brand);
   box-shadow: var(--shadow-2);
   width: 58px;
   height: 58px;
@@ -1657,12 +1660,12 @@ h2 {
   border-radius: var(--r-lg);
 }
 .nav-scene.active {
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--brand);
+  color: var(--on-brand);
   box-shadow: none;
 }
 .compass-check:hover {
-  border-color: var(--ink);
+  border-color: var(--brand);
   background: var(--fill);
 }
 
@@ -1746,8 +1749,8 @@ h2 {
   color: var(--ink);
 }
 .sidebar .nav button[aria-current='page'] {
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--brand);
+  color: var(--on-brand);
   box-shadow: var(--shadow-2);
 }
 .sidebar .nav .ico {
@@ -1976,7 +1979,7 @@ main.page.wide {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04), 0 12px 30px rgba(0, 0, 0, 0.08);
 }
 .card-scene.current {
-  outline: 2px solid var(--ink);
+  outline: 2px solid var(--brand);
 }
 .card-scene.dim {
   opacity: 0.25;
@@ -2019,8 +2022,8 @@ main.page.wide {
   color: var(--ink-3);
 }
 .card-foot .here {
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--brand);
+  color: var(--on-brand);
   border-radius: 999px;
   padding: 0 7px;
   font-weight: 500;
@@ -2352,8 +2355,8 @@ main.page.wide {
   color: var(--ink);
 }
 .tabs > button[aria-current='page'] {
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--brand);
+  color: var(--on-brand);
 }
 .tabs .tab-ico {
   display: none;
@@ -3461,8 +3464,8 @@ main.page {
   color: var(--ink);
 }
 .lib-nav button[aria-current='page'] {
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--brand);
+  color: var(--on-brand);
   box-shadow: var(--shadow-2);
 }
 .lib-back {
@@ -4037,8 +4040,8 @@ main.page {
 .tl-head .here,
 .tl-scene .here {
   flex: none;
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--brand);
+  color: var(--on-brand);
   border-radius: 999px;
   padding: 1px 8px;
   font-size: var(--fs-xs);
@@ -4166,8 +4169,8 @@ main.page {
 }
 
 .card-scene.node {
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--brand);
+  color: var(--on-brand);
 }
 .card-scene.node .card-title,
 .card-scene.node .card-goal,
@@ -4263,7 +4266,7 @@ main.page {
   background: color-mix(in srgb, #e5484d 55%, transparent);
 }
 .arc-bar.node {
-  background: var(--ink);
+  background: var(--brand);
 }
 .arc-bar.unset {
   background: var(--line-2);
@@ -4286,9 +4289,9 @@ main.page {
   cursor: pointer;
 }
 .chip-toggle.on {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--bg);
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--on-brand);
 }
 .sheet-heat {
   display: inline-flex;
@@ -4419,7 +4422,7 @@ main.page {
   background: var(--ink-2);
 }
 .pace-bars span.today i {
-  background: var(--ink);
+  background: var(--brand);
 }
 .pace-goal {
   position: absolute;
@@ -5288,8 +5291,8 @@ button.deadline {
   margin: 4px 0 18px;
   padding: 18px;
   border-radius: var(--r-lg);
-  background: var(--ink);
-  color: var(--bg);
+  background: var(--brand);
+  color: var(--on-brand);
   text-decoration: none;
 }
 .continue-k {
@@ -5701,6 +5704,213 @@ button.avatar {
 }
 @media (pointer: coarse) {
   .text-stats {
+    display: none;
+  }
+}
+
+/* Accent colour, chosen by the author (Настройки → Как выглядит → Акцент). The look stays the same. */
+:root[data-accent='forest'] {
+  --brand: #2f5d46;
+  --on-brand: #ffffff;
+  --accent-2: #2f5d46;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='paper'])[data-accent='forest'] {
+    --brand: #8fc0a2;
+    --on-brand: #15161a;
+    --accent-2: #8fc0a2;
+  }
+}
+:root[data-theme='dark'][data-accent='forest'] {
+  --brand: #8fc0a2;
+  --on-brand: #15161a;
+  --accent-2: #8fc0a2;
+}
+:root[data-accent='sea'] {
+  --brand: #1f5a8a;
+  --on-brand: #ffffff;
+  --accent-2: #1f5a8a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='paper'])[data-accent='sea'] {
+    --brand: #8db8e0;
+    --on-brand: #15161a;
+    --accent-2: #8db8e0;
+  }
+}
+:root[data-theme='dark'][data-accent='sea'] {
+  --brand: #8db8e0;
+  --on-brand: #15161a;
+  --accent-2: #8db8e0;
+}
+:root[data-accent='plum'] {
+  --brand: #6b3f7d;
+  --on-brand: #ffffff;
+  --accent-2: #6b3f7d;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='paper'])[data-accent='plum'] {
+    --brand: #c9a6da;
+    --on-brand: #15161a;
+    --accent-2: #c9a6da;
+  }
+}
+:root[data-theme='dark'][data-accent='plum'] {
+  --brand: #c9a6da;
+  --on-brand: #15161a;
+  --accent-2: #c9a6da;
+}
+:root[data-accent='terracotta'] {
+  --brand: #a24a2c;
+  --on-brand: #ffffff;
+  --accent-2: #a24a2c;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='paper'])[data-accent='terracotta'] {
+    --brand: #e5a184;
+    --on-brand: #15161a;
+    --accent-2: #e5a184;
+  }
+}
+:root[data-theme='dark'][data-accent='terracotta'] {
+  --brand: #e5a184;
+  --on-brand: #15161a;
+  --accent-2: #e5a184;
+}
+:root[data-accent='amber'] {
+  --brand: #8a6113;
+  --on-brand: #ffffff;
+  --accent-2: #8a6113;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='paper'])[data-accent='amber'] {
+    --brand: #e3aa5b;
+    --on-brand: #15161a;
+    --accent-2: #e3aa5b;
+  }
+}
+:root[data-theme='dark'][data-accent='amber'] {
+  --brand: #e3aa5b;
+  --on-brand: #15161a;
+  --accent-2: #e3aa5b;
+}
+:root[data-accent='rose'] {
+  --brand: #a3385f;
+  --on-brand: #ffffff;
+  --accent-2: #a3385f;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='paper'])[data-accent='rose'] {
+    --brand: #e8a0ba;
+    --on-brand: #15161a;
+    --accent-2: #e8a0ba;
+  }
+}
+:root[data-theme='dark'][data-accent='rose'] {
+  --brand: #e8a0ba;
+  --on-brand: #15161a;
+  --accent-2: #e8a0ba;
+}
+.accents {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.accent-swatch {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 3px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--line-2);
+  padding: 0;
+  cursor: pointer;
+}
+.accent-swatch[aria-checked='true'] {
+  box-shadow: 0 0 0 2px var(--ink);
+}
+/* Native controls (sliders, checkboxes) follow the accent too. */
+:root {
+  accent-color: var(--brand);
+}
+
+/* A chapter fixed in place: pale and quiet, so the chapters still to write stand out bright white. */
+.column.locked .card-scene {
+  background: color-mix(in srgb, var(--fill) 70%, var(--surface));
+  box-shadow: none;
+  cursor: pointer;
+}
+.column.locked .card-title,
+.column.locked .card-goal,
+.column.locked .card-excerpt {
+  color: var(--ink-3);
+}
+.column.locked .column-title {
+  color: var(--ink-2);
+}
+.lock-mark {
+  display: inline-flex;
+  align-items: center;
+  color: var(--ink-3);
+  flex: none;
+}
+.tl-chapter.locked .tl-title,
+.tl-chapter.locked .tl-scene {
+  color: var(--ink-3);
+}
+.plan-lock {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ink-3);
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.plan-lock:hover {
+  background: var(--fill);
+  color: var(--ink);
+}
+.plan-lock.on {
+  color: var(--ink-2);
+  background: var(--fill);
+}
+.ask-lock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ask-lock > span:first-of-type {
+  flex: 1 1 320px;
+}
+.sl-locked {
+  fill: color-mix(in srgb, var(--fill) 70%, transparent);
+}
+.sl-lock {
+  fill: none;
+  stroke: var(--ink-3);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sl-chapter.locked {
+  fill: var(--ink-3);
+}
+.sheet-where {
+  flex-wrap: wrap;
+}
+.sheet-where .small {
+  flex: 1 1 100%;
+  margin-top: -2px;
+}
+@media (max-width: 760px) {
+  .ask-lock > svg {
     display: none;
   }
 }
@@ -6136,4 +6346,183 @@ button.avatar {
 .app-text:has(.write.typing) .fab {
   opacity: 0;
   pointer-events: none;
+}
+
+/* «Что осталось дописать» */
+.ltw-title {
+  margin: 0 0 14px;
+}
+.ltw {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-height: 65vh;
+  overflow-y: auto;
+}
+.ltw h3 {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin: 0 0 6px;
+}
+.ltw-chapter + .ltw-chapter {
+  margin-top: 8px;
+}
+.ltw-k {
+  display: block;
+  font-weight: 700;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+.ltw-row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  padding: 6px 10px;
+  margin: 0 -10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.ltw-row:hover {
+  background: var(--fill);
+}
+.ltw-row.static {
+  cursor: default;
+}
+.ltw-row.static:hover {
+  background: none;
+}
+.ltw-open {
+  display: inline-block;
+  margin-top: 8px;
+}
+.chapters-unknown {
+  color: var(--ink);
+  font-size: 15px;
+}
+
+/* Chapter length against the norm: a thin line across the top of the page, filling up. */
+.chapter-meter {
+  position: fixed;
+  top: var(--header-h, 64px);
+  left: 0;
+  right: 0;
+  z-index: 12;
+  pointer-events: none;
+}
+.cm-track {
+  position: relative;
+  height: 3px;
+  background: var(--line);
+  pointer-events: auto;
+}
+.cm-fill {
+  height: 100%;
+  background: var(--ink-3);
+  opacity: 0.6;
+  transition: width 0.6s ease, background 0.3s;
+}
+.cm-min {
+  position: absolute;
+  top: -2px;
+  width: 1.5px;
+  height: 7px;
+  background: var(--ink-3);
+  opacity: 0.5;
+}
+.chapter-meter.ok .cm-fill {
+  background: var(--brand);
+  opacity: 0.55;
+}
+.chapter-meter.near .cm-fill {
+  background: var(--st-draft);
+  opacity: 0.9;
+}
+.chapter-meter.over .cm-fill {
+  background: var(--mk-hanging);
+  opacity: 0.75;
+}
+.cm-text {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 4px 20px 0;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+.cm-k {
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+.chapter-meter:hover .cm-k,
+.write:not(.typing) .chapter-meter.short .cm-k,
+.write:not(.typing) .chapter-meter.ok .cm-k {
+  opacity: 0.8;
+}
+.cm-say {
+  pointer-events: auto;
+  background: var(--paper);
+  border-radius: 999px;
+  padding: 2px 10px;
+}
+.chapter-meter.near .cm-say {
+  color: var(--ink-2);
+}
+.chapter-meter.over .cm-say {
+  color: var(--mk-hanging);
+}
+.chapter-meter.over .cm-say .link {
+  color: var(--ink);
+}
+.length-norm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: var(--fill);
+  border-radius: 12px;
+  max-width: 320px;
+}
+.length-norm .num-input {
+  width: 72px;
+}
+.norm-v {
+  color: var(--ink);
+}
+.len-tag.near {
+  color: var(--st-draft);
+}
+.len-tag.over {
+  color: var(--mk-hanging);
+}
+.three-parts {
+  display: block;
+  margin-top: 8px;
+  text-align: left;
+}
+.sl-drop {
+  fill: color-mix(in srgb, var(--brand) 6%, transparent);
+  stroke: color-mix(in srgb, var(--brand) 25%, transparent);
+  stroke-dasharray: 4 4;
+}
+.sl-drop.on {
+  fill: color-mix(in srgb, var(--brand) 16%, transparent);
+  stroke: var(--brand);
+}
+.sl-chip[draggable='true'] {
+  cursor: grab;
+}
+.sl-chip.lifted {
+  opacity: 0.4;
+}
+.app-version {
+  margin: 24px 0 8px;
+  text-align: center;
 }

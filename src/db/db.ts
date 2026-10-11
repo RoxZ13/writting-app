@@ -36,8 +36,17 @@ export interface Project extends Base {
   dailyGoal?: number
   /** Planned length of the whole book, in words. */
   targetWords?: number
-  /** How many chapters the book will have — a landmark besides the deadline. */
+  /** How many chapters the book will have — a landmark besides the deadline. 0 = «не знаю» (shown as «?»). */
   targetChapters?: number
+  /** The «lock the written chapters?» question after an import was asked, whatever the answer. */
+  lockAsked?: boolean
+  /** How long a chapter should be, in characters with spaces: the site's rule or the author's own. */
+  chapterMin?: number
+  chapterMax?: number
+  /** Characters on one page; a standard page is 1800. */
+  pageChars?: number
+  /** How the author thinks of length: in pages or in characters. */
+  lengthUnit?: 'pages' | 'chars'
   /** Where the book goes up; Фикбук when not chosen. */
   platform?: PlatformId
   /** A new chapter every N days. */
@@ -58,6 +67,8 @@ export interface Chapter extends Base {
   pool?: boolean
   /** Date the chapter went up on Ficbook, YYYY-MM-DD. */
   publishedAt?: string
+  /** Fixed in place: its scenes are not moved, added or removed by accident. The text stays editable. */
+  locked?: boolean
 }
 
 export type SceneStatus = 'idea' | 'draft' | 'written' | 'logic' | 'style' | 'done'
@@ -80,6 +91,8 @@ export interface Scene extends Base {
   beats: Beat[]
   /** Mirrored from the scene's text record, refreshed while writing. */
   wordCount: number
+  /** Characters with spaces, refreshed with the word count: chapter length the way sites measure it. */
+  charCount?: number
   /** Cursor position when the author last left the scene (per record, good enough across devices). */
   lastPos?: number
   /** The opening of the text, refreshed while writing — shown on cards when the scene has no title. */
@@ -213,7 +226,8 @@ export class ManuscriptDB extends Dexie {
   outbox!: Table<OutboxEntry, string>
   meta!: Table<Meta, string>
 
-  constructor(name = 'manuscript') {
+  // The test version on /preview/ keeps its own database: it must never touch the real books.
+  constructor(name = (import.meta.env.VITE_DB_NAME as string | undefined) || 'manuscript') {
     super(name)
     this.version(1).stores({
       projects: 'id, updatedAt',

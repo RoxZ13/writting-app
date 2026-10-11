@@ -29,6 +29,7 @@ const PATHS: Record<string, string> = {
   target: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-5a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z',
   type: 'M5 7V5h14v2M12 5v14M9 19h6',
   keyboard: 'M3 6h18v12H3V6Zm4 4h.5M11 10h.5M15 10h.5M8 14h8',
+  lock: 'M6 11h12v9H6v-9Zm2.5 0V8a3.5 3.5 0 0 1 7 0v3',
   spark: 'M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4L12 3Z',
 }
 

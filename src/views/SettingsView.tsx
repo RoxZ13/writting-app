@@ -10,7 +10,7 @@ import {
 } from '../db/cloud'
 import { downloadBackup, readBackupFile, restoreBackup } from '../lib/backup'
 import { toast } from '../lib/ui'
-import { applyTheme, getBoardLayout, getTheme, setBoardLayout, type BoardLayout, type Theme } from '../lib/session'
+import { ACCENTS, applyAccent, applyTheme, getAccent, getBoardLayout, getTheme, setBoardLayout, type Accent, type BoardLayout, type Theme } from '../lib/session'
 import { TypoControls } from '../components/TypoControls'
 import { timeAgo } from '../lib/status'
 
@@ -18,6 +18,7 @@ import { timeAgo } from '../lib/status'
 export function SettingsView({ sync }: { sync: SyncStatus }) {
   const [theme, setTheme] = useState<Theme>(getTheme)
   const [board, setBoard] = useState<BoardLayout>(getBoardLayout)
+  const [accent, setAccent] = useState<Accent>(getAccent)
   const restore = async (file: File) => {
     try {
       const dump = await readBackupFile(file)
@@ -60,6 +61,27 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
                 {label}
               </button>
             ))}
+          </div>
+        </div>
+        <div className="typo-row">
+          <span className="typo-label">Акцент</span>
+          <div className="accents" role="radiogroup" aria-label="Цвет акцента">
+            {ACCENTS.map((a) => (
+              <button
+                key={a.id}
+                role="radio"
+                aria-checked={accent === a.id}
+                className="accent-swatch"
+                title={a.name}
+                aria-label={a.name}
+                style={{ background: a.swatch }}
+                onClick={() => {
+                  setAccent(a.id)
+                  applyAccent(a.id)
+                }}
+              />
+            ))}
+            <span className="small muted">{ACCENTS.find((a) => a.id === accent)?.name}</span>
           </div>
         </div>
         <TypoControls />
@@ -125,6 +147,10 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
           </label>
         </div>
       </section>
+      <div className="small muted app-version">
+        {__PREVIEW__ ? 'Тестовая версия · свои данные, книги из основной сюда не попадают · ' : ''}
+        Версия от {new Date(__BUILD__).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+      </div>
     </div>
   )
 }
