@@ -66,7 +66,13 @@ export function App() {
 
   const data = useProjectData(projectId)
   useEffect(() => {
-    if (projectId) void tidyImportedScenes(projectId).then(() => recountWords(projectId)).then(() => recountChars(projectId))
+    if (!projectId) return
+    // Each step on its own: one failing must not keep the others (the chapter lengths) from running.
+    void tidyImportedScenes(projectId)
+      .catch(() => {})
+      .then(() => recountWords(projectId))
+      .catch(() => {})
+      .then(() => recountChars(projectId))
   }, [projectId])
 
   // A story opens where it was left: the text, or the board for someone who plans first.

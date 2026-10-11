@@ -576,13 +576,13 @@ function AskLock({ data }: { data: ProjectData }) {
   )
 }
 
-/** The chapter's length on the board, only once the author has a norm: in norm, close to the bound, over it. */
+/** The chapter's length on the board; with a norm, coloured: close to the bound, over it. */
 function LenTag({ data, chars }: { data: ProjectData; chars: number }) {
   const L = chapterLength(data.project, chars)
-  if (L.state === 'none' || !chars) return null
-  const say = { short: 'короче нормы', ok: 'в норме', near: 'почти у верхней границы', over: 'длиннее нормы' }[L.state]
+  if (!chars) return null
+  const say = { none: 'длина главы', short: 'короче нормы', ok: 'в норме', near: 'почти у верхней границы', over: 'длиннее нормы' }[L.state]
   return (
-    <span className={`len-tag ${L.state}`} title={`${say}: ${normText(data.project)}`}>
+    <span className={`len-tag ${L.state}`} title={L.state === 'none' ? say : `${say}: ${normText(data.project)}`}>
       {' · '}
       {lengthText(data.project, chars)}
     </span>

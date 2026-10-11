@@ -120,6 +120,10 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
           </label>
         </div>
       </section>
+      <div className="small muted app-version">
+        {__PREVIEW__ ? 'Тестовая версия · свои данные, книги из основной сюда не попадают · ' : ''}
+        Версия от {new Date(__BUILD__).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+      </div>
     </div>
   )
 }

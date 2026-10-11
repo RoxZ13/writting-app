@@ -2,12 +2,21 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+const base = process.env.BASE_PATH ?? '/'
+
 export default defineConfig({
-  base: process.env.BASE_PATH ?? '/',
+  base,
+  define: {
+    // Shown in Settings, so it is clear which version is open.
+    __BUILD__: JSON.stringify(new Date().toISOString()),
+    __PREVIEW__: JSON.stringify(!!process.env.VITE_DB_NAME),
+  },
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // Updates are applied by main.tsx at a calm moment, never mid-sentence.
+      registerType: 'prompt',
+      injectRegister: false,
       includeAssets: ['icon.svg'],
       manifest: {
         name: 'Manuscript.',
@@ -26,6 +35,8 @@ export default defineConfig({
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // The test version lives under /preview/ with its own worker; the main one must not answer for it.
+        navigateFallbackDenylist: process.env.VITE_DB_NAME ? [] : [/\/preview\//],
       },
     }),
   ],

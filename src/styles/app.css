@@ -6179,3 +6179,7 @@ button.avatar {
 .sl-chip.lifted {
   opacity: 0.4;
 }
+.app-version {
+  margin: 24px 0 8px;
+  text-align: center;
+}
