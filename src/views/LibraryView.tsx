@@ -133,7 +133,7 @@ function StoryCard({
                 onClick={async () => {
                   if (!confirm(`Удалить историю «${p.title}» со всеми главами и заметками?`)) return
                   await remove('projects', p.id)
-                  toast('История удалена')
+                  toast('История удалена', () => patch('projects', p.id, { deleted: false }))
                 }}
               >
                 Удалить историю

@@ -33,9 +33,22 @@ export function QuickCapture({ data, onClose }: { data: ProjectData; onClose: ()
   }
   const withPeople = kind === 'quote' || kind === 'dialogue'
 
+  /** A second Enter or click while the first save is still running must not make a duplicate. */
+  const saving = useRef(false)
   const saveIt = async () => {
+    if (saving.current) return
     const t = text.trim()
     if (!t) return onClose()
+    saving.current = true
+    try {
+      await write(t)
+    } catch (e) {
+      // Stay open and let her try again; on success the dialog closes, so the guard stays on.
+      saving.current = false
+      throw e
+    }
+  }
+  const write = async (t: string) => {
     const scene = attach ? sceneId : undefined
     if (kind === 'marker') {
       await createMarker(data.project.id, {
@@ -77,11 +90,9 @@ export function QuickCapture({ data, onClose }: { data: ProjectData; onClose: ()
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey && kind !== 'dialogue') {
-              e.preventDefault()
-              void saveIt()
-            }
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            if (e.key !== 'Enter') return
+            // Ctrl/⌘+Enter always saves; plain Enter saves except in «Диалог», where it is a new line. One branch, one save.
+            if (e.metaKey || e.ctrlKey || (!e.shiftKey && kind !== 'dialogue')) {
               e.preventDefault()
               void saveIt()
             }

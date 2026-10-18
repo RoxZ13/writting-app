@@ -1,5 +1,8 @@
-import { makeBackup, restoreBackup, type Backup } from './backup'
+import { makeBackup, mergeSyncedBackup, type Backup } from './backup'
+import { db } from '../db/db'
 import { onLocalChange } from '../db/repo'
+
+const BASE_KEY = 'filesync.base'
 
 /**
  * Sync through a single file in the author's own cloud (Яндекс Диск, later Dropbox, Google Drive):
@@ -24,17 +27,23 @@ export interface FileStore {
 export async function syncWithStore(store: FileStore, tries = 3): Promise<{ added: number; updated: number }> {
   let added = 0
   let updated = 0
+  const textBase = ((await db.meta.get(BASE_KEY))?.value as Record<string, number> | undefined) ?? {}
   for (let i = 0; i < tries; i++) {
     const remote = await store.read()
     if (remote) {
-      const r = await restoreBackup(remote.data)
+      const r = await mergeSyncedBackup(remote.data, textBase)
       added += r.added
       updated += r.updated
     }
     const before = remote?.version ?? null
     // Someone wrote while we were merging: take that in too before writing.
     if ((await store.version()) !== before) continue
-    await store.write(await makeBackup())
+    const out = await makeBackup()
+    await store.write(out)
+    // What each scene text looked like in the file we just wrote: the next merge tells «changed here» from «changed there» by it.
+    const base: Record<string, number> = {}
+    for (const row of out.texts ?? []) base[row.id] = row.updatedAt ?? 0
+    await db.meta.put({ key: BASE_KEY, value: base })
     return { added, updated }
   }
   throw new Error('Облако всё время меняется с другого устройства. Попробуй ещё раз через минуту.')

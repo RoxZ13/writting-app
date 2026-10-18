@@ -14,6 +14,8 @@ const API = 'https://cloud-api.yandex.net/v1/disk'
 const FILE = 'app:/manuscript.json'
 const TOKEN_KEY = 'manuscript.yandex.token'
 const CLIENT_KEY = 'manuscript.yandex.client'
+const STATE_KEY = 'manuscript.yandex.state'
+const STATE_TTL = 15 * 60 * 1000
 
 export function getYandexClientId(): string | null {
   try {
@@ -60,7 +62,16 @@ export const yandexRedirectUri = () => `${location.origin}${location.pathname}`
 export function connectYandex() {
   const id = getYandexClientId()
   if (!id) throw new Error('Подключение к Яндекс Диску ещё не настроено')
-  const q = new URLSearchParams({ response_type: 'token', client_id: id, redirect_uri: yandexRedirectUri(), state: 'manuscript-yandex', force_confirm: 'yes' })
+  // A fresh random state per sign-in: only a redirect that carries it back is ours (blocks login CSRF).
+  const bytes = new Uint8Array(16)
+  crypto.getRandomValues(bytes)
+  const state = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+  try {
+    localStorage.setItem(STATE_KEY, JSON.stringify({ state, at: Date.now() }))
+  } catch {
+    /* ignore */
+  }
+  const q = new URLSearchParams({ response_type: 'token', client_id: id, redirect_uri: yandexRedirectUri(), state, force_confirm: 'yes' })
   location.assign(`https://oauth.yandex.ru/authorize?${q}`)
 }
 
@@ -72,8 +83,17 @@ export function takeYandexRedirect(): boolean {
   const hash = location.hash.replace(/^#/, '')
   if (!hash.includes('access_token=') && !hash.includes('error=')) return false
   const p = new URLSearchParams(hash)
-  if (p.get('state') !== 'manuscript-yandex') return false
-  const token = p.get('access_token')
+  // The stored state is single-use: read it, then delete it whatever the outcome.
+  let expected: { state?: string; at?: number } | null = null
+  try {
+    expected = JSON.parse(localStorage.getItem(STATE_KEY) ?? 'null')
+    localStorage.removeItem(STATE_KEY)
+  } catch {
+    /* ignore */
+  }
+  const age = typeof expected?.at === 'number' ? Date.now() - expected.at : Infinity
+  const ok = !!expected?.state && age >= 0 && age < STATE_TTL && p.get('state') === expected.state
+  const token = ok ? p.get('access_token') : null
   if (token) {
     const ttl = Number(p.get('expires_in') || 31536000) * 1000
     try {

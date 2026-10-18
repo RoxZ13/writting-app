@@ -199,6 +199,7 @@ export function BookView({ data }: { data: ProjectData }) {
             onClick={async () => {
               if (!confirm(`Удалить историю «${p.title}» со всеми главами и заметками?`)) return
               await remove('projects', p.id)
+              toast('История удалена', () => patch('projects', p.id, { deleted: false }))
               go({ view: 'library' })
             }}
           >
