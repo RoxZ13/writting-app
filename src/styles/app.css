@@ -6579,3 +6579,23 @@ button.avatar {
   line-height: 1.5;
   color: var(--ink);
 }
+
+/* A key scene on the columns is an ordinary card with a quiet dot before its name — not a dark block. */
+.card-scene.node {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow), inset 0 0 0 1.5px var(--line-2);
+}
+.card-scene.node .card-title {
+  color: var(--ink);
+}
+.card-scene.node .card-goal,
+.card-scene.node .card-excerpt,
+.card-scene.node .card-epigraph,
+.card-scene.node .card-foot {
+  color: var(--ink-3);
+}
+.card-scene.node .here {
+  background: var(--accent-2);
+  color: #fff;
+}
