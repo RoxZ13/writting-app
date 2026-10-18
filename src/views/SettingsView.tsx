@@ -12,6 +12,7 @@ import { downloadBackup, readBackupFile, restoreBackup } from '../lib/backup'
 import { toast } from '../lib/ui'
 import { ACCENTS, applyAccent, applyTheme, getAccent, getBoardLayout, getTheme, setBoardLayout, type Accent, type BoardLayout, type Theme } from '../lib/session'
 import { TypoControls } from '../components/TypoControls'
+import { CloudDisks } from '../components/CloudDisks'
 import { timeAgo } from '../lib/status'
 
 /** Settings of the app itself (not of a book): look, devices, installing, backup. */
@@ -112,6 +113,8 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
           </div>
         </div>
       </section>
+
+      <CloudDisks />
 
       <SyncSection sync={sync} />
 

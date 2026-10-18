@@ -47,7 +47,8 @@ export async function restoreBackup(dump: Backup): Promise<{ added: number; upda
       }
     })
   }
-  notifyChange()
+  // Only a real change counts: a sync that brought nothing new must not wake another one.
+  if (added + updated) notifyChange()
   return { added, updated }
 }
 
