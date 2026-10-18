@@ -6526,3 +6526,56 @@ button.avatar {
   margin: 24px 0 8px;
   text-align: center;
 }
+
+/* =====================================================================
+   A sheet on a desk: the text sits on a page with edges, the space around
+   it is a shade darker — the eye knows where the page ends.
+   ===================================================================== */
+:root {
+  --sheet: var(--paper);
+  --desk: var(--bg);
+}
+:root[data-theme='dark'] {
+  --sheet: var(--surface);
+  --desk: var(--bg);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']):not([data-theme='paper']) {
+    --sheet: var(--surface);
+    --desk: var(--bg);
+  }
+}
+@media (min-width: 761px) {
+  .write-center {
+    background: var(--desk);
+  }
+  .write-top {
+    background: color-mix(in srgb, var(--desk) 92%, transparent);
+  }
+  .editor-area {
+    padding: 8px 24px 0;
+  }
+  .editor-wrap {
+    background: var(--sheet);
+    width: min(calc(var(--measure) + 160px), 100%);
+    padding: 64px 80px 45vh;
+    margin: 0 auto;
+    border-radius: 6px 6px 0 0;
+    box-shadow: 0 0 0 1px var(--line), 0 1px 3px rgba(0, 0, 0, 0.04), 0 12px 40px rgba(0, 0, 0, 0.04);
+    min-height: calc(100dvh - 120px);
+  }
+  .write.mode-edit .editor-wrap {
+    width: min(calc(var(--measure) + 200px), 100%);
+  }
+}
+
+/* The font choice shows itself: a sample line of prose in the chosen font and size. */
+.typo-sample {
+  margin: 4px 0 6px;
+  padding: 12px 14px;
+  background: var(--sheet, var(--paper));
+  border-radius: var(--r-md);
+  box-shadow: 0 0 0 1px var(--line);
+  line-height: 1.5;
+  color: var(--ink);
+}

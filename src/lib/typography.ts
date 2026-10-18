@@ -24,7 +24,8 @@ const KEY = 'manuscript.typo'
 const CALM_DEFAULT_KEY = 'manuscript.calmDefault2'
 const WIDTH = { narrow: '560px', medium: '660px', wide: '800px' }
 const LEADING = { tight: '1.5', normal: '1.7', loose: '1.95' }
-const FONT = { serif: 'var(--serif)', sans: 'var(--sans)', easy: "'Onest Variable', var(--sans)", mono: 'var(--mono)' }
+/** The CSS font of each choice — also used to draw the choices themselves in Settings. */
+export const FONT = { serif: 'var(--serif)', sans: 'var(--sans)', easy: "'Onest Variable', var(--sans)", mono: 'var(--mono)' }
 
 export function loadTypo(): Typo {
   try {
