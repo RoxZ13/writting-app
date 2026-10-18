@@ -818,7 +818,7 @@ function FinishSession({ project, onClose }: { project: Project; onClose: () => 
             className="textarea"
             rows={3}
             autoFocus
-            placeholder="Где остановилась и что дальше — пара слов, чтобы завтра начать без раскачки"
+            placeholder="Чем закончилось сегодня и что дальше — пара слов, чтобы завтра начать без раскачки"
             value={v}
             onChange={(e) => setV(e.target.value)}
           />

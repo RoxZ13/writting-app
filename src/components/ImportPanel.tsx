@@ -49,7 +49,7 @@ export function ImportPanel({ projectId, onDone }: { projectId: string; onDone?:
     const parsed = parseBook(blocks)
     const chapters = parsed.chapters
     if (!chapters.length || !chapters.some((c) => c.scenes.length)) {
-      setError('Не нашла текста. Попробуй другой файл или вставь текст вручную.')
+      setError('В файле нет текста. Попробуй другой файл или вставь текст вручную.')
       return
     }
     setError(null)
@@ -87,8 +87,8 @@ export function ImportPanel({ projectId, onDone }: { projectId: string; onDone?:
       <div className="stack">
         <div>
           <strong>
-            Нашла {preview.length} {plural(preview.length, 'главу', 'главы', 'глав')}, {scenes}{' '}
-            {plural(scenes, 'сцену', 'сцены', 'сцен')}, {formatWords(words)}.
+            В файле: {preview.length} {plural(preview.length, 'глава', 'главы', 'глав')}, {scenes}{' '}
+            {plural(scenes, 'сцена', 'сцены', 'сцен')}, {formatWords(words)}.
           </strong>
           <div className="small muted">
             Главы — по заголовкам «Глава…», «Пролог», «Chapter…». Сцены — по разделителям «* * *». Всё это потом

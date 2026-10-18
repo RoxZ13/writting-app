@@ -143,7 +143,7 @@ export function ScenePlan({
             <MarkerRows title="Раскрыть здесь" icon="◎" list={toPay} data={data} onOpen={onOpenMarker} />
             <MarkerRows title="Заложить в этой главе" icon="✦" list={toPlant} data={data} onOpen={onOpenMarker} />
             <MarkerRows title="Заложены здесь" icon="✦" list={planted} data={data} onOpen={onOpenMarker} />
-            <MarkerRows title="Напомнила здесь" icon="~" list={echoed} data={data} onOpen={onOpenMarker} />
+            <MarkerRows title="Мелькает здесь" icon="~" list={echoed} data={data} onOpen={onOpenMarker} />
             <MarkerAdd data={data} scene={scene} />
           </div>
         )}

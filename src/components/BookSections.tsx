@@ -174,7 +174,7 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
                 toast('Отмечено. Глава зафиксирована на доске — открепить можно в ⋯ у главы')
               }}
             >
-              ✓ Выложила сегодня
+              ✓ Выложено сегодня
             </button>
           </div>
         </div>

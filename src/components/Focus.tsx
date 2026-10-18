@@ -75,7 +75,7 @@ export function FocusStart({ data, onStarted, onClose }: { data: ProjectData; on
       <div className="stack">
         <h2>Фокус</h2>
         <p className="muted" style={{ margin: 0 }}>
-          Только текст и таймер. Панели спрячутся, в конце — сколько написала.
+          Только текст и таймер. Панели спрячутся, в конце — сколько написано.
         </p>
         <div className="seg">
           {[15, 25, 45].map((m) => (

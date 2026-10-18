@@ -68,7 +68,7 @@ function Echoes({ data, marker, onChange }: { data: ProjectData; marker: Marker;
   const set = (next: string[]) => onChange({ echoSceneIds: next })
   return (
     <div className="small muted mk-echoes">
-      <span>Напомнила</span>
+      <span>Мелькает ещё</span>
       {ids.map((id) => (
         <span key={id} className="chip">
           {sceneName(data, data.sceneById.get(id)!)}
