@@ -429,8 +429,7 @@ test.describe('11. the same scene in two tabs', () => {
 // ---------------------------------------------------------------------------------------------
 test.describe('12. restoring a version updates the counters (B-109)', () => {
   test('after «Вернуть» the stored counters match the restored text', async ({ page }) => {
-    // audit B-109: restoring a version rewrites the text but not the scene's wordCount / charCount / excerpt
-    knownBug('audit B-109: version restore leaves scene counters stale')
+    // audit B-109 (fixed): restoring a version goes through the editor save, which updates the counters
     await startStory(page)
     const v1 = 'Альфа бета гамма дельта эпсилон'
     await typeInEditor(page, v1)
@@ -447,8 +446,8 @@ test.describe('12. restoring a version updates the counters (B-109)', () => {
     await closePlan()
 
     // a completely different, longer text
-    await page.locator('.ProseMirror').click()
-    await page.keyboard.press('Control+a')
+    // A triple click selects the paragraph everywhere; Ctrl+A selects nothing in the iPhone emulation.
+    await page.locator('.ProseMirror p').first().click({ clickCount: 3 })
     await page.keyboard.type('Омега сигма тау ипсилон фи хи пси ро пи омикрон ню')
     await waitSaveTick(page)
     await expect.poll(async () => (await aliveRows<any>(page, 'scenes'))[0].wordCount).toBe(11)

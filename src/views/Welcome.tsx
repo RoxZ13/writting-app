@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import { createStory } from '../lib/stories'
 import { go } from '../lib/router'
-import type { SyncStatus } from '../db/cloud'
+import { getCloudConfig, type SyncStatus } from '../db/cloud'
 import { SyncSection } from './SettingsView'
+import { CloudDisks } from '../components/CloudDisks'
 import { readBackupFile, restoreBackup } from '../lib/backup'
 import { toast } from '../lib/ui'
 
@@ -63,7 +64,13 @@ export function Welcome({ onCreated, sync }: { onCreated: (id: string, view: 'te
               Уже пишу на другом устройстве
             </button>
           </div>
-          {cloud && <SyncSection sync={sync} />}
+          {/* Another device already holds the stories: they come from the author's own Disk. */}
+          {cloud && (
+            <>
+              <CloudDisks />
+              {getCloudConfig() && <SyncSection sync={sync} />}
+            </>
+          )}
         </div>
       </div>
     </div>

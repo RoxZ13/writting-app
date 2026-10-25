@@ -116,7 +116,8 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
 
       <CloudDisks />
 
-      <SyncSection sync={sync} />
+      {/* The old Supabase sync: shown only where it was set up, so it does not stand next to the Disk as a second «Устройства». */}
+      {getCloudConfig() && <SyncSection sync={sync} />}
 
       <section className="card settings-section stack">
         <h3>Установить как приложение</h3>

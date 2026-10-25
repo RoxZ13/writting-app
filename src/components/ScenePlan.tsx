@@ -1,8 +1,8 @@
 import type { Editor } from '@tiptap/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { db, uid, type Beat, type Marker, type Note, type Scene, type SceneText } from '../db/db'
-import { createMarker, createNote, mergeSceneIntoPrevious, patch, remove, save, snapshotScene } from '../db/repo'
+import { db, uid, type Beat, type Marker, type Note, type Scene } from '../db/db'
+import { createMarker, createNote, mergeSceneIntoPrevious, patch, remove, snapshotScene } from '../db/repo'
 import { isLocked, markerPayoffChapter, markerStatus, unusedLines, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { MARKER_STATES, noteKind, STATUSES, timeAgo } from '../lib/status'
@@ -488,13 +488,13 @@ function Versions({ scene, editor }: { scene: Scene; editor: Editor | null }) {
     await snapshotScene(t, `Версия от ${when}`)
     toast('Версия сохранена')
   }
-  const restore = async (content: unknown, wordCount: number) => {
+  const restore = async (content: unknown) => {
     const t = await db.texts.get(scene.id)
     if (!t || !editor) return
     if (!confirm('Вернуть эту версию? Текущий текст тоже сохранится как версия.')) return
     await snapshotScene(t, 'Перед восстановлением')
-    await save<SceneText>('texts', { ...t, content, wordCount })
-    editor.commands.setContent(content as object, { emitUpdate: false })
+    // Through the editor's own save, so the scene's word and character counts and its card excerpt follow (audit B-109).
+    editor.commands.setContent(content as object, { emitUpdate: true })
     toast('Версия восстановлена')
   }
   return (
@@ -511,7 +511,7 @@ function Versions({ scene, editor }: { scene: Scene; editor: Editor | null }) {
               {timeAgo(s.createdAt)} · {s.wordCount} сл.
             </div>
           </div>
-          <button className="btn sm ghost" onClick={() => void restore(s.content, s.wordCount)}>
+          <button className="btn sm ghost" onClick={() => void restore(s.content)}>
             Вернуть
           </button>
         </div>
