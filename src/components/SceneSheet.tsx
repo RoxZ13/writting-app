@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { Scene } from '../db/db'
 import { createMarker, ensurePool, mergeSceneIntoPrevious, moveScene, patch, remove, splitChapterAt } from '../db/repo'
 import { go } from '../lib/router'
+import { modalRoot, useModal } from '../lib/ui'
 import { isLocked, sceneName, type ProjectData } from '../lib/hooks'
 import { STATUSES } from '../lib/status'
 import { toastUndo, undoable } from '../lib/undo'
@@ -11,6 +13,8 @@ import { Icon } from './Icon'
 
 /** Quick edit of a scene from the board: what happens, lines, people, markers. No editor needed. */
 export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene: Scene; onClose: () => void }) {
+  const sheetRef = useRef<HTMLDivElement>(null)
+  useModal(sheetRef)
   const [title, setTitle] = useState(scene.title)
   const [goal, setGoal] = useState(scene.goal)
   useEffect(() => {
@@ -58,10 +62,10 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
     }
   }
 
-  return (
+  return createPortal(
     <>
       <div className="sheet-back" onClick={onClose} />
-      <aside className="sheet" role="dialog" aria-label="Сцена">
+      <div className="sheet" role="dialog" aria-modal="true" aria-label="Сцена" tabIndex={-1} ref={sheetRef}>
         <div className="row" style={{ flexWrap: 'nowrap' }}>
           <span className="eyebrow">{data.chapterById.get(scene.chapterId)?.title}</span>
           <span className="spacer" />
@@ -196,7 +200,7 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
             {!locked && (
               <button
                 className="btn ghost"
-                style={{ color: 'var(--mk-hanging)' }}
+                style={{ color: 'var(--danger-ink)' }}
                 onClick={async () => {
                   if (!confirm(`Удалить «${sceneName(data, scene)}» вместе с текстом?`)) return
                   await undoable('удаление сцены', async () => {
@@ -212,7 +216,8 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
             )}
           </div>
         </details>
-      </aside>
-    </>
+      </div>
+    </>,
+    modalRoot(),
   )
 }

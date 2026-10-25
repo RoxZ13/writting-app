@@ -7,13 +7,13 @@ import './styles/line.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
-import { applyAccent, applyTheme, getAccent, getTheme } from './lib/session'
+import { applyAccent, getAccent, getTheme, showTheme } from './lib/session'
 import { applyTypo, loadTypo } from './lib/typography'
 import { registerSW } from 'virtual:pwa-register'
 import { getYandexToken, takeYandexRedirect, yandexStore } from './lib/yandex'
 import { startFileSync } from './lib/filesync'
 
-applyTheme(getTheme())
+showTheme(getTheme())
 applyAccent(getAccent())
 applyTypo(loadTypo())
 navigator.storage?.persist?.().catch(() => {})

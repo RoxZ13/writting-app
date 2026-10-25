@@ -6,7 +6,7 @@ import { alive, patch, remove } from '../db/repo'
 import { COVERS, createStory, deadlineText } from '../lib/stories'
 import { timeAgo } from '../lib/status'
 import { formatWords } from '../lib/text'
-import { toast } from '../lib/ui'
+import { FilePick, toast } from '../lib/ui'
 import { BookCover, CoverPicker } from '../components/BookCover'
 import { useCover } from '../lib/cover'
 import { DateChip } from '../components/DateChip'
@@ -53,10 +53,9 @@ export function LibraryView({
         <div style={{ marginRight: 'auto' }}>
           <h1>Истории</h1>
         </div>
-        <label className="btn">
+        <FilePick className="btn" accept=".docx,.txt,.md,.html,.htm" onFile={(f) => void create(f)}>
           {busy ? 'Раскладываю…' : 'Импорт .docx / .txt'}
-          <input type="file" hidden accept=".docx,.txt,.md,.html,.htm" onChange={(e) => e.target.files?.[0] && void create(e.target.files[0])} />
-        </label>
+        </FilePick>
         <button className="btn primary big-pill" disabled={busy} onClick={() => void create()}>
           + Новая история
         </button>

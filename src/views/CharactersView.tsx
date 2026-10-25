@@ -102,7 +102,7 @@ function Branches({ data }: { data: ProjectData }) {
       {data.lines.map((l) => (
         <div key={l.id} className="branch-row">
           <ColorDot color={l.color} label={l.name} onChange={(color) => void patch<Line>('lines', l.id, { color })} />
-          <InlineEdit className="branch-name" value={l.name} onSave={(n) => n.trim() && void patch<Line>('lines', l.id, { name: n.trim() })} />
+          <InlineEdit className="branch-name" label="Название ветки" value={l.name} onSave={(n) => n.trim() && void patch<Line>('lines', l.id, { name: n.trim() })} />
           <span className="small muted">{count(l.id)} сц.</span>
           <button className="icon-btn" aria-label={`Удалить линию «${l.name}»`} title="Удалить линию" onClick={() => void del(l.id, l.name)}>
             <Icon name="close" size={15} />
@@ -152,7 +152,7 @@ function Person({ data, c, found }: { data: ProjectData; c: Character; found?: F
         >
           {c.name.trim()[0]?.toUpperCase()}
         </ColorDot>
-        <InlineEdit className="person-name" value={c.name} onSave={(name) => set({ name })} />
+        <InlineEdit className="person-name" label="Имя героя" value={c.name} onSave={(name) => set({ name })} />
         <details className="menu">
           <summary className="icon-btn" aria-label="Действия">
             <Icon name="more" size={18} />

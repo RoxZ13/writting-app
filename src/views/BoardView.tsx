@@ -2,12 +2,14 @@ import {
   closestCorners,
   DndContext,
   DragOverlay,
+  KeyboardCode,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
   useDroppable,
   useSensor,
   useSensors,
+  type Announcements,
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
@@ -87,7 +89,11 @@ export function BoardView({ data }: { data: ProjectData }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    // Space lifts and drops a card; Enter is kept for opening it (see SortableCard).
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+      keyboardCodes: { start: [KeyboardCode.Space], cancel: [KeyboardCode.Esc], end: [KeyboardCode.Space, KeyboardCode.Enter] },
+    }),
   )
 
   // Ctrl/⌘ Z takes back the last board action, Ctrl/⌘ Shift Z (and Ctrl Y) does it again. Text fields keep their own undo.
@@ -104,6 +110,20 @@ export function BoardView({ data }: { data: ProjectData }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [])
 
+  // What a screen reader says while a card is moved with the keyboard.
+  const place = (id: unknown) => {
+    const key = String(id)
+    if (key === 'col:pool') return 'Пока без места'
+    if (key.startsWith('col:')) return `глава «${data.chapterById.get(key.slice(4))?.title ?? ''}»`
+    const s = data.sceneById.get(key)
+    return s ? `сцена «${sceneName(data, s)}»` : ''
+  }
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `Поднята ${place(active.id)}. Стрелками выбери место, пробел — положить, Escape — отменить.`,
+    onDragOver: ({ active, over }) => (over && over.id !== active.id ? `${place(active.id)} — над: ${place(over.id)}` : undefined),
+    onDragEnd: ({ active, over }) => (over && over.id !== active.id ? `Сцена положена: ${place(over.id)}` : `${place(active.id)} осталась на месте`),
+    onDragCancel: ({ active }) => `Перенос отменён, ${place(active.id)} на месте`,
+  }
   const onDragStart = (e: DragStartEvent) => setDragging(String(e.active.id))
   const onDragEnd = (e: DragEndEvent) => {
     setDragging(null)
@@ -270,7 +290,13 @@ export function BoardView({ data }: { data: ProjectData }) {
           dim={(s) => dims(lens, s, data)}
         />
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <DndContext
+          sensors={sensors}
+          accessibility={{
+            announcements,
+            screenReaderInstructions: { draggable: 'Пробел поднимает карточку, стрелки двигают, пробел кладёт, Escape отменяет. Enter открывает сцену.' },
+          }}
+          collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <div className="board">
             <PoolColumn data={data} lens={lens} onOpenScene={setOpenScene} />
             {data.outline.map(({ chapter, scenes }, i) => (
@@ -371,7 +397,7 @@ function Column({
           <button className="fold-btn" aria-label={folded ? 'Развернуть главу' : 'Свернуть главу'} onClick={() => setFolded(!folded)}>
             {folded ? '▸' : '▾'}
           </button>
-          <InlineEdit className="column-title" value={chapter.title} onSave={(title) => edit('название главы', { title })} />
+          <InlineEdit className="column-title" label="Название главы" value={chapter.title} onSave={(title) => edit('название главы', { title })} />
           {locked && (
             <span className="lock-mark" title="Глава зафиксирована: сцены не двигаются, текст править можно">
               <Icon name="lock" size={14} />
@@ -527,7 +553,7 @@ function LineNote({ data, lineId, onGone }: { data: ProjectData; lineId: string;
   return (
     <div className="lens-note line-note">
       <div className="line-note-head">
-        <InlineEdit className="line-name" value={line.name} placeholder="Название линии" onSave={(name) => name.trim() && void undoable('название линии', () => patch<Line>('lines', line.id, { name: name.trim() }))} />
+        <InlineEdit className="line-name" label="Название линии" value={line.name} placeholder="Название линии" onSave={(name) => name.trim() && void undoable('название линии', () => patch<Line>('lines', line.id, { name: name.trim() }))} />
         <div className="swatches" role="radiogroup" aria-label="Цвет линии">
           {PALETTE.map((c) => (
             <button
@@ -727,6 +753,15 @@ function SortableCard({ data, scene, lens, locked, onOpen }: { data: ProjectData
       aria-disabled={undefined}
       {...listeners}
       onClick={onOpen}
+      onKeyDown={(e) => {
+        // Enter opens the scene, as a click does; Space (and the arrows while lifted) belong to dragging.
+        if (e.key === 'Enter' && e.target === e.currentTarget && !isDragging) {
+          e.preventDefault()
+          onOpen()
+          return
+        }
+        listeners?.onKeyDown?.(e)
+      }}
     >
       <Card data={data} scene={scene} lens={lens} />
     </div>

@@ -145,7 +145,7 @@ function LorePins({ n, data }: { n: Note; data: ProjectData }) {
           </button>
         </span>
       ))}
-      <select className="lore-pin-add" value="" onChange={(e) => e.target.value && add(e.target.value)} title="Прикрепить к герою, главе или сцене — запись появится в плане этих сцен">
+      <select className="lore-pin-add" aria-label="Прикрепить запись" value="" onChange={(e) => e.target.value && add(e.target.value)} title="Прикрепить к герою, главе или сцене — запись появится в плане этих сцен">
         <option value="">+ где нужно</option>
         {data.characters.length > 0 && (
           <optgroup label="Герой">

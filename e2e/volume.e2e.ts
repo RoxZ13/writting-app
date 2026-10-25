@@ -32,7 +32,7 @@ const perf = (rec: Record<string, unknown>) => {
   appendFileSync(PERF_OUT, JSON.stringify(rec) + '\n')
 }
 
-const WELCOME_IMPORT = 'label:has-text("Импортировать .docx / .txt") input[type="file"]'
+const WELCOME_IMPORT = 'input[type="file"][accept*="docx"]'
 const DESKTOP_COLUMNS = 'section.column:not(.pool)'
 
 const within = (actual: number, expected: number, pct: number) => Math.abs(actual - expected) <= expected * pct
@@ -168,7 +168,7 @@ test.describe('a Ficbook export of ~110 scenes', () => {
     await page.goto('/#/library')
     const before = (await dumpDb(page, null, '')).projects.length
     const t1 = Date.now()
-    await page.locator('label:has-text("Импорт .docx / .txt") input[type="file"]').setInputFiles({
+    await page.locator('input[type="file"][accept*="docx"]').setInputFiles({
       name: 'round-trip.docx',
       mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       buffer: docx,

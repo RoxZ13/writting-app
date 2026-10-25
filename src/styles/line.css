@@ -147,7 +147,7 @@
 /* Hints of the hovered scene: arcs from where they are planted to where they pay off. */
 .sm-arc path {
   fill: none;
-  stroke: var(--ink-3);
+  stroke: var(--ink-4);
   stroke-width: 1.25;
   stroke-dasharray: 4 3;
 }

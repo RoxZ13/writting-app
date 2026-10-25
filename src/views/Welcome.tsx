@@ -5,7 +5,7 @@ import { getCloudConfig, type SyncStatus } from '../db/cloud'
 import { SyncSection } from './SettingsView'
 import { CloudDisks } from '../components/CloudDisks'
 import { readBackupFile, restoreBackup } from '../lib/backup'
-import { toast } from '../lib/ui'
+import { FilePick, toast } from '../lib/ui'
 
 export function Welcome({ onCreated, sync }: { onCreated: (id: string, view: 'text' | 'board') => void; sync: SyncStatus }) {
   const [cloud, setCloud] = useState(false)
@@ -34,32 +34,27 @@ export function Welcome({ onCreated, sync }: { onCreated: (id: string, view: 'te
             <button className="btn primary" disabled={busy} onClick={() => void create()}>
               Начать историю
             </button>
-            <label className="btn">
+            <FilePick className="btn" accept=".docx,.txt,.md,.html,.htm" onFile={(f) => void create(f)}>
               Импортировать .docx / .txt
-              <input type="file" hidden accept=".docx,.txt,.md,.html,.htm" onChange={(e) => e.target.files?.[0] && void create(e.target.files[0])} />
-            </label>
+            </FilePick>
           </div>
           {busy && <div className="small muted">Раскладываю текст по главам…</div>}
           <div className="welcome-more">
-            <label className="link-plain">
+            <FilePick
+              className="link-plain"
+              accept=".json,application/json"
+              onFile={async (file) => {
+                try {
+                  const { added } = await restoreBackup(await readBackupFile(file))
+                  toast(added ? 'Всё на месте — истории вернулись из копии' : 'В этой копии нет историй')
+                  go({ view: 'library' })
+                } catch (err) {
+                  toast(err instanceof Error ? err.message : 'Не получилось прочитать файл')
+                }
+              }}
+            >
               Вернуть из копии
-              <input
-                type="file"
-                hidden
-                accept=".json,application/json"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0]
-                  if (!file) return
-                  try {
-                    const { added } = await restoreBackup(await readBackupFile(file))
-                    toast(added ? 'Всё на месте — истории вернулись из копии' : 'В этой копии нет историй')
-                    go({ view: 'library' })
-                  } catch (err) {
-                    toast(err instanceof Error ? err.message : 'Не получилось прочитать файл')
-                  }
-                }}
-              />
-            </label>
+            </FilePick>
             <button className="link-plain" onClick={() => setCloud(!cloud)}>
               Уже пишу на другом устройстве
             </button>

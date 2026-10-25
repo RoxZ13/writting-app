@@ -334,8 +334,15 @@ async function newStoryFromLibrary(page: Page) {
 
 async function deleteStoryInLibrary(page: Page, which: string) {
   const card = page.locator(`.story${which}`).first()
-  await card.locator('summary[aria-label="Действия"]').click()
-  await card.getByRole('button', { name: 'Удалить историю' }).click()
+  const actions = card.locator('summary[aria-label="Действия"]')
+  const del = card.getByRole('button', { name: 'Удалить историю' })
+  await actions.click()
+  // Under load WebKit sometimes misses the first tap on <summary>; a person would simply tap again.
+  if (!(await del.isVisible().catch(() => false))) {
+    await page.waitForTimeout(500)
+    if (!(await del.isVisible().catch(() => false))) await actions.click()
+  }
+  await del.click()
 }
 
 const aliveProjects = (page: Page) => aliveRows<any>(page, 'projects')

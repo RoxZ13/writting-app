@@ -3,6 +3,7 @@ import { appendFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
+import { startStory } from './helpers'
 import { asFile, smallBook } from './volume-helpers'
 
 /**
@@ -13,7 +14,8 @@ import { asFile, smallBook } from './volume-helpers'
  */
 
 const AXE_OUT = process.env.AXE_OUT ?? join(tmpdir(), 'manuscript-axe.jsonl')
-const WELCOME_IMPORT = 'label:has-text("Импортировать .docx / .txt") input[type="file"]'
+/** The hidden file input behind the «Импортировать» button (the button itself is what a person reaches). */
+const WELCOME_IMPORT = 'input[type="file"][accept*="docx"]'
 
 // ---------------------------------------------------------------- helpers
 
@@ -103,29 +105,15 @@ async function tabOrder(page: Page, presses: number): Promise<string[]> {
   return seen
 }
 
-const criticals = (found: Found[]) => found.filter((f) => f.impact === 'critical')
+/** What must be zero: every critical violation, and the serious ones fixed in the audit (names, labels, contrast). */
+const FIXED_RULES = ['label-content-name-mismatch', 'aria-prohibited-attr', 'label-title-only', 'aria-allowed-role', 'color-contrast']
+const criticals = (found: Found[]) => found.filter((f) => f.impact === 'critical' || FIXED_RULES.includes(f.id))
 
 // ---------------------------------------------------------------- axe on every main screen
 
-// Screens where the scan found critical violations are listed here and run as test.fail().
-// audit: filled from the first full run, see audit/axe.md.
-const KNOWN_CRITICAL: Record<string, string[]> = {
-  // axe "label" (critical): an <input> with no accessible name — chapter titles on the board (InlineEdit), hero names, settings fields.
-  // The two dialogs below are flagged only because axe also scans the board that stays behind them.
-  desktop: [
-    'board',
-    'Герои',
-    'Об истории (книга)',
-    'Об истории — «Файлы и прочее» открыто',
-    'Настройки',
-    'быстрая запись (Ctrl+J)',
-    'поиск по истории (Ctrl+Shift+F)',
-    'карточка сцены на доске',
-  ],
-  phone: ['Герои', 'Об истории (книга)', 'Об истории — «Файлы и прочее» открыто', 'Настройки'],
-  // WebKit (iPhone 14) gives the same axe result as Chromium on the phone layout.
-  iphone: ['Герои', 'Об истории (книга)', 'Об истории — «Файлы и прочее» открыто', 'Настройки'],
-}
+// Screens where the scan found critical violations would be listed here and run as test.fail().
+// After the labelling pass (audit P1-5) the list is empty: every screen below must have no critical violation.
+const KNOWN_CRITICAL: Record<string, string[]> = { desktop: [], phone: [], iphone: [] }
 
 type Screen = { name: string; extras?: boolean; open: (page: Page) => Promise<void> }
 const SCREENS: Screen[] = [
@@ -242,7 +230,7 @@ test('axe: welcome screen', async ({ page }, testInfo) => {
   await expect(page.getByRole('button', { name: 'Начать историю' })).toBeVisible()
   const found = await scan(page, project, 'welcome')
   if ((KNOWN_CRITICAL[project] ?? []).includes('welcome')) test.fail() // audit: see audit/axe.md
-  expect(criticals(found), 'critical axe violations on welcome').toEqual([])
+  expect(criticals(found), 'critical or fixed-rule axe violations on welcome').toEqual([])
 })
 
 for (const screen of SCREENS) {
@@ -252,7 +240,7 @@ for (const screen of SCREENS) {
     await screen.open(page)
     const found = await scan(page, project, screen.name)
     if ((KNOWN_CRITICAL[project] ?? []).includes(screen.name)) test.fail() // audit: see audit/axe.md
-    expect(criticals(found), `critical axe violations on ${screen.name}`).toEqual([])
+    expect(criticals(found), `critical or fixed-rule axe violations on ${screen.name}`).toEqual([])
   })
 }
 
@@ -269,38 +257,40 @@ test.describe('keyboard only', () => {
     expect(order.some((o) => o.includes('Начать историю'))).toBe(true)
   })
 
-  test('welcome: «Импортировать .docx / .txt» can be reached with Tab', async ({ page }) => {
-    // audit: file inputs unreachable by keyboard — the <label> is not focusable and the input is `hidden`
-    test.fail()
-    await page.goto('/')
-    await expect(page.getByRole('button', { name: 'Начать историю' })).toBeVisible()
-    const order = await tabOrder(page, 10)
-    expect(order.some((o) => o.includes('Импортировать'))).toBe(true)
-  })
+  // Each file button is a real <button> in the Tab order, and Enter / Space open the file dialog.
+  for (const [name, label] of [
+    ['«Импортировать .docx / .txt»', 'Импортировать'],
+    ['«Вернуть из копии»', 'Вернуть из копии'],
+  ] as const) {
+    test(`welcome: ${name} can be reached with Tab and opened with Enter and Space`, async ({ page }) => {
+      await page.goto('/')
+      await expect(page.getByRole('button', { name: 'Начать историю' })).toBeVisible()
+      const order = await tabOrder(page, 10)
+      expect(order.some((o) => o.includes(label))).toBe(true)
+      for (const key of ['Enter', 'Space']) {
+        await page.getByRole('button', { name: label }).focus()
+        const chooser = page.waitForEvent('filechooser', { timeout: 5_000 })
+        await page.keyboard.press(key)
+        await chooser
+      }
+    })
+  }
 
-  test('welcome: «Вернуть из копии» can be reached with Tab', async ({ page }) => {
-    // audit: file inputs unreachable by keyboard — same cause as the import button
-    test.fail()
-    await page.goto('/')
-    await expect(page.getByRole('button', { name: 'Начать историю' })).toBeVisible()
-    const order = await tabOrder(page, 10)
-    expect(order.some((o) => o.includes('Вернуть из копии'))).toBe(true)
-  })
-
-  test('library: «Импорт .docx / .txt» can be reached with Tab', async ({ page }) => {
-    // audit: file inputs unreachable by keyboard — the same pattern in the library header
-    test.fail()
+  test('library: «Импорт .docx / .txt» can be reached with Tab and opened with Enter', async ({ page }) => {
     await seedStory(page)
     await page.goto('/#/library')
     await expect(page.getByRole('heading', { name: 'Истории' })).toBeVisible()
     const order = await tabOrder(page, 25)
     expect(order.some((o) => o.includes('Импорт .docx'))).toBe(true)
+    await page.getByRole('button', { name: 'Импорт .docx' }).focus()
+    const chooser = page.waitForEvent('filechooser', { timeout: 5_000 })
+    await page.keyboard.press('Enter')
+    await chooser
   })
 
-  test('board: a scene card is reachable with Tab, and Enter opens it (B-017)', async ({ page }, testInfo) => {
+  test('board: a scene card is reachable with Tab, and Enter opens it (B-017 fixed)', async ({ page }, testInfo) => {
     const project = testInfo.project.name
-    // audit B-017: on the desktop board a card is a dnd-kit draggable; Enter/Space start a keyboard drag instead of opening the scene.
-    if (project === 'desktop') test.fail()
+    // B-017 (fixed): on the desktop board a card is a dnd-kit draggable; Enter opens the scene, Space starts a keyboard drag.
     await seedStory(page)
     await page.goto('/#/board')
     await expect(page.locator('.board, .timeline')).toBeVisible()
@@ -330,4 +320,180 @@ test.describe('keyboard only', () => {
     appendFileSync(AXE_OUT, JSON.stringify({ project, screen: 'KEYBOARD board card', tabsToCard: presses + 1, focused: reached, enterOpensScene: openedByEnter }) + '\n')
     expect(openedByEnter, 'Enter on a focused scene card should open the scene').toBe(true)
   })
+})
+
+// ---------------------------------------------------------------- the same contrast check in the other two themes
+
+for (const theme of ['dark', 'paper'] as const) {
+  test(`axe color-contrast in the «${theme}» theme`, async ({ page }, testInfo) => {
+    test.setTimeout(120_000)
+    await page.addInitScript((t) => {
+      try {
+        localStorage.setItem('manuscript.theme', t)
+        localStorage.setItem('manuscript.theme.chosen', '1')
+      } catch {
+        /* ignore */
+      }
+    }, theme)
+    await seedStory(page, { extras: true })
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme)
+    const bad: string[] = []
+    for (const hash of ['#/text', '#/board', '#/characters', '#/lore', '#/inbox', '#/book', '#/settings', '#/library']) {
+      await page.goto('/' + hash)
+      await page.waitForTimeout(600)
+      const res = await new AxeBuilder({ page }).withRules(['color-contrast']).analyze()
+      for (const v of res.violations) for (const n of v.nodes) bad.push(`${hash}: ${n.target.join(' >> ')} — ${n.any[0]?.message ?? ''}`)
+    }
+    appendFileSync(AXE_OUT, JSON.stringify({ project: testInfo.project.name, screen: `contrast in theme ${theme}`, bad }) + '\n')
+    expect(bad, `low-contrast text in the «${theme}» theme`).toEqual([])
+  })
+}
+
+// ---------------------------------------------------------------- dialogs
+
+test.describe('dialogs', () => {
+  test('quick capture is a real modal dialog: inert page behind, focus inside, Escape closes, focus returns', async ({ page }) => {
+    await seedStory(page)
+    await page.goto('/#/board')
+    await expect(page.locator('.board, .timeline')).toBeVisible()
+    await page.keyboard.press('Control+j')
+    const dialog = page.getByRole('dialog', { name: 'Быстрая запись' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog).toHaveAttribute('aria-modal', 'true')
+    await expect(page.locator('#root')).toHaveAttribute('inert', '')
+    expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true)
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+    await expect(page.locator('#root')).not.toHaveAttribute('inert', '')
+  })
+
+  test('scene card on the board is a modal dialog with focus inside; the focus returns to the card', async ({ page }, testInfo) => {
+    test.skip(testInfo.project.name !== 'desktop', 'cards are keyboard-focusable on the desktop board')
+    await seedStory(page)
+    await page.goto('/#/board')
+    const card = page.locator('article.card-scene').first()
+    await expect(card).toBeVisible()
+    const wrapper = card.locator('xpath=..')
+    await wrapper.focus()
+    await page.keyboard.press('Enter')
+    const dialog = page.getByRole('dialog', { name: 'Сцена' })
+    await expect(dialog).toBeVisible()
+    await expect(dialog).toHaveAttribute('aria-modal', 'true')
+    await expect(page.locator('#root')).toHaveAttribute('inert', '')
+    expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true)
+    // Tab never leaves the dialog.
+    for (let i = 0; i < 40; i++) {
+      await page.keyboard.press('Tab')
+      expect(await dialog.evaluate((el) => el.contains(document.activeElement))).toBe(true)
+    }
+    await page.keyboard.press('Escape')
+    await expect(dialog).toHaveCount(0)
+    await expect(page.locator('#root')).not.toHaveAttribute('inert', '')
+    expect(await wrapper.evaluate((el) => el === document.activeElement)).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------- focus ring
+
+test('focus ring: buttons and the inline fields without a frame show a visible outline on keyboard focus', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'the board columns are a desktop layout')
+  await seedStory(page)
+  await page.goto('/#/board')
+  await expect(page.locator('.board')).toBeVisible()
+  // The chapter title and the «+ о чём глава» field had `outline: none` before the audit.
+  for (const sel of ['input.column-title', 'textarea.column-goal', '.add-column', '[aria-roledescription="sortable"]']) {
+    const target = page.locator(sel).first()
+    await target.focus()
+    // A key press first, so the browser treats the focus as keyboard focus (:focus-visible).
+    await page.keyboard.press('Shift+Tab')
+    await target.focus()
+    const r = await target.evaluate((el) => {
+      const cs = getComputedStyle(el)
+      return { focused: el === document.activeElement, style: cs.outlineStyle, width: parseFloat(cs.outlineWidth) }
+    })
+    expect(r.focused, `${sel} regained focus`).toBe(true)
+    expect(r.style, `outline of ${sel} on keyboard focus`).not.toBe('none')
+    expect(r.width, `outline width of ${sel}`).toBeGreaterThanOrEqual(2)
+  }
+})
+
+// ---------------------------------------------------------------- touch targets
+
+test('touch: the text toolbar and the selection bubble reach 44×44 px of hit area', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'desktop', 'touch screens only')
+  await seedStory(page)
+  await page.goto('/#/text')
+  const editor = page.locator('.ProseMirror')
+  await expect(editor).toBeVisible()
+  /** How far, in each direction from the centre, a point still hits the element or its pseudo-element (capped at 30 px). */
+  const hitSize = (sel: string) =>
+    page.locator(sel).evaluateAll((els) =>
+      els
+        .filter((el) => (el as HTMLElement).offsetParent !== null)
+        .map((el) => {
+          const r = el.getBoundingClientRect()
+          const cx = r.left + r.width / 2
+          const cy = r.top + r.height / 2
+          const hits = (x: number, y: number) => {
+            const t = document.elementFromPoint(x, y)
+            return !!t && (t === el || el.contains(t))
+          }
+          const probe = (dx: number, dy: number) => {
+            let n = 0
+            while (n < 30 && hits(cx + dx * (n + 1), cy + dy * (n + 1))) n++
+            return n
+          }
+          return { name: (el.getAttribute('aria-label') ?? el.textContent ?? '').trim().slice(0, 20), w: probe(-1, 0) + probe(1, 0) + 1, h: probe(0, -1) + probe(0, 1) + 1 }
+        }),
+    )
+  const tools = await hitSize('.write-top .tool')
+  expect(tools.length).toBeGreaterThan(0)
+  for (const t of tools) {
+    expect(t.h, `toolbar «${t.name}» height`).toBeGreaterThanOrEqual(44)
+    expect(t.w, `toolbar «${t.name}» width`).toBeGreaterThanOrEqual(44)
+  }
+  // Select a line: the bubble appears.
+  await editor.click()
+  await page.keyboard.type('Слово для выделения')
+  await page.keyboard.press('Shift+Home')
+  await expect(page.locator('.bubble button').first()).toBeVisible()
+  const inBubble = await hitSize('.bubble button')
+  expect(inBubble.length).toBeGreaterThan(0)
+  for (const t of inBubble) {
+    expect(t.h, `bubble «${t.name}» height`).toBeGreaterThanOrEqual(44)
+    expect(t.w, `bubble «${t.name}» width`).toBeGreaterThanOrEqual(44)
+  }
+})
+
+// ---------------------------------------------------------------- keyboard drag on the board
+
+test('board: Space lifts a card, the live region speaks Russian, Escape puts it back (desktop)', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'desktop', 'cards are draggable columns on the desktop board')
+  await seedStory(page)
+  await page.goto('/#/board')
+  const wrapper = page.locator('article.card-scene').first().locator('xpath=..')
+  await expect(wrapper).toBeVisible()
+  await wrapper.focus()
+  await page.keyboard.press('Space')
+  const live = page.locator('[aria-live]')
+  await expect.poll(async () => (await live.allTextContents()).join(' ')).toContain('Поднята')
+  // Not the library's English default text.
+  expect((await live.allTextContents()).join(' ')).not.toMatch(/Picked up|Draggable item/)
+  expect(await page.getByRole('dialog', { name: 'Сцена' }).count()).toBe(0)
+  await page.keyboard.press('Escape')
+  await expect.poll(async () => (await live.allTextContents()).join(' ')).toContain('Перенос отменён')
+  // The instructions are Russian too.
+  const hint = await wrapper.getAttribute('aria-describedby')
+  expect(await page.locator(`#${hint}`).textContent()).toContain('Enter открывает сцену')
+})
+
+test('focus ring: the text itself stays quiet — no frame around the editor while writing', async ({ page }) => {
+  const editor = await startStory(page)
+  await editor.click()
+  await page.keyboard.type('Тихо')
+  const outline = await editor.evaluate((el) => {
+    const cs = getComputedStyle(el)
+    return { style: cs.outlineStyle, width: parseFloat(cs.outlineWidth) }
+  })
+  expect(outline.style === 'none' || outline.width === 0).toBe(true)
 })

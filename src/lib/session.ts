@@ -33,21 +33,33 @@ export const setCurrentProjectId = (id: string) => {
 
 const THEME_KEY = 'manuscript.theme'
 export type Theme = 'auto' | 'light' | 'dark' | 'paper'
+/** Set once the author picks a theme in Settings. Older starts saved «light» on their own, without a choice. */
+const THEME_CHOSEN_KEY = 'manuscript.theme.chosen'
+/** The theme in effect: the author's choice, otherwise the system's (light or dark). */
 export function getTheme(): Theme {
   try {
-    return (localStorage.getItem(THEME_KEY) as Theme) || 'light'
+    const saved = localStorage.getItem(THEME_KEY) as Theme | null
+    if (!saved) return 'auto'
+    if (saved === 'light' && !localStorage.getItem(THEME_CHOSEN_KEY)) return 'auto'
+    return saved
   } catch {
-    return 'light'
+    return 'auto'
   }
 }
+/** Show a theme without remembering it as a choice (on start). */
+export function showTheme(t: Theme) {
+  if (t === 'auto') delete document.documentElement.dataset.theme
+  else document.documentElement.dataset.theme = t
+}
+/** The author chose a theme in Settings: remember it. */
 export function applyTheme(t: Theme) {
   try {
     localStorage.setItem(THEME_KEY, t)
+    localStorage.setItem(THEME_CHOSEN_KEY, '1')
   } catch {
     /* ignore */
   }
-  if (t === 'auto') delete document.documentElement.dataset.theme
-  else document.documentElement.dataset.theme = t
+  showTheme(t)
 }
 
 /** Keyboard shortcut hints only make sense where there is a keyboard. */

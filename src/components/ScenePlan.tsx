@@ -408,7 +408,7 @@ function More({ data, scene, editor }: { data: ProjectData; scene: Scene; editor
           )}
           <button
             className="btn sm ghost"
-            style={{ color: 'var(--mk-hanging)' }}
+            style={{ color: 'var(--danger-ink)' }}
             onClick={async () => {
               if (!confirm('Удалить эту сцену вместе с текстом?')) return
               await undoable('удаление сцены', async () => {

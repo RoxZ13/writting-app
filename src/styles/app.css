@@ -6,7 +6,12 @@
   --fill: #f0f0f2;
   --ink: #0b0b0c;
   --ink-2: #4a4a50;
-  --ink-3: #8e8e95;
+  /* Muted text: 4.5:1 or better on every background below (bg, side, paper, surface, fill, accent-soft). Checked by src/__tests__/contrast.test.ts. */
+  --ink-3: #696970;
+  /* Not text: dots, hairlines, strokes and disabled marks. Lighter on purpose; never use for words. */
+  --ink-4: #8e8e95;
+  /* Red for words (a danger button, an error): the plain marker red is too pale for text. */
+  --danger-ink: #bc3b3f;
   --line: #ececef;
   --line-2: #dedee3;
   --accent: #0b0b0c;
@@ -78,7 +83,9 @@
     --fill: #2a282c;
     --ink: #ece6da;
     --ink-2: #bdb7ab;
-    --ink-3: #8a867e;
+    --ink-3: #959189;
+    --ink-4: #8a867e;
+    --danger-ink: #ea696d;
     --line: #2a292d;
     --line-2: #38363b;
     --accent: #ece6da;
@@ -99,7 +106,9 @@
   --fill: #2a282c;
   --ink: #ece6da;
   --ink-2: #bdb7ab;
-  --ink-3: #8a867e;
+  --ink-3: #959189;
+  --ink-4: #8a867e;
+  --danger-ink: #ea696d;
   --line: #2a292d;
   --line-2: #38363b;
   --accent: #ece6da;
@@ -119,7 +128,9 @@
   --fill: #dfdfda;
   --ink: #232326;
   --ink-2: #4f4f55;
-  --ink-3: #85858b;
+  --ink-3: #5d5d63;
+  --ink-4: #85858b;
+  --danger-ink: #a73538;
   --line: #d9d9d3;
   --line-2: #cdcdc6;
   --accent: #232326;
@@ -159,6 +170,11 @@ button {
 }
 a {
   color: inherit;
+}
+/* Hints in empty fields read as muted text, in every theme (Firefox fades them by default). */
+::placeholder {
+  color: var(--ink-3);
+  opacity: 1;
 }
 ::selection {
   background: color-mix(in srgb, var(--accent) 25%, transparent);
@@ -246,7 +262,7 @@ a {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--ink-3);
+  background: var(--ink-4);
   flex: none;
 }
 .sync-dot[data-state='ok'] {
@@ -339,6 +355,17 @@ h3 {
 .small {
   font-size: var(--fs-ui);
 }
+/* Read by screen readers only. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .eyebrow {
   font-size: var(--fs-sm);
   text-transform: uppercase;
@@ -383,7 +410,7 @@ h3 {
   white-space: nowrap;
 }
 .btn:hover {
-  border-color: var(--ink-3);
+  border-color: var(--ink-4);
 }
 .btn:active {
   transform: translateY(1px);
@@ -803,7 +830,7 @@ details.menu > summary::-webkit-details-marker {
   background: var(--bg);
 }
 .menu-list button.danger {
-  color: var(--mk-hanging);
+  color: var(--danger-ink);
 }
 .arrange-list {
   display: flex;
@@ -2046,7 +2073,7 @@ main.page.wide {
   font-weight: 500;
 }
 .mk-count {
-  color: var(--mk-hanging);
+  color: var(--danger-ink);
   font-weight: 500;
 }
 .gap-slot {
@@ -2136,7 +2163,7 @@ main.page.wide {
 }
 .add-column:hover {
   color: var(--ink);
-  border-color: var(--ink-3);
+  border-color: var(--ink-4);
 }
 
 /* ---------- chips & faces ---------- */
@@ -3094,7 +3121,7 @@ main.page {
 }
 .story.add:hover {
   color: var(--ink);
-  border-color: var(--ink-3);
+  border-color: var(--ink-4);
 }
 .story-menu {
   min-width: 280px;
@@ -3379,7 +3406,7 @@ main.page {
 .pp-hang {
   font-size: var(--fs-xs);
   font-weight: 500;
-  color: var(--mk-hanging);
+  color: var(--danger-ink);
 }
 .link-plain {
   border: 0;
@@ -3653,11 +3680,11 @@ main.page {
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  opacity: 0.7;
+  opacity: 0.85;
 }
 .book-words {
   font-size: var(--fs-sm);
-  opacity: 0.6;
+  opacity: 0.8;
 }
 .story .book {
   margin-bottom: 4px;
@@ -4225,7 +4252,7 @@ main.page {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-bottom: 4px;
-  opacity: 0.7;
+  opacity: 0.85;
 }
 
 .heat {
@@ -4461,7 +4488,7 @@ main.page {
   position: absolute;
   left: 0;
   right: 0;
-  border-top: 1.5px dashed var(--ink-3);
+  border-top: 1.5px dashed var(--ink-4);
 }
 .pace-forecast {
   font-size: var(--fs-md);
@@ -4480,7 +4507,7 @@ main.page {
   font-size: var(--fs-md);
 }
 .publish-next .late {
-  color: var(--mk-hanging);
+  color: var(--danger-ink);
 }
 .publish-list {
   display: flex;
@@ -4724,7 +4751,7 @@ main.page {
   gap: 2px;
 }
 .date-chip .btn.late {
-  color: var(--mk-hanging);
+  color: var(--danger-ink);
 }
 .date-chip-input {
   position: absolute;
@@ -4851,7 +4878,7 @@ button.deadline {
   align-self: flex-start;
   transform: scale(0.92);
   transform-origin: left center;
-  opacity: 0.8;
+  opacity: 0.9;
 }
 /* Plan: only what is filled; the rest waits here. */
 .pp-add {
@@ -5010,7 +5037,7 @@ button.deadline {
 .old-body del {
   color: var(--ink-3);
   text-decoration: line-through;
-  text-decoration-color: var(--ink-3);
+  text-decoration-color: var(--ink-4);
 }
 .old-body ins {
   text-decoration: none;
@@ -5082,7 +5109,6 @@ button.deadline {
 }
 .title-page input::placeholder {
   color: var(--ink-3);
-  opacity: 0.7;
 }
 .title-page .tp-rule {
   width: 40px;
@@ -5333,7 +5359,7 @@ button.deadline {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  opacity: 0.6;
+  opacity: 0.8;
 }
 .continue-t {
   font-size: var(--fs-xl);
@@ -5344,7 +5370,7 @@ button.deadline {
   font-family: var(--text-font);
   font-size: var(--fs-md);
   line-height: 1.5;
-  opacity: 0.8;
+  opacity: 0.9;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -5505,7 +5531,7 @@ button.deadline {
   font-family: var(--text-font);
   font-style: italic;
   font-size: var(--fs-sm);
-  color: #b8860b;
+  color: var(--ink-3);
 }
 .write.typing .margin-note {
   opacity: 0.35;
@@ -5697,7 +5723,6 @@ button.avatar {
   border-radius: var(--r-md);
   font-size: var(--fs-sm);
   color: var(--ink-3);
-  opacity: 0.7;
   font-variant-numeric: tabular-nums;
   transition: opacity 0.3s, background 0.2s;
 }
@@ -6378,7 +6403,7 @@ button.avatar {
   margin-bottom: 20px;
 }
 .title-page .tp-title::placeholder {
-  color: var(--line-2);
+  color: var(--ink-3);
 }
 
 /* =====================================================================
@@ -6508,7 +6533,7 @@ button.avatar {
 }
 .cm-fill {
   height: 100%;
-  background: var(--ink-3);
+  background: var(--ink-4);
   opacity: 0.6;
   transition: width 0.6s ease, background 0.3s;
 }
@@ -6517,7 +6542,7 @@ button.avatar {
   top: -2px;
   width: 1.5px;
   height: 7px;
-  background: var(--ink-3);
+  background: var(--ink-4);
   opacity: 0.5;
 }
 .chapter-meter.ok .cm-fill {
@@ -6595,7 +6620,7 @@ button.avatar {
   color: var(--st-draft);
 }
 .len-tag.over {
-  color: var(--mk-hanging);
+  color: var(--danger-ink);
 }
 .three-parts {
   display: block;
@@ -6703,7 +6728,7 @@ button.avatar {
   padding: 10px 0;
   border-top: 1px solid var(--line);
 }
-.cloud-row.soon {
+.cloud-row.soon .cloud-logo {
   opacity: 0.65;
 }
 .cloud-logo {
@@ -6729,7 +6754,7 @@ button.avatar {
   gap: 2px;
 }
 .cloud-error {
-  color: var(--mk-hanging);
+  color: var(--danger-ink);
 }
 .cloud-steps {
   margin: 8px 0;
@@ -6749,5 +6774,53 @@ button.avatar {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* =====================================================================
+   Keyboard focus: one ring for everything Tab can reach. The mouse does not show it (:focus-visible),
+   text fields always do. Kept at the end so it wins over the older `outline: none` rules above.
+   ===================================================================== */
+:is(a[href], button, summary, select, input, textarea, [role='button'], [tabindex]:not([tabindex='-1'], .ProseMirror)):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+/* Fields without a frame of their own (titles, inline notes): the ring hugs them and does not push the line. */
+:is(input, textarea):is(.bare, .quick-add, .sheet-title, .find-input, .ref-input, .capture-text):focus-visible,
+.title-page input:focus-visible,
+.beat textarea:focus-visible {
+  outline-offset: 0;
+  border-radius: var(--r-sm);
+}
+/* The current story already wears a ring: a dashed one tells «you are here» from «focus is here». */
+.story.current .book:focus-visible {
+  outline-style: dashed;
+}
+/* On the dark bubble and other inverted surfaces the ring flips with the surface. */
+.bubble button:focus-visible {
+  outline-color: var(--bg);
+  outline-offset: -2px;
+}
+
+/* =====================================================================
+   Touch: a finger needs about 44 px. The text toolbar keeps its look and gets an invisible
+   bigger hit area; the selection bubble, which floats only while text is selected, grows a little.
+   ===================================================================== */
+@media (pointer: coarse) {
+  .tool {
+    position: relative;
+    min-width: 44px;
+    justify-content: center;
+  }
+  /* Taller than it looks: 34 px of button, 44 px that answer a finger. */
+  .tool::after {
+    content: '';
+    position: absolute;
+    inset: -5px 0;
+  }
+  .bubble button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0 10px;
   }
 }
