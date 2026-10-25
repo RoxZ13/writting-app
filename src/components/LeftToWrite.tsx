@@ -42,7 +42,7 @@ export function LeftToWrite({ data, onClose }: { data: ProjectData; onClose: () 
               className="ltw-row"
               onClick={() => {
                 onClose()
-                document.querySelector('.essence')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+                document.querySelector('.essence')?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
               }}
             >
               Чем закончится история, пока не записано — «Замысел» на этой странице

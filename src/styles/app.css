@@ -51,6 +51,17 @@
   --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
   --text-font: var(--serif);
   --text-size: 20px;
+  /* One z-index scale for everything that floats. Move a layer here, not with a number in a rule. */
+  --z-page: 6; /* the counter pinned to the page */
+  --z-bar: 10; /* the bars of the text view: toolbar, chapter line */
+  --z-meter: 12; /* the chapter line sits over the toolbar's edge */
+  --z-float: 25; /* the round «+», the «В прошлый раз» bar */
+  --z-nav: 30; /* the header and the phone tab bar */
+  --z-menu-back: 44; /* click-catcher behind a menu */
+  --z-menu: 45; /* menus and popovers: over every bar, under sheets and dialogs */
+  --z-sheet: 50; /* side sheet */
+  --z-modal: 60; /* dialogs */
+  --z-toast: 70; /* toasts: over everything */
   color-scheme: light;
 }
 :root[data-font='sans'] {
@@ -243,7 +254,8 @@ a {
 }
 .sync-dot[data-state='syncing'] {
   background: var(--focus);
-  animation: pulse 1s infinite alternate;
+  /* A few beats, not forever: a dot that never rests pulls the eye while writing. */
+  animation: pulse 1s 6 alternate;
 }
 .sync-dot[data-state='error'] {
   background: var(--accent);
@@ -889,7 +901,7 @@ details.menu > summary::-webkit-details-marker {
 .write-top {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--z-bar);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1396,7 +1408,7 @@ details.menu > summary::-webkit-details-marker {
   position: fixed;
   right: 22px;
   bottom: calc(env(safe-area-inset-bottom) + 22px);
-  z-index: 25;
+  z-index: var(--z-float);
   width: 54px;
   height: 54px;
   border-radius: 50%;
@@ -1417,7 +1429,7 @@ details.menu > summary::-webkit-details-marker {
 .modal-back {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: var(--z-modal);
   background: rgba(20, 15, 10, 0.35);
   display: flex;
   align-items: flex-start;
@@ -1458,7 +1470,7 @@ details.menu > summary::-webkit-details-marker {
   left: 50%;
   bottom: calc(env(safe-area-inset-bottom) + 90px);
   transform: translateX(-50%);
-  z-index: 70;
+  z-index: var(--z-toast);
   background: var(--ink);
   color: var(--bg);
   padding: 10px 18px;
@@ -2195,7 +2207,7 @@ main.page.wide {
 .sheet-back {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: var(--z-sheet);
   background: rgba(10, 10, 12, 0.18);
 }
 .sheet {
@@ -2203,7 +2215,7 @@ main.page.wide {
   top: 12px;
   right: 12px;
   bottom: 12px;
-  z-index: 51;
+  z-index: calc(var(--z-sheet) + 1);
   width: min(420px, calc(100vw - 24px));
   background: var(--surface);
   border-radius: var(--r-lg);
@@ -2291,7 +2303,7 @@ main.page.wide {
 .app-header {
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: var(--z-nav);
   height: var(--header-h);
   display: flex;
   align-items: center;
@@ -2401,7 +2413,7 @@ main.page {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 30;
+    z-index: var(--z-nav);
     justify-content: space-around;
     margin: 0;
     padding: 6px 4px calc(env(safe-area-inset-bottom) + 6px);
@@ -2433,7 +2445,8 @@ main.page {
     right: 4px;
   }
   main.page {
-    padding: 20px 16px 120px;
+    /* Room under the last row for the round «+» (76px up, 54px tall): it never covers a row at the end of a list. */
+    padding: 20px 16px calc(env(safe-area-inset-bottom) + 150px);
   }
   .app-text .tabs {
     transition: opacity 0.3s;
@@ -2526,7 +2539,7 @@ main.page {
 .resume {
   /* Pinned to the bottom of the screen: the editor may open scrolled to where the author stopped. */
   position: fixed;
-  z-index: 30;
+  z-index: var(--z-float);
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
@@ -2885,13 +2898,13 @@ main.page {
 .typo-back {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: var(--z-menu-back);
 }
 .typo-pop {
   position: absolute;
   right: -60px;
   top: 40px;
-  z-index: 41;
+  z-index: var(--z-menu);
   width: 400px;
   max-width: calc(100vw - 24px);
   padding: 18px 20px;
@@ -5672,7 +5685,7 @@ button.avatar {
   position: fixed;
   right: 16px;
   bottom: calc(env(safe-area-inset-bottom) + 12px);
-  z-index: 6;
+  z-index: var(--z-page);
 }
 .stats-chip {
   display: inline-flex;
@@ -5723,7 +5736,7 @@ button.avatar {
   position: absolute;
   right: 0;
   bottom: calc(100% + 6px);
-  z-index: 41;
+  z-index: var(--z-menu);
   width: 230px;
   padding: 14px 16px;
   display: flex;
@@ -6163,6 +6176,21 @@ button.avatar {
 .menu-modes button {
   padding: 6px 8px;
 }
+/* On a phone the «⋯» menu opens right under its button (the shared popover rule pins it to the bottom, under the resume bar). */
+@media (max-width: 600px) {
+  .typo-pop.write-menu {
+    position: absolute;
+    left: auto;
+    right: 0;
+    top: 40px;
+    bottom: auto;
+    width: min(270px, calc(100vw - 24px));
+  }
+}
+/* A toolbar with an open menu rises over the bars at the bottom of the screen. */
+.write-top:has(.typo-pop) {
+  z-index: var(--z-menu);
+}
 
 /* «В прошлый раз»: one line at the bottom, gone with the first letter or scroll. */
 .resume {
@@ -6469,7 +6497,7 @@ button.avatar {
   top: var(--header-h, 64px);
   left: 0;
   right: 0;
-  z-index: 12;
+  z-index: var(--z-meter);
   pointer-events: none;
 }
 .cm-track {
@@ -6496,15 +6524,17 @@ button.avatar {
   background: var(--brand);
   opacity: 0.55;
 }
+/* Near and over the norm the bar warms up, calmly: never the alarm red. */
 .chapter-meter.near .cm-fill {
   background: var(--st-draft);
-  opacity: 0.9;
+  opacity: 0.7;
 }
 .chapter-meter.over .cm-fill {
-  background: var(--mk-hanging);
-  opacity: 0.75;
+  background: var(--st-draft);
+  opacity: 0.85;
 }
 .cm-text {
+  transition: opacity 0.2s, visibility 0.2s;
   display: flex;
   /* Centred: the toolbar row below the bar keeps the breadcrumbs on the left and the buttons on the right. */
   justify-content: center;
@@ -6522,26 +6552,22 @@ button.avatar {
 .write:not(.typing) .chapter-meter.ok .cm-k {
   opacity: 0.8;
 }
-/* On a phone the count would sit on the toolbar buttons: the bar and the scene ring say enough. */
+/* While typing nothing but the bar is left. */
+.write.typing .cm-text {
+  opacity: 0;
+  visibility: hidden;
+}
+/* On a phone the words would sit on the toolbar buttons: the bar and the scene ring say enough. */
 @media (max-width: 760px) {
-  .cm-k {
+  .cm-text {
     display: none;
   }
 }
 .cm-say {
-  pointer-events: auto;
   background: var(--paper);
   border-radius: 999px;
   padding: 2px 10px;
-}
-.chapter-meter.near .cm-say {
   color: var(--ink-2);
-}
-.chapter-meter.over .cm-say {
-  color: var(--mk-hanging);
-}
-.chapter-meter.over .cm-say .link {
-  color: var(--ink);
 }
 .length-norm {
   display: flex;
@@ -6712,4 +6738,16 @@ button.avatar {
   flex-direction: column;
   gap: 4px;
   word-break: break-word;
+}
+
+/* Reduced motion: no slides, rises, fades or pulses; things simply appear and change. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

@@ -31,57 +31,48 @@ export async function trimHead(sceneId: string, head: JSONContent): Promise<void
 }
 
 /**
- * The chapter's length against the norm, always in sight while writing: a thin line across the top
- * of the page that fills up. Calm while there is room; in the last tenth it says how much is left;
- * past the bound it says by how much — and the rest can start the next chapter from the cursor.
- * Nothing at all when the author has set no norm.
+ * The paragraph with the cursor and everything after it become a new scene opening a new chapter.
+ * Called from the «⋯» menu of the text view: the meter itself has no buttons.
  */
-export function ChapterMeter({
-  project,
-  scene,
-  chars,
-  editor,
-  locked,
-}: {
-  project: Project
-  scene: Scene
-  chars: number
-  editor: Editor | null
-  locked: boolean
-}) {
+export async function splitChapterHere(project: Project, scene: Scene, editor: Editor | null): Promise<void> {
+  if (!editor) return
+  const doc = editor.state.doc.toJSON() as JSONContent
+  const at = editor.state.doc.resolve(editor.state.selection.from).index(0)
+  const before = (doc.content ?? []).slice(0, at)
+  const after = (doc.content ?? []).slice(at)
+  if (!before.length || !after.length) return toast('Поставь курсор на абзац, с которого начнётся новая глава')
+  const head = { type: 'doc', content: before }
+  const tail = { type: 'doc', content: after }
+  // Order matters: the tail is first copied into the new chapter, and only then cut from this scene.
+  // If anything fails on the way, the worst case is a duplicated paragraph, never a lost one.
+  let next: Scene
+  try {
+    next = await createTailChapter(project, scene, tail)
+  } catch {
+    return toast('Не получилось разделить главу — текст не тронут')
+  }
+  try {
+    await trimHead(scene.id, head)
+    // Saved right away, not on the editor's next pause: the page moves to the new chapter at once.
+    editor.commands.setContent(head, { emitUpdate: true })
+  } catch {
+    return toast('Новая глава создана, но из этой сцены конец не убрался — абзацы теперь продублированы')
+  }
+  toast('Новая глава начинается с этого абзаца. Название — на доске')
+  go({ view: 'text', sceneId: next.id })
+}
+
+/**
+ * The chapter's length against the norm: a thin line across the top of the page that fills up.
+ * The bar is the indicator. Its words (how much is left, by how much the norm is passed) are small,
+ * neutral, shown only on a wide screen and only while the author is not typing. Nothing at all when
+ * the author has set no norm. Starting the next chapter from the cursor is in the «⋯» menu.
+ */
+export function ChapterMeter({ project, chars }: { project: Project; chars: number }) {
   const L = chapterLength(project, chars)
   if (L.state === 'none') return null
   const len = (n: number) => lengthText(project, n)
   const minMark = project.chapterMin && project.chapterMax ? project.chapterMin / project.chapterMax : undefined
-
-  // The paragraph with the cursor and everything after it become a new scene opening a new chapter.
-  const splitHere = async () => {
-    if (!editor) return
-    const doc = editor.state.doc.toJSON() as JSONContent
-    const at = editor.state.doc.resolve(editor.state.selection.from).index(0)
-    const before = (doc.content ?? []).slice(0, at)
-    const after = (doc.content ?? []).slice(at)
-    if (!before.length || !after.length) return toast('Поставь курсор на абзац, с которого начнётся новая глава')
-    const head = { type: 'doc', content: before }
-    const tail = { type: 'doc', content: after }
-    // Order matters: the tail is first copied into the new chapter, and only then cut from this scene.
-    // If anything fails on the way, the worst case is a duplicated paragraph, never a lost one.
-    let next: Scene
-    try {
-      next = await createTailChapter(project, scene, tail)
-    } catch {
-      return toast('Не получилось разделить главу — текст не тронут')
-    }
-    try {
-      await trimHead(scene.id, head)
-      // Saved right away, not on the editor's next pause: the page moves to the new chapter at once.
-      editor.commands.setContent(head, { emitUpdate: true })
-    } catch {
-      return toast('Новая глава создана, но из этой сцены конец не убрался — абзацы теперь продублированы')
-    }
-    toast('Новая глава начинается с этого абзаца. Название — на доске')
-    go({ view: 'text', sceneId: next.id })
-  }
 
   return (
     <div className={`chapter-meter ${L.state}`}>
@@ -93,20 +84,8 @@ export function ChapterMeter({
         <span className="cm-k">
           глава · {len(chars)} · норма {normText(project)}
         </span>
-        {L.state === 'near' && <span className="cm-say">до конца нормы ≈ {len(L.left ?? 0)} — пора вести главу к концу</span>}
-        {L.state === 'over' && (
-          <span className="cm-say">
-            длиннее нормы на {len(L.over)}
-            {!locked && (
-              <>
-                {' · '}
-                <button className="link" title="Абзац с курсором и всё после него станут новой главой" onClick={() => void splitHere()}>
-                  ✂ новая глава с этого абзаца
-                </button>
-              </>
-            )}
-          </span>
-        )}
+        {L.state === 'near' && <span className="cm-say">до конца нормы ≈ {len(L.left ?? 0)}</span>}
+        {L.state === 'over' && <span className="cm-say">длиннее нормы на {len(L.over)}</span>}
       </div>
     </div>
   )
