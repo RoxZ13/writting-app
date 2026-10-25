@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { connectYandex, getYandexToken, setYandexClientId, takeYandexRedirect } from '../lib/yandex'
+import { gzipSync } from 'node:zlib'
+import { connectYandex, getYandexToken, setYandexClientId, setYandexProxyUrl, takeYandexRedirect } from '../lib/yandex'
 
 function setup() {
   const store = new Map<string, string>()
@@ -82,26 +83,101 @@ describe('Yandex OAuth state (login CSRF)', () => {
 })
 
 describe('Yandex Disk file store', () => {
+  let store: Map<string, string>
   beforeEach(() => {
-    const { store } = setup()
+    store = setup().store
     store.set('manuscript.yandex.token', JSON.stringify({ token: 'tok', expiresAt: Date.now() + 60_000 }))
   })
   afterEach(() => vi.unstubAllGlobals())
 
-  // The download host answers 403 to a browser fetch without the token: cookies of yandex.ru never reach it from another site.
-  it('sends the token with the download of the file itself, not only to the API', async () => {
+  const BACKUP = { projects: [{ id: 'p1', title: 'Книга' }] }
+  const PROXY = 'https://proxy.test/fn'
+
+  /** Disk API answers the version request; the proxy answers with whatever the test hands it. */
+  function stubFetch(proxyAnswer: () => Response) {
+    const calls: { url: string; init?: RequestInit }[] = []
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      calls.push({ url, init })
+      if (url === PROXY) return proxyAnswer()
+      if (url.includes('/resources?')) return new Response(JSON.stringify({ revision: 7 }))
+      return new Response('', { status: 404 })
+    })
+    return calls
+  }
+
+  it('reads through the proxy: text/plain POST with token and path, gzipped answer', async () => {
+    setYandexProxyUrl(PROXY)
+    const calls = stubFetch(() => new Response(gzipSync(Buffer.from(JSON.stringify(BACKUP)))))
+    const { yandexStore } = await import('../lib/yandex')
+    const got = await yandexStore().read()
+    expect(got?.version).toBe('7')
+    expect(got?.data).toEqual(BACKUP)
+    const call = calls.find((c) => c.url === PROXY)!
+    expect(call.init?.method).toBe('POST')
+    expect((call.init?.headers as Record<string, string>)['Content-Type']).toBe('text/plain')
+    expect(JSON.parse(call.init?.body as string)).toEqual({ token: 'tok', path: 'app:/manuscript.json' })
+    // The token goes to the proxy in the body only, never to the download host.
+    expect(calls.some((c) => c.url.includes('/resources/download'))).toBe(false)
+  })
+
+  it('also reads a plain JSON answer from the proxy', async () => {
+    setYandexProxyUrl(PROXY)
+    stubFetch(() => new Response(JSON.stringify(BACKUP)))
+    const { yandexStore } = await import('../lib/yandex')
+    expect((await yandexStore().read())?.data).toEqual(BACKUP)
+  })
+
+  it('returns null when the proxy says there is no file yet', async () => {
+    setYandexProxyUrl(PROXY)
+    stubFetch(() => new Response('{}', { status: 404 }))
+    const { yandexStore } = await import('../lib/yandex')
+    expect(await yandexStore().read()).toBeNull()
+  })
+
+  it('forgets the token and asks to sign in again when the proxy says 401', async () => {
+    setYandexProxyUrl(PROXY)
+    stubFetch(() => new Response('{}', { status: 401 }))
+    const { yandexStore } = await import('../lib/yandex')
+    await expect(yandexStore().read()).rejects.toThrow('Яндекс Диск попросил войти заново')
+    expect(getYandexToken()).toBeNull()
+  })
+
+  it('shows an error with the status for other proxy failures', async () => {
+    setYandexProxyUrl(PROXY)
+    stubFetch(() => new Response('{}', { status: 502 }))
+    const { yandexStore } = await import('../lib/yandex')
+    await expect(yandexStore().read()).rejects.toThrow('502')
+  })
+
+  it('shows a network message when the proxy cannot be reached', async () => {
+    setYandexProxyUrl(PROXY)
+    stubFetch(() => {
+      throw new TypeError('Failed to fetch')
+    })
+    const { yandexStore } = await import('../lib/yandex')
+    await expect(yandexStore().read()).rejects.toThrow('Проверь интернет')
+  })
+
+  it('without a proxy the direct download still sends the token, and a failure explains the proxy is needed', async () => {
     const calls: { url: string; auth?: string }[] = []
     vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
       const auth = (init?.headers as Record<string, string> | undefined)?.Authorization
       calls.push({ url, auth })
       if (url.includes('/resources/download')) return new Response(JSON.stringify({ href: 'https://downloader.disk.yandex.ru/disk/abc' }))
       if (url.includes('/resources?')) return new Response(JSON.stringify({ revision: 7 }))
-      if (url.startsWith('https://downloader.')) return auth ? new Response(JSON.stringify({ projects: [] })) : new Response('', { status: 403 })
+      if (url.startsWith('https://downloader.')) return auth ? new Response(JSON.stringify(BACKUP)) : new Response('', { status: 403 })
       return new Response('', { status: 404 })
     })
     const { yandexStore } = await import('../lib/yandex')
     const got = await yandexStore().read()
-    expect(got?.version).toBe('7')
+    expect(got?.data).toEqual(BACKUP)
     expect(calls.find((c) => c.url.startsWith('https://downloader.'))?.auth).toBe('OAuth tok')
+
+    vi.stubGlobal('fetch', async (url: string) => {
+      if (url.includes('/resources/download')) return new Response(JSON.stringify({ href: 'https://downloader.disk.yandex.ru/disk/abc' }))
+      if (url.includes('/resources?')) return new Response(JSON.stringify({ revision: 7 }))
+      throw new TypeError('Failed to fetch')
+    })
+    await expect(yandexStore().read()).rejects.toThrow('нужен прокси')
   })
 })

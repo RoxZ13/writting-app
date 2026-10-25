@@ -38,6 +38,7 @@ jobs:
           VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ vars.VITE_SUPABASE_ANON_KEY }}
           VITE_YANDEX_CLIENT_ID: ${{ vars.VITE_YANDEX_CLIENT_ID }}
+          VITE_YANDEX_PROXY_URL: ${{ vars.VITE_YANDEX_PROXY_URL }}
       # The test version: the work branch, under /preview/, with its own database so it never touches real books.
       # Netlify previews do not open from everywhere; GitHub Pages does.
       - name: Build the test version
@@ -47,6 +48,8 @@ jobs:
           BRANCH: ${{ inputs.preview || 'claude/writer-app-adhd-tmceif' }}
           BASE_PATH: /${{ github.event.repository.name }}/preview/
           VITE_DB_NAME: manuscript-preview
+          VITE_YANDEX_CLIENT_ID: ${{ vars.VITE_YANDEX_CLIENT_ID }}
+          VITE_YANDEX_PROXY_URL: ${{ vars.VITE_YANDEX_PROXY_URL }}
         run: |
           if ! git fetch --depth=1 origin "$BRANCH"; then echo "No branch $BRANCH, no test version"; exit 0; fi
           git worktree add ../preview FETCH_HEAD
