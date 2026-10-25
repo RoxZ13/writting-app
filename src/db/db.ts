@@ -45,8 +45,10 @@ export interface Project extends Base {
   chapterMax?: number
   /** Characters on one page; a standard page is 1800. */
   pageChars?: number
-  /** How the author thinks of length: in pages or in characters. */
-  lengthUnit?: 'pages' | 'chars'
+  /** How the author thinks of length: in pages, characters or words. The norm itself stays in characters. */
+  lengthUnit?: 'pages' | 'chars' | 'words'
+  /** The scene's share of the chapter norm, as a ring on the word counter. Off unless the author turns it on. */
+  sceneBudget?: boolean
   /** Where the book goes up; Фикбук when not chosen. */
   platform?: PlatformId
   /** A new chapter every N days. */
@@ -177,6 +179,8 @@ export interface Note extends Base {
   chapterIds?: string[]
   /** Матчасть: other names for the same thing. */
   aliases?: string
+  /** «Убрать в запас»: the piece taken out of the scene's text, as TipTap JSON, so it can go back with its italics. */
+  content?: unknown
   /** Scenes where a match turned out to be something else («не то»). */
   ignoreSceneIds?: string[]
 }

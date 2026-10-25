@@ -5,7 +5,7 @@ import { bank, dayKey, pace, totalWords } from '../lib/pace'
 import { formatWords } from '../lib/text'
 import { PLATFORMS, platformOf } from '../lib/platforms'
 import { toast } from '../lib/ui'
-import { chapterLength, hasNorm, lengthText, normText, PAGE, pageSize, sumChars } from '../lib/length'
+import { bookCharsPerWord, chapterLength, hasNorm, lengthText, normText, PAGE, pageSize, sumChars } from '../lib/length'
 import { useState } from 'react'
 
 const DAY = 86400000
@@ -240,18 +240,22 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
 }
 
 /**
- * «Длина главы»: the site's rule or the author's own, from–to, in pages or characters.
- * While writing, a thin line at the top of the page fills up against it.
+ * «Длина главы»: the site's rule or the author's own, from–to, in pages, characters or words.
+ * While writing, a thin line at the top of the page fills up against it. The same norm can also
+ * feed a ring on the word counter (the scene's share of the chapter), off until the author turns it on.
  */
 export function LengthNorm({ project }: { project: Project }) {
   const p = project
   const [open, setOpen] = useState(false)
   const set = (changes: Partial<Project>) => void patch<Project>('projects', p.id, changes)
-  const inPages = p.lengthUnit !== 'chars'
+  const unit = p.lengthUnit ?? 'pages'
+  const inPages = unit === 'pages'
   const page = pageSize(p)
+  const cpw = bookCharsPerWord()
   // Fields show the author's unit; the norm is kept in characters.
-  const shown = (chars?: number) => (chars ? (inPages ? Math.round((chars / page) * 10) / 10 : chars) : undefined)
-  const toChars = (v?: number) => (v ? Math.round(inPages ? v * page : v) : undefined)
+  const shown = (chars?: number) => (chars ? (inPages ? Math.round((chars / page) * 10) / 10 : unit === 'words' ? Math.round(chars / cpw) : chars) : undefined)
+  const toChars = (v?: number) => (v ? Math.round(inPages ? v * page : unit === 'words' ? v * cpw : v) : undefined)
+  const normKey = `${unit}${p.chapterMin ?? ''}-${p.chapterMax ?? ''}`
   if (!open)
     return (
       <div className="small muted" style={{ marginTop: 6 }}>
@@ -271,20 +275,32 @@ export function LengthNorm({ project }: { project: Project }) {
     )
   return (
     <div className="length-norm">
+      {/* Presets come from the sites' own rules (audit/platforms.md); they only fill the fields below. */}
+      <div className="norm-presets small">
+        <button className="link" onClick={() => set({ lengthUnit: 'words', chapterMin: undefined, chapterMax: Math.round(2000 * cpw) })}>
+          Фикбук · около 2000 слов
+        </button>
+        <button className="link" onClick={() => set({ lengthUnit: 'chars', chapterMin: 15000, chapterMax: 40000 })}>
+          Author.Today · 15–40 тыс. знаков
+        </button>
+      </div>
       <div className="seg sm">
         <button aria-pressed={inPages} onClick={() => set({ lengthUnit: 'pages' })}>
           страницы
         </button>
-        <button aria-pressed={!inPages} onClick={() => set({ lengthUnit: 'chars' })}>
+        <button aria-pressed={unit === 'chars'} onClick={() => set({ lengthUnit: 'chars' })}>
           знаки
+        </button>
+        <button aria-pressed={unit === 'words'} onClick={() => set({ lengthUnit: 'words' })}>
+          слова
         </button>
       </div>
       <label className="row small" style={{ gap: 6 }}>
         от
-        <NumberField key={`min${p.lengthUnit}`} value={shown(p.chapterMin)} decimal={inPages} placeholder="—" onSave={(v) => set({ chapterMin: toChars(v) })} />
+        <NumberField key={`min${normKey}`} value={shown(p.chapterMin)} decimal={inPages} placeholder="—" onSave={(v) => set({ chapterMin: toChars(v) })} />
         до
-        <NumberField key={`max${p.lengthUnit}`} value={shown(p.chapterMax)} decimal={inPages} placeholder="—" onSave={(v) => set({ chapterMax: toChars(v) })} />
-        {inPages ? 'стр.' : 'знаков'}
+        <NumberField key={`max${normKey}`} value={shown(p.chapterMax)} decimal={inPages} placeholder="—" onSave={(v) => set({ chapterMax: toChars(v) })} />
+        {inPages ? 'стр.' : unit === 'words' ? 'слов' : 'знаков'}
       </label>
       {inPages && (
         <label className="row small muted" style={{ gap: 6 }}>
@@ -293,6 +309,11 @@ export function LengthNorm({ project }: { project: Project }) {
           знаков с пробелами
         </label>
       )}
+      <label className="check-row small">
+        <input type="checkbox" checked={!!p.sceneBudget} onChange={(e) => set({ sceneBudget: e.target.checked })} />
+        Кольцо объёма у счётчика сцены
+      </label>
+      {p.sceneBudget && !hasNorm(p) && <div className="small muted">Без нормы кольцо считает по обычной сцене книги.</div>}
       <div className="row small" style={{ gap: 12 }}>
         <button className="link" onClick={() => setOpen(false)}>
           готово

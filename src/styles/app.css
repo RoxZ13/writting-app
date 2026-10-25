@@ -5655,6 +5655,9 @@ button.avatar {
   z-index: 6;
 }
 .stats-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   border: 0;
   background: none;
   padding: 4px 8px;
@@ -5669,6 +5672,28 @@ button.avatar {
   opacity: 1;
   background: var(--fill);
   color: var(--ink-2);
+}
+/* The scene-budget ring (off unless the author turns it on): quiet while there is room, warmer from 80 %, past 100 % red. */
+.budget-ring {
+  flex: none;
+}
+.budget-ring .ring-track {
+  stroke: color-mix(in srgb, var(--ink-3) 30%, transparent);
+}
+.budget-ring .ring-fill {
+  stroke: var(--ink-3);
+  transition: stroke 0.3s, stroke-dasharray 0.3s;
+}
+.stats-chip.budget-near .ring-fill {
+  stroke: var(--st-draft);
+}
+.stats-chip.budget-over .ring-fill {
+  stroke: var(--mk-hanging);
+}
+@media (prefers-reduced-motion: reduce) {
+  .budget-ring .ring-fill {
+    transition: none;
+  }
 }
 .write.typing ~ .text-stats .stats-chip,
 .write.typing .text-stats .stats-chip {
@@ -5705,6 +5730,17 @@ button.avatar {
 @media (pointer: coarse) {
   .text-stats {
     display: none;
+  }
+  /* The ring is the one reason to keep the counter on a touch screen. */
+  .text-stats.has-ring {
+    display: block;
+  }
+}
+/* On the phone the tab bar takes the bottom edge: the counter sits above it (the same place as the round button). */
+@media (max-width: 760px) {
+  .text-stats {
+    right: 16px;
+    bottom: calc(env(safe-area-inset-bottom) + 72px);
   }
 }
 
@@ -6450,7 +6486,8 @@ button.avatar {
 }
 .cm-text {
   display: flex;
-  justify-content: flex-end;
+  /* Centred: the toolbar row below the bar keeps the breadcrumbs on the left and the buttons on the right. */
+  justify-content: center;
   gap: 10px;
   padding: 4px 20px 0;
   font-size: 12px;
@@ -6464,6 +6501,12 @@ button.avatar {
 .write:not(.typing) .chapter-meter.short .cm-k,
 .write:not(.typing) .chapter-meter.ok .cm-k {
   opacity: 0.8;
+}
+/* On a phone the count would sit on the toolbar buttons: the bar and the scene ring say enough. */
+@media (max-width: 760px) {
+  .cm-k {
+    display: none;
+  }
 }
 .cm-say {
   pointer-events: auto;
@@ -6489,6 +6532,12 @@ button.avatar {
   background: var(--fill);
   border-radius: 12px;
   max-width: 320px;
+}
+.norm-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  color: var(--ink-3);
 }
 .length-norm .num-input {
   width: 72px;

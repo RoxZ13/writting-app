@@ -507,6 +507,10 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
           .reduce((n, s) => n + (s.id === scene.id ? (words ?? s.wordCount) : s.wordCount), 0)}
         bookWords={totalWords([...data.scenes, ...data.pool.scenes]) - scene.wordCount + (words ?? scene.wordCount)}
         today={wordsOn(data.project, dayKey())}
+        project={data.project}
+        scene={scene}
+        chapterScenes={chapter && !chapter.pool ? data.scenes.filter((s) => s.chapterId === scene.chapterId) : null}
+        bookScenes={[...data.scenes, ...data.pool.scenes]}
       />
       {keysOpen && <Shortcuts onClose={() => setKeysOpen(false)} />}
 

@@ -2,6 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { useMemo } from 'react'
 import { db, type Chapter, type Character, type Line, type Marker, type Note, type Project, type Scene } from '../db/db'
 import { alive, markerState } from '../db/repo'
+import { charsPerWord } from './budget'
+import { setBookCharsPerWord } from './length'
 
 export interface ProjectData {
   project: Project
@@ -66,6 +68,8 @@ export function useProjectData(projectId: string | undefined): ProjectData | und
     }))
     const scenes = outline.flatMap((o) => o.scenes)
     const sceneIndex = new Map(scenes.map((s, i) => [s.id, i]))
+    // Words on screen («сл.») are converted with this book's own ratio.
+    setBookCharsPerWord(charsPerWord(raw.scenes))
     const chapterIndex = new Map(chapters.map((c, i) => [c.id, i]))
     return {
       ...raw,
