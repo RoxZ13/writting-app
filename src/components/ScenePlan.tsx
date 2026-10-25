@@ -9,6 +9,7 @@ import { MARKER_STATES, noteKind, STATUSES, timeAgo } from '../lib/status'
 import { hotkey } from '../lib/session'
 import { returnToText } from '../lib/stash'
 import { toast } from '../lib/ui'
+import { toastUndo, undoable } from '../lib/undo'
 import { RefChips } from './Refs'
 import { loreForScene, type LoreReason } from '../lib/lore'
 import { docParagraphs } from '../lib/text'
@@ -395,8 +396,11 @@ function More({ data, scene, editor }: { data: ProjectData; scene: Scene; editor
               className="btn sm"
               onClick={async () => {
                 if (!confirm('Склеить эту сцену с предыдущей? Текст станет одним.')) return
-                const prev = await mergeSceneIntoPrevious(scene.id)
-                if (prev) go({ view: 'text', sceneId: prev })
+                const prev = await undoable('склейка сцен', () => mergeSceneIntoPrevious(scene.id))
+                if (prev) {
+                  go({ view: 'text', sceneId: prev })
+                  toastUndo('Сцены склеены')
+                }
               }}
             >
               Склеить с предыдущей
@@ -407,9 +411,12 @@ function More({ data, scene, editor }: { data: ProjectData; scene: Scene; editor
             style={{ color: 'var(--mk-hanging)' }}
             onClick={async () => {
               if (!confirm('Удалить эту сцену вместе с текстом?')) return
-              await remove('scenes', scene.id)
-              await remove('texts', scene.id)
+              await undoable('удаление сцены', async () => {
+                await remove('scenes', scene.id)
+                await remove('texts', scene.id)
+              })
               go({ view: 'board' })
+              toastUndo('Сцена удалена')
             }}
           >
             Удалить сцену

@@ -20,6 +20,7 @@ import { BookView } from './views/BookView'
 import { HelpView } from './views/HelpView'
 import { LoreView } from './views/LoreView'
 import { backupDue, downloadBackup, snoozeBackup } from './lib/backup'
+import { clearHistory } from './lib/undo'
 
 const TABS: { view: Route['view']; label: string; ico: string }[] = [
   { view: 'text', label: 'Текст', ico: 'pen' },
@@ -63,6 +64,8 @@ export function App() {
   }, [projects, projectId])
 
   const data = useProjectData(projectId)
+  // The board's undo history belongs to one story: switching stories starts it afresh.
+  useEffect(() => clearHistory(), [projectId])
   useEffect(() => {
     if (!projectId) return
     // Each step on its own: one failing must not keep the others (the chapter lengths) from running.
