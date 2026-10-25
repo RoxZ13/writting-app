@@ -80,3 +80,28 @@ describe('Yandex OAuth state (login CSRF)', () => {
     expect(getYandexToken()).toBeNull()
   })
 })
+
+describe('Yandex Disk file store', () => {
+  beforeEach(() => {
+    const { store } = setup()
+    store.set('manuscript.yandex.token', JSON.stringify({ token: 'tok', expiresAt: Date.now() + 60_000 }))
+  })
+  afterEach(() => vi.unstubAllGlobals())
+
+  // The download host answers 403 to a browser fetch without the token: cookies of yandex.ru never reach it from another site.
+  it('sends the token with the download of the file itself, not only to the API', async () => {
+    const calls: { url: string; auth?: string }[] = []
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      const auth = (init?.headers as Record<string, string> | undefined)?.Authorization
+      calls.push({ url, auth })
+      if (url.includes('/resources/download')) return new Response(JSON.stringify({ href: 'https://downloader.disk.yandex.ru/disk/abc' }))
+      if (url.includes('/resources?')) return new Response(JSON.stringify({ revision: 7 }))
+      if (url.startsWith('https://downloader.')) return auth ? new Response(JSON.stringify({ projects: [] })) : new Response('', { status: 403 })
+      return new Response('', { status: 404 })
+    })
+    const { yandexStore } = await import('../lib/yandex')
+    const got = await yandexStore().read()
+    expect(got?.version).toBe('7')
+    expect(calls.find((c) => c.url.startsWith('https://downloader.'))?.auth).toBe('OAuth tok')
+  })
+})

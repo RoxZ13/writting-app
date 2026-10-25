@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getFileSyncState, onFileSyncState, stopFileSync, syncNow, type FileSyncState } from '../lib/filesync'
-import { connectYandex, forgetYandex, getYandexClientId, getYandexToken, setYandexClientId, yandexRedirectUri, yandexUser } from '../lib/yandex'
+import { connectYandex, forgetYandex, getYandexClientId, getYandexToken, setYandexClientId, yandexRedirectUri } from '../lib/yandex'
 
 const ago = (at: number) => {
   const m = Math.round((Date.now() - at) / 60000)
@@ -14,14 +14,10 @@ const ago = (at: number) => {
 export function CloudDisks() {
   const [state, setState] = useState<FileSyncState>(getFileSyncState)
   const [connected, setConnected] = useState(() => !!getYandexToken())
-  const [who, setWho] = useState<string | null>(null)
   const [clientId, setClientId] = useState(getYandexClientId() ?? '')
   const ready = !!getYandexClientId()
 
   useEffect(() => onFileSyncState(setState), [])
-  useEffect(() => {
-    if (connected) void yandexUser().then(setWho)
-  }, [connected])
 
   const status =
     state.state === 'syncing'
@@ -49,7 +45,6 @@ export function CloudDisks() {
           <strong>Яндекс Диск</strong>
           {connected && (
             <span className={`small ${state.state === 'error' ? 'cloud-error' : 'muted'}`}>
-              {who ? `${who} · ` : ''}
               {status}
             </span>
           )}
