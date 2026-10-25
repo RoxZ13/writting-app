@@ -174,7 +174,7 @@ export function markerState(m: Marker): MarkerState {
 
 // ---------- notes ----------
 
-export async function createNote(text: string, kind: NoteKind, projectId?: string, sceneId?: string) {
+export async function createNote(text: string, kind: NoteKind, projectId?: string, sceneId?: string, extra: Partial<Note> = {}) {
   const now = Date.now()
   return save<Note>('notes', {
     id: uid(),
@@ -185,6 +185,7 @@ export async function createNote(text: string, kind: NoteKind, projectId?: strin
     archived: false,
     createdAt: now,
     updatedAt: now,
+    ...extra,
   })
 }
 

@@ -15,10 +15,12 @@ import { EditHints } from './EditHints'
 import { Typography } from './Typography'
 import { FindHighlight } from './FindHighlight'
 import { CommentMark } from './CommentMark'
+import { StashUndo } from './StashUndo'
 import { InlineNote } from './InlineNote'
 import { toast } from '../lib/ui'
 import { findInEditor } from '../lib/search'
 import { createSaver } from '../lib/saver'
+import { applyPendingRestore, stashSelection } from '../lib/stash'
 
 export interface SelectionAction {
   kind: 'setup' | 'payoff' | 'comment'
@@ -111,6 +113,7 @@ export function SceneEditor({
       MarkerMark,
       EditHints,
       CommentMark,
+      StashUndo,
       Typography,
       FindHighlight,
       InlineNote.configure({
@@ -161,6 +164,7 @@ export function SceneEditor({
     requestAnimationFrame(() => {
       // The scene may already be closed (a quick jump to the next one).
       if (editor.isDestroyed) return
+      void applyPendingRestore(editor, scene.id)
       if (session.find) {
         const q = session.find
         session.find = undefined
@@ -243,6 +247,9 @@ export function SceneEditor({
           </button>
           <button onClick={() => act('comment')} title="Заметка на полях к этому месту">
             ✎ Заметка
+          </button>
+          <button onClick={() => stashSelection(editor, scene)} title="Убрать выделенное в запас — в заметку к этой сцене">
+            В запас
           </button>
         </div>
       </BubbleMenu>

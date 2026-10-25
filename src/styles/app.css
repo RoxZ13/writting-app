@@ -1063,6 +1063,11 @@ details.menu > summary::-webkit-details-marker {
 }
 .bubble {
   display: flex;
+  /* On a phone six buttons do not fit in one row: the menu wraps instead of leaving the screen. */
+  flex-wrap: wrap;
+  justify-content: center;
+  width: max-content;
+  max-width: calc(100vw - 16px);
   gap: 2px;
   background: var(--ink);
   color: var(--bg);
@@ -3834,6 +3839,21 @@ main.page {
 .pp-note .icon-btn {
   width: 24px;
   height: 24px;
+}
+/* A piece put aside with «В запас»: a few lines of it, the rest on demand. */
+.pp-stash {
+  padding: 6px 0 10px;
+  border-bottom: 1px solid var(--line);
+  font-size: var(--fs-md);
+}
+.pp-stash-text {
+  margin-bottom: 6px;
+  color: var(--ink-2);
+  white-space: pre-wrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .suggest {
   display: flex;
