@@ -115,16 +115,6 @@ async function call(path: string, token: string, init?: RequestInit): Promise<Re
   return res
 }
 
-/** The author's name on Yandex, to show which Disk is connected. */
-export async function yandexUser(): Promise<string | null> {
-  const t = getYandexToken()
-  if (!t) return null
-  const res = await call('/', t.token)
-  if (!res.ok) return null
-  const j = (await res.json()) as { user?: { display_name?: string; login?: string } }
-  return j.user?.display_name || j.user?.login || null
-}
-
 export function yandexStore(): FileStore {
   const token = () => {
     const t = getYandexToken()
@@ -147,7 +137,13 @@ export function yandexStore(): FileStore {
       const link = await call(`/resources/download?path=${encodeURIComponent(FILE)}`, token())
       if (!link.ok) throw new Error(`Не получилось скачать с Яндекс Диска (${link.status})`)
       const { href } = (await link.json()) as { href: string }
-      const file = await fetch(href)
+      // The download host wants the token too: from another site the browser sends no yandex.ru cookies, and without it the answer is 403.
+      let file: Response
+      try {
+        file = await fetch(href, { headers: { Authorization: `OAuth ${token()}` } })
+      } catch {
+        throw new Error('Не получилось скачать файл с Яндекс Диска. Проверь интернет и попробуй ещё раз.')
+      }
       if (!file.ok) throw new Error(`Не получилось скачать с Яндекс Диска (${file.status})`)
       return { data: (await file.json()) as Backup, version }
     },
