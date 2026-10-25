@@ -19,6 +19,8 @@ export default defineConfig({
   projects: [
     { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
     { name: 'phone', use: { ...devices['Pixel 7'] } },
+    // WebKit, the engine of Safari: the closest to an iPhone without one. Not a substitute for real Safari.
+    { name: 'iphone', use: { ...devices['iPhone 14'] } },
   ],
   webServer: {
     command: `${build}npm run preview -- --port ${PORT} --strictPort`,

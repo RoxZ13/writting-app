@@ -112,7 +112,13 @@ export function App() {
   if (projects === undefined || (projects.length > 0 && data === undefined)) {
     return <div className="empty" style={{ paddingTop: '30vh' }}>Открываю…</div>
   }
-  if (!projects.length || !data) return <Welcome onCreated={selectProject} sync={sync} />
+  if (!projects.length || !data)
+    return (
+      <>
+        <Welcome onCreated={selectProject} sync={sync} />
+        <Toaster />
+      </>
+    )
 
   const closeCapture = () => {
     setCapture(false)
