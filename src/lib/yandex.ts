@@ -15,6 +15,7 @@ const FILE = 'app:/manuscript.json'
 const TOKEN_KEY = 'manuscript.yandex.token'
 const CLIENT_KEY = 'manuscript.yandex.client'
 const STATE_KEY = 'manuscript.yandex.state'
+const PROXY_KEY = 'manuscript.yandex.proxy'
 const STATE_TTL = 15 * 60 * 1000
 
 export function getYandexClientId(): string | null {
@@ -30,6 +31,28 @@ export function setYandexClientId(id: string) {
   try {
     if (id.trim()) localStorage.setItem(CLIENT_KEY, id.trim())
     else localStorage.removeItem(CLIENT_KEY)
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * Reading the file goes through a tiny proxy (proxy/yandex-disk): the browser cannot fetch from Yandex's
+ * download host (no CORS). The owner gives its address in VITE_YANDEX_PROXY_URL — or pastes it in Settings.
+ */
+export function getYandexProxyUrl(): string | null {
+  try {
+    const saved = localStorage.getItem(PROXY_KEY)
+    if (saved) return saved
+  } catch {
+    /* ignore */
+  }
+  return (import.meta.env.VITE_YANDEX_PROXY_URL as string | undefined) || null
+}
+export function setYandexProxyUrl(url: string) {
+  try {
+    if (url.trim()) localStorage.setItem(PROXY_KEY, url.trim())
+    else localStorage.removeItem(PROXY_KEY)
   } catch {
     /* ignore */
   }
@@ -106,11 +129,23 @@ export function takeYandexRedirect(): boolean {
   return !!token
 }
 
+const reauth = () => new Error('Яндекс Диск попросил войти заново. Нажми «Подключить» ещё раз.')
+
+/** Gzip bytes (from the proxy) or plain JSON text. */
+async function parseBackup(buf: ArrayBuffer): Promise<Backup> {
+  const bytes = new Uint8Array(buf)
+  if (bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b) {
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))
+    return JSON.parse(await new Response(stream).text()) as Backup
+  }
+  return JSON.parse(new TextDecoder().decode(bytes)) as Backup
+}
+
 async function call(path: string, token: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(`${API}${path}`, { ...init, headers: { Authorization: `OAuth ${token}`, Accept: 'application/json' } })
   if (res.status === 401) {
     forgetYandex()
-    throw new Error('Яндекс Диск попросил войти заново. Нажми «Подключить» ещё раз.')
+    throw reauth()
   }
   return res
 }
@@ -134,18 +169,45 @@ export function yandexStore(): FileStore {
     async read() {
       const version = await meta()
       if (version === null) return null
-      const link = await call(`/resources/download?path=${encodeURIComponent(FILE)}`, token())
-      if (!link.ok) throw new Error(`Не получилось скачать с Яндекс Диска (${link.status})`)
-      const { href } = (await link.json()) as { href: string }
-      // The download host wants the token too: from another site the browser sends no yandex.ru cookies, and without it the answer is 403.
-      let file: Response
+      const proxy = getYandexProxyUrl()
+      if (!proxy) {
+        // The old direct path: browsers cannot reach the download host, so this only works outside them.
+        const needProxy = 'Чтение с Яндекс Диска не настроено: нужен прокси (см. proxy/yandex-disk/README.md)'
+        const link = await call(`/resources/download?path=${encodeURIComponent(FILE)}`, token())
+        if (!link.ok) throw new Error(`Не получилось скачать с Яндекс Диска (${link.status})`)
+        const { href } = (await link.json()) as { href: string }
+        let direct: Response
+        try {
+          direct = await fetch(href, { headers: { Authorization: `OAuth ${token()}` } })
+        } catch {
+          throw new Error(needProxy)
+        }
+        if (!direct.ok) throw new Error(needProxy)
+        return { data: (await direct.json()) as Backup, version }
+      }
+      let res: Response
       try {
-        file = await fetch(href, { headers: { Authorization: `OAuth ${token()}` } })
+        res = await fetch(proxy, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ token: token(), path: FILE }),
+        })
       } catch {
         throw new Error('Не получилось скачать файл с Яндекс Диска. Проверь интернет и попробуй ещё раз.')
       }
-      if (!file.ok) throw new Error(`Не получилось скачать с Яндекс Диска (${file.status})`)
-      return { data: (await file.json()) as Backup, version }
+      if (res.status === 404) return null
+      if (res.status === 401) {
+        forgetYandex()
+        throw reauth()
+      }
+      if (!res.ok) throw new Error(`Не получилось скачать с Яндекс Диска (${res.status})`)
+      let data: Backup
+      try {
+        data = await parseBackup(await res.arrayBuffer())
+      } catch {
+        throw new Error('Не получилось прочитать файл с Яндекс Диска. Попробуй ещё раз.')
+      }
+      return { data, version }
     },
     async write(data) {
       const link = await call(`/resources/upload?path=${encodeURIComponent(FILE)}&overwrite=true`, token())
