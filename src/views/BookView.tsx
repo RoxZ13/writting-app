@@ -67,7 +67,7 @@ export function BookView({ data }: { data: ProjectData }) {
       <div className="book-hero">
         <BookCover project={p} words={words} />
         <div className="stack" style={{ flex: 1, minWidth: 0 }}>
-          <span className="eyebrow">О книге</span>
+          <span className="eyebrow">Об истории</span>
           <InlineEdit className="book-title" value={p.title} onSave={(title) => title.trim() && set({ title })} />
           <InlineEdit className="book-genre" value={p.genre ?? ''} placeholder="Жанр — например, фэнтези, гет, макси" onSave={(genre) => set({ genre })} />
           <div>
@@ -162,11 +162,11 @@ export function BookView({ data }: { data: ProjectData }) {
         </summary>
         <div className="stack" style={{ marginTop: 14 }}>
           <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void exportWord()}>
-            Вся книга в Word (.docx)
+            Вся история в Word (.docx)
           </button>
           <div>
             <span className="field-label">Добавить текст</span>
-            <div className="small muted">Главы из файла встанут в конец книги.</div>
+            <div className="small muted">Главы из файла встанут в конец истории.</div>
             <ImportPanel projectId={p.id} onDone={() => go({ view: 'board' })} />
           </div>
           <div>
@@ -199,6 +199,7 @@ export function BookView({ data }: { data: ProjectData }) {
             onClick={async () => {
               if (!confirm(`Удалить историю «${p.title}» со всеми главами и заметками?`)) return
               await remove('projects', p.id)
+              toast('История удалена', () => patch('projects', p.id, { deleted: false }))
               go({ view: 'library' })
             }}
           >

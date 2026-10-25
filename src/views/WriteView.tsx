@@ -15,10 +15,10 @@ import { editHintsKey } from '../components/EditHints'
 import { countHints } from '../lib/editcheck'
 import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, sceneShort, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
-import { hotkey, session } from '../lib/session'
+import { hotkey, isTouch, session } from '../lib/session'
 import { clock, useSprint } from '../lib/sprint'
 import { endFocus, FocusStart } from '../components/Focus'
-import { lengthText, pages, sumChars } from '../lib/length'
+import { sumChars } from '../lib/length'
 import { ChapterMeter } from '../components/ChapterMeter'
 import { chapterProgress, dayKey, totalWords, wordsOn } from '../lib/pace'
 import { MARKER_STATES } from '../lib/status'
@@ -26,23 +26,34 @@ import { docParagraphs, emptyDoc, formatWords, lastSentences } from '../lib/text
 import { loadTypo } from '../lib/typography'
 import { diffParagraphs } from '../lib/diff'
 import { InlineEdit, Modal, toast } from '../lib/ui'
+import { FindBar } from '../components/FindBar'
+import { TextStats } from '../components/TextStats'
+import { typesetDoc } from '../components/Typography'
+import { Shortcuts } from '../components/Shortcuts'
 
 type Mode = 'write' | 'edit' | 'rewrite'
 const PANELS_KEY = 'manuscript.panels'
+const PANELS_RESET_KEY = 'manuscript.panelsReset2'
 const MODE_KEY = 'manuscript.mode'
 const HINTS_KEY = 'manuscript.hints'
 
 function loadPanels(): { nav: boolean; plan: boolean } {
   const wide = typeof matchMedia !== 'undefined' && matchMedia('(min-width: 1101px)').matches
   try {
+    // Once: panels used to open by default — start everyone from a clean page.
+    if (!localStorage.getItem(PANELS_RESET_KEY)) {
+      localStorage.removeItem(PANELS_KEY)
+      localStorage.setItem(PANELS_RESET_KEY, '1')
+    }
     const saved = JSON.parse(localStorage.getItem(PANELS_KEY) ?? '{}')
     // Side panels only stay open between visits on a wide screen; on a phone they cover the text.
     // The navigator is there by default (where am I in the book); in the quiet view it hides with the header.
-    return wide ? { nav: true, plan: false, ...saved } : { nav: false, plan: false }
+    return wide ? { nav: false, plan: false, ...saved } : { nav: false, plan: false }
   } catch {
     return { nav: wide, plan: false }
   }
 }
+const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 const isWide = () => matchMedia('(min-width: 1101px)').matches
 function loadMode(): Mode {
   try {
@@ -75,7 +86,7 @@ function selectionForMarker(editor: Editor): SelectionAction {
   return { kind: 'setup', from, to, text: editor.state.doc.textBetween(from, to, ' ') }
 }
 
-export function WriteView({ data, sceneId, onCapture, onSearch }: { data: ProjectData; sceneId: string; onCapture: () => void; onSearch: () => void }) {
+export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; sceneId: string; onSearch: (query?: string) => void }) {
   const scene = data.sceneById.get(sceneId)
   const text = useLiveQuery(() => db.texts.get(sceneId), [sceneId])
   const [panels, setPanels] = useState(loadPanels)
@@ -92,7 +103,17 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
   const [typoOpen, setTypoOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const { sprint, left } = useSprint()
+  // Focus, as in Ulysses: while the timer runs only the text is on screen; the bars come back at the top edge.
+  const focusRun = !!sprint && sprint.projectId === data.project.id && left > 0
+  useEffect(() => {
+    document.documentElement.dataset.focusrun = focusRun ? 'on' : 'off'
+    return () => {
+      document.documentElement.dataset.focusrun = 'off'
+    }
+  }, [focusRun])
   const [focusOpen, setFocusOpen] = useState(false)
+  const [find, setFind] = useState<{ replace: boolean } | null>(null)
+  const [keysOpen, setKeysOpen] = useState(false)
   const [hintsOn, setHintsOn] = useState(() => {
     try {
       // Off until asked for: the text is the author's, hints come only on request.
@@ -162,7 +183,7 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
   // ⌘/Ctrl+M: drop a marker right where the cursor is.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'm' && editor) {
+      if ((e.metaKey || e.ctrlKey) && e.code === 'KeyM' && editor) {
         e.preventDefault()
         setAction(selectionForMarker(editor))
       }
@@ -170,6 +191,40 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [editor])
+
+  // The editor's own keys, as in Word and Google Docs:
+  // ⌘/Ctrl+F — find in the scene, Ctrl+H (⌘⇧H on Mac) — find and replace,
+  // ⌘/Ctrl+Alt+↓/↑ — next / previous scene, ⌘/Ctrl+/ — all the keys.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.metaKey && !e.ctrlKey) return
+      if (e.code === 'KeyF' && !e.shiftKey && !e.altKey) {
+        e.preventDefault()
+        setFind((f) => ({ replace: f?.replace ?? false }))
+      } else if (e.code === 'KeyH' && (e.ctrlKey || e.shiftKey) && !e.altKey) {
+        e.preventDefault()
+        setFind({ replace: true })
+      } else if (e.altKey && (e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+        e.preventDefault()
+        const i = data.scenes.findIndex((s) => s.id === sceneId)
+        const next = i === -1 ? undefined : data.scenes[i + (e.key === 'ArrowDown' ? 1 : -1)]
+        if (next) go({ view: 'text', sceneId: next.id })
+        else toast(e.key === 'ArrowDown' ? 'Это последняя сцена' : 'Это первая сцена')
+      } else if (e.code === 'Slash') {
+        e.preventDefault()
+        setKeysOpen((o) => !o)
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [data.scenes, sceneId])
+
+  const typeset = () => {
+    if (!editor) return
+    const n = typesetDoc(editor.state, (tr) => editor.view.dispatch(tr))
+    if (n) toast(`Причёсано абзацев: ${n}`, () => editor.commands.undo())
+    else toast('Здесь уже всё аккуратно')
+  }
 
   // Remember where the author is — this powers "continue where I stopped" on every device.
   useEffect(() => {
@@ -217,6 +272,9 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
     },
     [sceneId],
   )
+  const [saved, setSaved] = useState(true)
+  // Whether the story was empty when the page opened.
+  const [storyEmpty] = useState(() => [...data.scenes, ...data.pool.scenes].every((s) => !s.wordCount))
   const onReady = useCallback((ed: Editor) => setEditor(ed), [])
 
   if (!scene) return null
@@ -242,7 +300,7 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
 
   return (
     <div className={cls}>
-      <aside className="write-side" aria-label="Структура">
+      <aside className="write-side" aria-label="Главы">
         <div className="inner">
           <Structure data={data} sceneId={sceneId} onPick={() => !isWide() && closeOverlays()} />
         </div>
@@ -250,15 +308,15 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
 
       <div className="write-center">
         <div className="write-top">
-          <button className={`tool ${panels.nav ? 'on' : ''}`} title={panels.nav ? 'Скрыть структуру книги' : 'Показать структуру книги'} onClick={() => togglePanel('nav')}>
+          <button className={`tool ${panels.nav ? 'on' : ''}`} title={panels.nav ? 'Скрыть главы' : 'Показать главы'} onClick={() => togglePanel('nav')}>
             <Icon name="panel" size={17} />
-            <span className="tool-label">Структура</span>
+            <span className="tool-label">Главы</span>
           </button>
           <div className="crumbs">
             <span className="hide-sm" style={{ whiteSpace: 'nowrap' }}>
               {chapter?.title} ›
             </span>
-            <InlineEdit value={scene.title} placeholder={sceneName(data, scene)} onSave={(title) => void patch<Scene>('scenes', scene.id, { title })} />
+            <span className="crumb-scene">{sceneName(data, scene)}</span>
             {mode !== 'write' && <span className="mode-chip">{mode === 'edit' ? 'правка' : 'переписываю'}</span>}
           </div>
           {mode === 'edit' && (
@@ -276,9 +334,12 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
             </span>
           )}
           <span className="spacer" />
+          <span className={`save-state ${saved ? '' : 'busy'}`} aria-live="polite" title={saved ? 'Сохранено на этом устройстве' : 'Сохраняю…'}>
+            {saved ? <Icon name="check" size={15} /> : 'Сохраняю…'}
+          </span>
           {sprint && sprint.projectId === data.project.id && left > 0 && (
             <button className="tool sprint-pill" title="Фокус идёт. Нажми, чтобы остановить" onClick={() => confirm('Остановить фокус?') && endFocus()}>
-              ⏱ {clock(left)}
+              <Icon name="clock" size={14} /> {clock(left)}
             </button>
           )}
           <button
@@ -311,112 +372,120 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
           </div>
           <div className="typo-anchor">
             <button className={`tool ${menuOpen ? 'on' : ''}`} title="Режимы и прочее" aria-label="Ещё" onClick={() => setMenuOpen(!menuOpen)}>
-              ⋯
+              <Icon name="more" size={18} />
             </button>
             {menuOpen && (
               <>
                 <div className="typo-back" onClick={() => setMenuOpen(false)} />
                 <div className="typo-pop card write-menu">
-                  <button
-                    className="mode-item"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      if (editor) setAction(selectionForMarker(editor))
-                    }}
-                  >
-                    <span className="mode-dot">✦</span>
-                    <span>
-                      <strong>Маячок здесь</strong>
-                      <span className="mode-hint">Деталь, которую раскроешь потом{hotkey(' · ⌘/Ctrl + M')}</span>
-                    </span>
-                  </button>
-                  <div className="hr" />
-                  <div className="menu-label">Режим</div>
+                  <div className="seg menu-modes" role="group" aria-label="Режим">
+                    {(
+                      [
+                        ['write', 'Писать', 'Только текст'],
+                        ['edit', 'Править', 'Маячки и подсказки на странице'],
+                        ['rewrite', 'Переписать', 'Прежний текст сбоку, новый рядом'],
+                      ] as [Mode, string, string][]
+                    ).map(([m, label, hint]) => (
+                      <button
+                        key={m}
+                        aria-pressed={mode === m}
+                        title={hint}
+                        onClick={() => {
+                          setMenuOpen(false)
+                          setMode(m)
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                   {(
                     [
-                      ['write', 'Писать', 'Только текст. Ничего лишнего.'],
-                      ['edit', 'Править', 'Текст на странице, маячки подсвечены.'],
-                      ['rewrite', 'Переписывать', 'Прежний текст тихо сбоку, новый — рядом.'],
-                    ] as [Mode, string, string][]
-                  ).map(([m, label, hint]) => (
+                      ['spark', 'Маячок здесь', '⌘M', () => editor && setAction(selectionForMarker(editor))],
+                      ['search', 'Найти и заменить', '⌘F', () => setFind({ replace: true })],
+                      ['type', 'Причесать текст', '', typeset],
+                      ['focus', 'Фокус с таймером', '', () => setFocusOpen(true)],
+                      ['check', 'Закончить на сегодня', '', () => setFinishing(true)],
+                    ] as [string, string, string, () => void][]
+                  ).map(([ico, label, keys, run]) => (
                     <button
-                      key={m}
-                      className={`mode-item ${mode === m ? 'on' : ''}`}
+                      key={label}
+                      className="menu-item"
                       onClick={() => {
                         setMenuOpen(false)
-                        setMode(m)
+                        run()
                       }}
                     >
-                      <span className="mode-dot">{mode === m ? '●' : '○'}</span>
-                      <span>
-                        <strong>{label}</strong>
-                        <span className="mode-hint">{hint}</span>
-                      </span>
+                      <Icon name={ico} size={17} />
+                      <span>{label}</span>
+                      {keys && <kbd className="menu-keys">{hotkey(keys.replace('⌘', isMac ? '⌘' : 'Ctrl+'))}</kbd>}
                     </button>
                   ))}
-                  <div className="hr" />
-                  <button
-                    className="mode-item"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setFocusOpen(true)
-                    }}
-                  >
-                    <span className="mode-dot">⏱</span>
-                    <span>
-                      <strong>Фокус</strong>
-                      <span className="mode-hint">Только текст и таймер, без уведомлений. В конце — сколько написала</span>
-                    </span>
-                  </button>
-                  <button
-                    className="mode-item"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      onCapture()
-                    }}
-                  >
-                    <span className="mode-dot">⚡</span>
-                    <span>
-                      <strong>Быстрая запись</strong>
-                      <span className="mode-hint">Мысль, цитата, вопрос{hotkey(' · ⌘/Ctrl + J')}</span>
-                    </span>
-                  </button>
-                  <button
-                    className="mode-item"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      onSearch()
-                    }}
-                  >
-                    <span className="mode-dot">⌕</span>
-                    <span>
-                      <strong>Поиск по книге</strong>
-                      <span className="mode-hint">Где у меня было…{hotkey(' · ⌘/Ctrl + Shift + F')}</span>
-                    </span>
-                  </button>
-                  <button
-                    className="mode-item"
-                    onClick={() => {
-                      setMenuOpen(false)
-                      setFinishing(true)
-                    }}
-                  >
-                    <span className="mode-dot">✓</span>
-                    <span>
-                      <strong>Закончить на сегодня</strong>
-                      <span className="mode-hint">Оставить записку себе на следующий раз</span>
-                    </span>
-                  </button>
-                  <div className="small muted" style={{ padding: '8px 10px 2px' }}>
-                    {formatWords(words ?? scene.wordCount)} в сцене · глава {pages(data.project, chapterChars)} · сегодня +
-                    {wordsOn(data.project, dayKey()).toLocaleString('ru-RU')}
-                  </div>
+                  {!isTouch() && (
+                    <button
+                      className="menu-foot"
+                      onClick={() => {
+                        setMenuOpen(false)
+                        setKeysOpen(true)
+                      }}
+                    >
+                      Все горячие клавиши · {isMac ? '⌘' : 'Ctrl'} + /
+                    </button>
+                  )}
                 </div>
               </>
             )}
           </div>
         </div>
 
+        {find && editor && (
+          <FindBar
+            editor={editor}
+            replace={find.replace}
+            onClose={() => setFind(null)}
+            onBookSearch={(q) => {
+              setFind(null)
+              onSearch(q)
+            }}
+          />
+        )}
+        <div className="passport-wrap">
+          <SceneNow data={data} scene={scene} onOpenPlan={openPlan} />
+        </div>
+        {chapter && !chapter.pool && (
+          <ChapterMeter project={data.project} scene={scene} chars={chapterChars} editor={editor} locked={!!chapter.locked} />
+        )}
+
+        <div className="editor-area">
+          {rewriting && <RewriteOld scene={scene} editor={editor} onDone={() => setModeState('write')} />}
+          <div className="editor-wrap">
+            {text && !rewriting && storyEmpty && <TitlePage key={`title-${scene.id}`} project={data.project} editor={editor} empty />}
+            {text && !rewriting && (
+              <header className="scene-head">
+                <div className="scene-head-chapter">{chapter?.title}</div>
+                <InlineEdit
+                  className="scene-head-title"
+                  value={scene.title}
+                  placeholder={sceneName(data, scene)}
+                  onSave={(title) => void patch<Scene>('scenes', scene.id, { title })}
+                />
+              </header>
+            )}
+            {text && (
+              <SceneEditor
+                scene={scene}
+                initial={text}
+                onReady={onReady}
+                onWords={onWords}
+                onSaved={setSaved}
+                onSelectionAction={setAction}
+                onMarkerClick={setOpenMarker}
+                onCommentClick={setOpenComment}
+              />
+            )}
+            {text && !rewriting && <MarginNotes key={`notes-${scene.id}`} data={data} editor={editor} onOpen={setOpenComment} />}
+          </div>
+        </div>
         {text && editor && !rewriting && (
           <Resume
             key={scene.id}
@@ -429,38 +498,17 @@ export function WriteView({ data, sceneId, onCapture, onSearch }: { data: Projec
             }}
           />
         )}
-        <div className="passport-wrap">
-          <SceneNow data={data} scene={scene} onOpenPlan={openPlan} />
-        </div>
-
-        {chapter && !chapter.pool && (
-          <ChapterMeter project={data.project} scene={scene} chars={chapterChars} editor={editor} locked={!!chapter.locked} />
-        )}
-        <div className="editor-area">
-          {rewriting && <RewriteOld scene={scene} editor={editor} onDone={() => setModeState('write')} />}
-          <div className="editor-wrap">
-            {text && !rewriting && (
-              <TitlePage key={scene.id} project={data.project} editor={editor} empty={[...data.scenes, ...data.pool.scenes].every((s) => !s.wordCount)} />
-            )}
-            {text && (
-              <SceneEditor
-                scene={scene}
-                initial={text}
-                onReady={onReady}
-                onWords={onWords}
-                onSelectionAction={setAction}
-                onMarkerClick={setOpenMarker}
-                onCommentClick={setOpenComment}
-              />
-            )}
-            {text && !rewriting && <MarginNotes key={scene.id} data={data} editor={editor} onOpen={setOpenComment} />}
-          </div>
-        </div>
       </div>
 
-      <div className="calm-count" aria-hidden="true">
-        {formatWords(words ?? scene.wordCount)} · глава {lengthText(data.project, chapterChars)}
-      </div>
+      <TextStats
+        editor={editor}
+        chapterWords={data.scenes
+          .filter((s) => s.chapterId === scene.chapterId)
+          .reduce((n, s) => n + (s.id === scene.id ? (words ?? s.wordCount) : s.wordCount), 0)}
+        bookWords={totalWords([...data.scenes, ...data.pool.scenes]) - scene.wordCount + (words ?? scene.wordCount)}
+        today={wordsOn(data.project, dayKey())}
+      />
+      {keysOpen && <Shortcuts onClose={() => setKeysOpen(false)} />}
 
       <aside className="write-brief" aria-label="План сцены">
         <div className="inner">
@@ -527,7 +575,6 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
     })
   const cp = chapterProgress(data.project, data.chapters, data.scenes)
   const words = totalWords([...data.scenes, ...data.pool.scenes])
-  const inbox = data.notes.filter((n) => !n.archived && !n.sceneId && !n.used && !(n.characterIds ?? []).length).length
   const addScene = async (chapterId: string) => {
     const s = await createScene(data.project.id, chapterId, '')
     go({ view: 'text', sceneId: s.id })
@@ -586,17 +633,6 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
           </div>
         )
       })}
-      <div className="navi-foot">
-        <button className="navi-row" onClick={() => go({ view: 'board' })}>
-          Доска
-        </button>
-        <button className="navi-row" onClick={() => go({ view: 'characters' })}>
-          Герои и матчасть
-        </button>
-        <button className="navi-row" onClick={() => go({ view: 'inbox' })}>
-          Входящие{inbox > 0 && <span className="navi-count">{inbox}</span>}
-        </button>
-      </div>
     </nav>
   )
 }
@@ -718,8 +754,13 @@ function Resume({ note, doc, editor, onNoteSeen }: { note: string; doc: unknown;
       if (transaction.docChanged) close()
     }
     editor.on('update', onUpdate)
+    // Scrolling by hand puts it away too: the author is already moving through the text.
+    window.addEventListener('wheel', close, { passive: true })
+    window.addEventListener('touchmove', close, { passive: true })
     return () => {
       editor.off('update', onUpdate)
+      window.removeEventListener('wheel', close)
+      window.removeEventListener('touchmove', close)
     }
   }, [open, editor, close])
   if (!open) return null
@@ -727,25 +768,26 @@ function Resume({ note, doc, editor, onNoteSeen }: { note: string; doc: unknown;
     close()
     editor.chain().focus('end', { scrollIntoView: true }).run()
   }
+  // One quiet line, not a card over the text: what was there last time, and a way back in.
   return (
     <div className="resume" role="note">
-      {note && (
-        <div className="resume-note">
-          <span className="muted">В прошлый раз:</span> {note}
-        </div>
-      )}
-      {tail && <div className="resume-tail">…{tail}</div>}
-      <div className="row">
-        {tail && (
-          <button className="btn primary" onClick={resume}>
-            Продолжить отсюда
-          </button>
+      <span className="resume-text">
+        {note ? (
+          <>
+            <span className="muted">В прошлый раз:</span> {note}
+          </>
+        ) : (
+          <>…{tail}</>
         )}
-        <span className="spacer" />
-        <button className="icon-btn" aria-label="Скрыть" onClick={close}>
-          ×
+      </span>
+      {tail && (
+        <button className="resume-go" onClick={resume}>
+          Продолжить
         </button>
-      </div>
+      )}
+      <button className="icon-btn" aria-label="Скрыть" onClick={close}>
+        <Icon name="close" size={14} />
+      </button>
     </div>
   )
 }
@@ -776,7 +818,7 @@ function FinishSession({ project, onClose }: { project: Project; onClose: () => 
             className="textarea"
             rows={3}
             autoFocus
-            placeholder="Где остановилась и что дальше — пара слов, чтобы завтра начать без раскачки"
+            placeholder="Чем закончилось сегодня и что дальше — пара слов, чтобы завтра начать без раскачки"
             value={v}
             onChange={(e) => setV(e.target.value)}
           />

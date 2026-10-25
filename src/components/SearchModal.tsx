@@ -6,8 +6,8 @@ import { session } from '../lib/session'
 import { Modal } from '../lib/ui'
 
 /** Find a word or phrase anywhere in the book and jump straight to it. */
-export function SearchModal({ data, onClose }: { data: ProjectData; onClose: () => void }) {
-  const [q, setQ] = useState('')
+export function SearchModal({ data, initial = '', onClose }: { data: ProjectData; initial?: string; onClose: () => void }) {
+  const [q, setQ] = useState(initial)
   const [res, setRes] = useState<{ hits: Hit[]; total: number }>({ hits: [], total: 0 })
   useEffect(() => {
     let cancelled = false
@@ -32,12 +32,12 @@ export function SearchModal({ data, onClose }: { data: ProjectData; onClose: () 
   }
 
   return (
-    <Modal onClose={onClose} label="Поиск по книге">
+    <Modal onClose={onClose} label="Поиск по истории">
       <div className="stack">
         <input
           className="input search-input"
           autoFocus
-          placeholder="Найти в книге — слово, имя, фразу"
+          placeholder="Найти в истории — слово, имя, фразу"
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && res.hits[0] && open(res.hits[0])}

@@ -7,6 +7,7 @@ import { sceneName } from '../lib/hooks'
 import { useWhereFound, WhereFound } from '../components/WhereFound'
 import type { Found } from '../lib/mentions'
 import { InlineEdit, toast } from '../lib/ui'
+import { Icon } from '../components/Icon'
 
 /** "Герои · Матчасть": two sides of the same world, one tab. */
 export function WorldNav({ current }: { current: 'characters' | 'lore' }) {
@@ -16,7 +17,7 @@ export function WorldNav({ current }: { current: 'characters' | 'lore' }) {
         Герои
       </button>
       <button aria-pressed={current === 'lore'} onClick={() => go({ view: 'lore' })}>
-        Матчасть
+        Мир
       </button>
     </div>
   )
@@ -48,11 +49,8 @@ export function LoreView({ data }: { data: ProjectData }) {
       <div className="toolbar">
         <WorldNav current="lore" />
         <span className="spacer" />
-        <input className="input lore-search" placeholder="Найти в матчасти" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input className="input lore-search" placeholder="Найти в мире" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
-      <p className="small muted" style={{ marginTop: 0 }}>
-        Места, магия, даты, кто что знает. Где запись встречается в тексте — видно в карточке. Прикрепи к герою, главе или сцене («+ где нужно») — она будет в плане этих сцен.
-      </p>
       {topics.length > 0 && (
         <div className="row lore-topics">
           <button className={`chip-toggle ${topic === null ? 'on' : ''}`} onClick={() => setTopic(null)}>
@@ -77,7 +75,7 @@ export function LoreView({ data }: { data: ProjectData }) {
           <LoreCard key={n.id} n={n} data={data} found={found?.get(n.id) ?? (found ? [] : undefined)} />
         ))}
       </div>
-      {!data.lore.length && <div className="empty">Пока пусто. Начни с того, что чаще всего приходится проверять.</div>}
+      {!data.lore.length && <div className="empty">Места, магия, даты, кто что знает. Запись можно прикрепить к герою, главе или сцене — она появится в плане сцены.</div>}
     </div>
   )
 }
@@ -92,12 +90,12 @@ function LoreCard({ n, data, found }: { n: Note; data: ProjectData; found?: Foun
           className="icon-btn"
           title="Удалить запись"
           onClick={() => {
-            if (!confirm(`Удалить «${n.title}» из матчасти?`)) return
+            if (!confirm(`Удалить «${n.title}» из мира?`)) return
             void remove('notes', n.id)
             toast('Запись удалена')
           }}
         >
-          ×
+          <Icon name="close" size={15} />
         </button>
       </div>
       <InlineEdit className="lore-topic" value={n.topic ?? ''} placeholder="тема: места, магия, даты…" onSave={(topic) => set({ topic: topic.trim() || undefined })} />
@@ -127,7 +125,7 @@ function LorePins({ n, data }: { n: Note; data: ProjectData }) {
         <span key={h!.id} className="lore-pin">
           {h!.name}
           <button aria-label="Открепить" onClick={() => drop('characterIds', h!.id)}>
-            ×
+            <Icon name="close" size={15} />
           </button>
         </span>
       ))}
@@ -135,7 +133,7 @@ function LorePins({ n, data }: { n: Note; data: ProjectData }) {
         <span key={c!.id} className="lore-pin">
           {c!.title}
           <button aria-label="Открепить" onClick={() => drop('chapterIds', c!.id)}>
-            ×
+            <Icon name="close" size={15} />
           </button>
         </span>
       ))}
@@ -143,7 +141,7 @@ function LorePins({ n, data }: { n: Note; data: ProjectData }) {
         <span key={s!.id} className="lore-pin">
           {data.chapterById.get(s!.chapterId)?.title} · {sceneName(data, s!)}
           <button aria-label="Открепить" onClick={() => drop('sceneIds', s!.id)}>
-            ×
+            <Icon name="close" size={15} />
           </button>
         </span>
       ))}

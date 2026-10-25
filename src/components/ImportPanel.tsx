@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { db, type Project } from '../db/db'
-import { alive, createChapter, createScene, patch, save } from '../db/repo'
+import { alive, createChapter, createNote, createScene, patch, save } from '../db/repo'
 import {
   parseBook,
   htmlToBlocks,
@@ -14,8 +14,10 @@ import { toast } from '../lib/ui'
 
 export async function importBook(projectId: string, book: ImportedBook) {
   const project = await db.projects.get(projectId)
-  if (project && book.preface && !project.description) {
-    await save<Project>('projects', { ...project, description: book.preface })
+  if (project && book.preface) {
+    if (!project.description) await save<Project>('projects', { ...project, description: book.preface })
+    // The project already has its own description: do not drop the file's header, keep it as a note.
+    else await createNote(`Шапка из файла:\n${book.preface}`, 'note', projectId)
   }
   return importChapters(projectId, book.chapters)
 }
@@ -26,10 +28,14 @@ export async function importChapters(projectId: string, chapters: ImportedBook['
   let firstScene: string | undefined
   for (const ch of chapters) {
     const chapter = await createChapter(projectId, ch.title, order++)
+    let lastScene: string | undefined
     for (const sc of ch.scenes) {
       const scene = await createScene(projectId, chapter.id, sc.title, { status: 'written', excerpt: sc.excerpt, epigraph: sc.epigraph }, sc.doc, sc.wordCount)
       firstScene ??= scene.id
+      lastScene = scene.id
     }
+    // The author's note to readers is not prose: it hangs on the part's last scene as a note.
+    if (ch.comment) await createNote(`Комментарий к части «${ch.title}»:\n${ch.comment}`, 'note', projectId, lastScene)
   }
   // Written chapters came in: the board asks once whether to fix them in place.
   if (chapters.length > 1) await patch<Project>('projects', projectId, { lockAsked: false })
@@ -49,7 +55,7 @@ export function ImportPanel({ projectId, onDone }: { projectId: string; onDone?:
     const parsed = parseBook(blocks)
     const chapters = parsed.chapters
     if (!chapters.length || !chapters.some((c) => c.scenes.length)) {
-      setError('Не нашла текста. Попробуй другой файл или вставь текст вручную.')
+      setError('В файле нет текста. Попробуй другой файл или вставь текст вручную.')
       return
     }
     setError(null)
@@ -87,8 +93,8 @@ export function ImportPanel({ projectId, onDone }: { projectId: string; onDone?:
       <div className="stack">
         <div>
           <strong>
-            Нашла {preview.length} {plural(preview.length, 'главу', 'главы', 'глав')}, {scenes}{' '}
-            {plural(scenes, 'сцену', 'сцены', 'сцен')}, {formatWords(words)}.
+            В файле: {preview.length} {plural(preview.length, 'глава', 'главы', 'глав')}, {scenes}{' '}
+            {plural(scenes, 'сцена', 'сцены', 'сцен')}, {formatWords(words)}.
           </strong>
           <div className="small muted">
             Главы — по заголовкам «Глава…», «Пролог», «Chapter…». Сцены — по разделителям «* * *». Всё это потом

@@ -3,17 +3,24 @@ import '@fontsource-variable/literata/wght-italic.css'
 import '@fontsource-variable/manrope'
 import '@fontsource-variable/onest'
 import './styles/app.css'
+import './styles/line.css'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
 import { applyAccent, applyTheme, getAccent, getTheme } from './lib/session'
 import { applyTypo, loadTypo } from './lib/typography'
 import { registerSW } from 'virtual:pwa-register'
+import { getYandexToken, takeYandexRedirect, yandexStore } from './lib/yandex'
+import { startFileSync } from './lib/filesync'
 
 applyTheme(getTheme())
 applyAccent(getAccent())
 applyTypo(loadTypo())
 navigator.storage?.persist?.().catch(() => {})
+
+// Back from Yandex sign-in: keep the token. Connected to a Disk: keep the stories in step with it.
+takeYandexRedirect()
+if (getYandexToken()) startFileSync(yandexStore())
 
 // A new version is taken in when the author steps away (switches app or tab), never while typing.
 // It is looked for on every return and once an hour, so an installed app does not stay old.

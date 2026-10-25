@@ -4,19 +4,21 @@ import { BubbleMenu } from '@tiptap/react/menus'
 import StarterKit from '@tiptap/starter-kit'
 import { Focus, Placeholder } from '@tiptap/extensions'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { db, type Note, type Scene, type SceneText } from '../db/db'
-import { patch, save } from '../db/repo'
+import { patch, save, snapshotScene } from '../db/repo'
 import { docCharCount, docParagraphs, docWordCount } from '../lib/text'
 import { makeExcerpt } from '../lib/importer'
 import { session } from '../lib/session'
 import { MarkerMark } from './MarkerMark'
 import { EditHints } from './EditHints'
 import { Typography } from './Typography'
+import { FindHighlight } from './FindHighlight'
 import { CommentMark } from './CommentMark'
 import { InlineNote } from './InlineNote'
 import { toast } from '../lib/ui'
 import { findInEditor } from '../lib/search'
+import { createSaver } from '../lib/saver'
 
 export interface SelectionAction {
   kind: 'setup' | 'payoff' | 'comment'
@@ -34,6 +36,7 @@ export function SceneEditor({
   initial,
   onReady,
   onWords,
+  onSaved,
   onSelectionAction,
   onMarkerClick,
   onCommentClick,
@@ -42,16 +45,60 @@ export function SceneEditor({
   initial: SceneText
   onReady: (editor: Editor) => void
   onWords: (n: number, chars: number) => void
+  /** False while there are unsaved changes, true once they are on the device. */
+  onSaved?: (saved: boolean) => void
   onSelectionAction: (a: SelectionAction) => void
   onMarkerClick: (markerId: string) => void
   onCommentClick?: (noteId: string) => void
 }) {
-  const pending = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const lastSavedAt = useRef(initial.updatedAt)
-  const dirty = useRef(false)
-  const saving = useRef(false)
   /** Latest editor state, kept so the final save still works after the editor is destroyed. */
   const latest = useRef<Editor['state'] | null>(null)
+  /** Always the newest props, so the saver (created once) never works with stale callbacks. */
+  const live = useRef({ scene, initial, onWords, onSaved })
+  useEffect(() => {
+    live.current = { scene, initial, onWords, onSaved }
+  })
+  const errorShown = useRef(false)
+
+  const [saver] = useState(() =>
+    createSaver<Editor['state']>({
+      delay: 800,
+      retryDelay: 3000,
+      write: async (state) => {
+        const { scene, initial, onWords } = live.current
+        const content = state.doc.toJSON()
+        const wordCount = docWordCount(content)
+        const charCount = docCharCount(content)
+        // Another device's text arrived while this one was being typed: keep it in versions before writing over it.
+        const stored = await db.texts.get(scene.id)
+        if (stored && stored.updatedAt > lastSavedAt.current && JSON.stringify(stored.content) !== JSON.stringify(content)) {
+          await snapshotScene(stored, 'Версия с другого устройства (конфликт синхронизации)')
+        }
+        const saved = await save<SceneText>('texts', { ...initial, content, wordCount })
+        lastSavedAt.current = saved.updatedAt
+        onWords(wordCount, charCount)
+        const current = await db.scenes.get(scene.id)
+        const paras = docParagraphs(content).map((p) => p.trim()).filter(Boolean)
+        const excerpt = makeExcerpt(current?.epigraph && paras[0] === current.epigraph ? paras.slice(1) : paras)
+        if (
+          current &&
+          (current.wordCount !== wordCount || current.charCount !== charCount || current.lastPos !== state.selection.from || current.excerpt !== excerpt)
+        ) {
+          await patch<Scene>('scenes', scene.id, { wordCount, charCount, lastPos: state.selection.from, excerpt })
+        }
+        // Counted only once everything is written, so a retry does not count the words twice.
+        if (current) recordWords(current.projectId, wordCount - current.wordCount)
+      },
+      onState: (s) => {
+        live.current.onSaved?.(s === 'saved')
+        if (s === 'error') {
+          if (!errorShown.current) toast('Не получилось сохранить текст. Пробую ещё раз…')
+          errorShown.current = true
+        } else if (s === 'saved') errorShown.current = false
+      },
+    }),
+  )
 
   const editor = useEditor({
     extensions: [
@@ -62,6 +109,7 @@ export function SceneEditor({
       EditHints,
       CommentMark,
       Typography,
+      FindHighlight,
       InlineNote.configure({
         onNote: (id, text) => {
           const now = Date.now()
@@ -96,39 +144,9 @@ export function SceneEditor({
     onUpdate: ({ editor }) => {
       latest.current = editor.state
       keepLineCentered(editor)
-      dirty.current = true
-      clearTimeout(pending.current)
-      pending.current = setTimeout(() => void flush(editor), 800)
+      saver.change(() => latest.current ?? editor.state)
     },
   })
-
-  async function flush(ed: Editor | null = editor) {
-    clearTimeout(pending.current)
-    const state = latest.current ?? ed?.state
-    if (!state || !dirty.current) return
-    dirty.current = false
-    saving.current = true
-    const content = state.doc.toJSON()
-    const wordCount = docWordCount(content)
-    const charCount = docCharCount(content)
-    try {
-      const saved = await save<SceneText>('texts', { ...initial, content, wordCount })
-      lastSavedAt.current = saved.updatedAt
-    } finally {
-      saving.current = false
-    }
-    onWords(wordCount, charCount)
-    const current = await db.scenes.get(scene.id)
-    const paras = docParagraphs(content).map((p) => p.trim()).filter(Boolean)
-    const excerpt = makeExcerpt(current?.epigraph && paras[0] === current.epigraph ? paras.slice(1) : paras)
-    if (current) recordWords(current.projectId, wordCount - current.wordCount)
-    if (
-      current &&
-      (current.wordCount !== wordCount || current.charCount !== charCount || current.lastPos !== state.selection.from || current.excerpt !== excerpt)
-    ) {
-      await patch<Scene>('scenes', scene.id, { wordCount, charCount, lastPos: state.selection.from, excerpt })
-    }
-  }
 
   // Restore the cursor where the author left it.
   useEffect(() => {
@@ -138,6 +156,8 @@ export function SceneEditor({
     const pos = Math.min(scene.lastPos ?? editor.state.doc.content.size, editor.state.doc.content.size - 1)
     editor.commands.setTextSelection(Math.max(1, pos))
     requestAnimationFrame(() => {
+      // The scene may already be closed (a quick jump to the next one).
+      if (editor.isDestroyed) return
       if (session.find) {
         const q = session.find
         session.find = undefined
@@ -146,15 +166,18 @@ export function SceneEditor({
       if (matchMedia('(pointer: fine)').matches) editor.commands.focus(undefined, { scrollIntoView: true })
       else editor.commands.scrollIntoView()
     })
-    const onHide = () => document.visibilityState === 'hidden' && void flush(editor)
-    document.addEventListener('visibilitychange', onHide)
-    window.addEventListener('pagehide', onHide)
+    const onHidden = () => document.visibilityState === 'hidden' && void saver.flush()
+    const onPageHide = () => void saver.flush()
+    document.addEventListener('visibilitychange', onHidden)
+    window.addEventListener('pagehide', onPageHide)
     return () => {
-      document.removeEventListener('visibilitychange', onHide)
-      window.removeEventListener('pagehide', onHide)
+      document.removeEventListener('visibilitychange', onHidden)
+      window.removeEventListener('pagehide', onPageHide)
       const pos = (latest.current ?? editor.state).selection.from
-      if (dirty.current) void flush(editor)
-      else
+      if (saver.isDirty()) {
+        void saver.flush()
+        saver.dispose()
+      } else
         void db.scenes.get(scene.id).then((s) => {
           if (s && s.lastPos !== pos) void patch<Scene>('scenes', scene.id, { lastPos: pos })
         })
@@ -163,10 +186,21 @@ export function SceneEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor])
 
+  // Closing the tab inside the quiet window, or while a write is failing, asks first.
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (!saver.isDirty()) return
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
+  }, [saver])
+
   // If another device changed this scene and nothing is being typed here, show the new text.
   const remote = useLiveQuery(() => db.texts.get(scene.id), [scene.id])
   useEffect(() => {
-    if (!editor || !remote || dirty.current || saving.current) return
+    if (!editor || !remote || saver.isDirty()) return
     if (remote.updatedAt > lastSavedAt.current) {
       lastSavedAt.current = remote.updatedAt
       const { from } = editor.state.selection
@@ -175,7 +209,7 @@ export function SceneEditor({
       latest.current = editor.state
       onWords(remote.wordCount, docCharCount(remote.content))
     }
-  }, [remote, editor, onWords])
+  }, [remote, editor, onWords, saver])
 
   if (!editor) return null
 

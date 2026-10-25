@@ -48,9 +48,9 @@ export const COVERS = ['#0b0b0c', '#3a3a3f', '#5b5b63', '#1f3a5f', '#3b82f6', '#
 
 export const STAGES: { id: import('../db/db').StoryStage; label: string }[] = [
   { id: 'idea', label: 'Идея' },
-  { id: 'writing', label: 'Пишу' },
-  { id: 'editing', label: 'Правлю' },
-  { id: 'publishing', label: 'Выкладываю' },
+  { id: 'writing', label: 'Черновик' },
+  { id: 'editing', label: 'Редактура' },
+  { id: 'publishing', label: 'Выкладка' },
   { id: 'done', label: 'Готово' },
 ]
-export const stageLabel = (id?: string) => STAGES.find((s) => s.id === id)?.label ?? 'Пишу'
+export const stageLabel = (id?: string) => STAGES.find((s) => s.id === id)?.label ?? 'Черновик'

@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { ManuscriptDB, useDatabase, db, type Scene } from '../db/db'
-import { createChapter, createScene, patch } from '../db/repo'
+import { createChapter, createProject, createScene, patch, remove } from '../db/repo'
 import { makeBackup, restoreBackup } from '../lib/backup'
 
 let n = 0
@@ -28,5 +28,19 @@ describe('backup', () => {
     expect((await db.scenes.get(a.id))?.title).toBe('a')
     expect((await db.scenes.get(b.id))?.title).toBe('b — правка после копии')
     expect((await db.outbox.toArray()).map((o) => o.key)).toEqual([`scenes:${a.id}`])
+  })
+
+  it('a manual restore brings back a deleted story', async () => {
+    const p = await createProject('Потерянная')
+    const dump = JSON.parse(JSON.stringify(await makeBackup()))
+    await new Promise((r) => setTimeout(r, 5))
+    await remove('projects', p.id)
+    await db.outbox.clear()
+
+    const res = await restoreBackup(dump)
+    const back = await db.projects.get(p.id)
+    expect(back?.deleted, 'story must be alive again').toBeFalsy()
+    expect(res.updated).toBeGreaterThanOrEqual(1)
+    expect((await db.outbox.toArray()).map((o) => o.key)).toContain(`projects:${p.id}`)
   })
 })

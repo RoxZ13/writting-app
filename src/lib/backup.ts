@@ -1,4 +1,4 @@
-import { db, SYNCED_TABLES, type Base } from '../db/db'
+import { db, SYNCED_TABLES, uid, type Base, type SceneText, type Snapshot } from '../db/db'
 import { notifyChange } from '../db/repo'
 import { download } from './exporter'
 
@@ -25,21 +25,55 @@ export async function downloadBackup() {
   }
 }
 
-/**
- * Bring a backup back without destroying anything: records missing here are added, records that are
- * newer in the file replace older ones here, everything else stays. Restored records go to the cloud too.
- */
-export async function restoreBackup(dump: Backup): Promise<{ added: number; updated: number }> {
+const CONFLICT_HERE = 'Версия с этого устройства (конфликт синхронизации)'
+const CONFLICT_THERE = 'Версия с другого устройства (конфликт синхронизации)'
+
+interface MergeOptions {
+  /** Manual restore: a story deleted here but alive in the copy comes back. File sync never does this. */
+  revive: boolean
+  /**
+   * File sync: `updatedAt` of every scene text as it was in the file after this device's last write.
+   * When given, two different texts that both changed since then are both kept (the loser as a snapshot).
+   */
+  textBase?: Record<string, number>
+}
+
+async function mergeBackup(dump: Backup, opts: MergeOptions): Promise<{ added: number; updated: number }> {
   let added = 0
   let updated = 0
   for (const t of SYNCED_TABLES) {
     const rows = dump[t]
     if (!Array.isArray(rows)) continue
-    await db.transaction('rw', db.table(t), db.outbox, async () => {
+    const tables = t === 'snapshots' ? [db.table(t), db.outbox] : [db.table(t), db.outbox, db.snapshots]
+    await db.transaction('rw', tables, async () => {
       for (const row of rows) {
         if (!row || typeof row.id !== 'string') continue
         const here = (await db.table(t).get(row.id)) as Base | undefined
-        if (here && (here.updatedAt ?? 0) >= (row.updatedAt ?? 0)) continue
+        if (opts.revive && here?.deleted && !row.deleted) {
+          // The author asked for this copy: a deleted record that is alive in it comes back, as a fresh edit.
+          const alive: Base = { ...row, updatedAt: Date.now() }
+          delete alive.deleted
+          await db.table(t).put(alive)
+          await db.outbox.put({ key: `${t}:${row.id}`, table: t, id: row.id })
+          updated++
+          continue
+        }
+        const hereUpdated = here?.updatedAt ?? 0
+        const rowUpdated = row.updatedAt ?? 0
+        const base = opts.textBase
+        const conflict =
+          t === 'texts' &&
+          base !== undefined &&
+          here !== undefined &&
+          JSON.stringify((here as SceneText).content) !== JSON.stringify((row as SceneText).content)
+        if (conflict) {
+          const b = base[row.id]
+          const localChanged = b === undefined || hereUpdated > b
+          const remoteChanged = b === undefined || rowUpdated > b
+          if (rowUpdated > hereUpdated && localChanged) await keepAsSnapshot(here as SceneText, CONFLICT_HERE)
+          else if (hereUpdated >= rowUpdated && remoteChanged) await keepAsSnapshot(row as SceneText, CONFLICT_THERE)
+        }
+        if (here && hereUpdated >= rowUpdated) continue
         await db.table(t).put(row)
         await db.outbox.put({ key: `${t}:${row.id}`, table: t, id: row.id })
         if (here) updated++
@@ -47,8 +81,46 @@ export async function restoreBackup(dump: Backup): Promise<{ added: number; upda
       }
     })
   }
-  notifyChange()
+  // Only a real change counts: a sync that brought nothing new must not wake another one.
+  if (added + updated) notifyChange()
   return { added, updated }
+}
+
+/** A copy of a scene text that is about to lose (or did not win) a sync conflict. Written inside the merge's transaction. */
+async function keepAsSnapshot(text: SceneText, reason: string) {
+  const content = JSON.stringify(text.content)
+  const same = await db.snapshots.where('sceneId').equals(text.id).filter((s) => s.reason === reason && JSON.stringify(s.content) === content).first()
+  if (same) return // the merge may run twice in one sync round
+  const now = Date.now()
+  const snap: Snapshot = {
+    id: uid(),
+    sceneId: text.id,
+    projectId: text.projectId,
+    content: text.content,
+    wordCount: text.wordCount,
+    reason,
+    createdAt: now,
+    updatedAt: now,
+  }
+  await db.snapshots.put(snap)
+  await db.outbox.put({ key: `snapshots:${snap.id}`, table: 'snapshots', id: snap.id })
+}
+
+/**
+ * Bring a backup back without destroying anything: records missing here are added, records that are
+ * newer in the file replace older ones here, everything else stays. A story deleted here but alive in
+ * the copy comes back. Restored records go to the cloud too.
+ */
+export function restoreBackup(dump: Backup): Promise<{ added: number; updated: number }> {
+  return mergeBackup(dump, { revive: true })
+}
+
+/**
+ * The merge of file sync: like a restore, but a deletion made on another device stays a deletion, and
+ * two different versions of one scene text are both kept — the older one as a snapshot.
+ */
+export function mergeSyncedBackup(dump: Backup, textBase: Record<string, number>): Promise<{ added: number; updated: number }> {
+  return mergeBackup(dump, { revive: false, textBase })
 }
 
 export async function readBackupFile(file: File): Promise<Backup> {

@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import { deadlineText } from '../lib/stories'
+import { Icon } from './Icon'
 
 /**
  * A date as calm Russian words («через 12 дн. · 15 окт.») instead of the browser's own field, which
@@ -21,11 +22,11 @@ export function DateChip({ value, empty, onChange }: { value?: string; empty: st
   return (
     <span className="date-chip">
       <button className={`btn sm ${text?.late ? 'late' : ''}`} onClick={open}>
-        {text ? `⏳ ${text.text}` : empty}
+        {text ? <><Icon name="clock" size={13} /> {text.text}</> : empty}
       </button>
       {value && (
         <button className="icon-btn" aria-label="Убрать дату" title="Убрать дату" onClick={() => onChange(undefined)}>
-          ×
+          <Icon name="close" size={15} />
         </button>
       )}
       <input ref={ref} type="date" className="date-chip-input" tabIndex={-1} aria-hidden="true" value={value ?? ''} onChange={(e) => onChange(e.target.value || undefined)} />

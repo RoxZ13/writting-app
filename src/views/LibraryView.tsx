@@ -10,6 +10,7 @@ import { toast } from '../lib/ui'
 import { BookCover, CoverPicker } from '../components/BookCover'
 import { useCover } from '../lib/cover'
 import { DateChip } from '../components/DateChip'
+import { Icon } from '../components/Icon'
 
 /** All stories side by side — authors rarely write just one. */
 export function LibraryView({
@@ -22,12 +23,12 @@ export function LibraryView({
   onOpen: (id: string, view?: 'text' | 'board') => void
 }) {
   const [busy, setBusy] = useState(false)
-  // A new story opens at once on its page; name, cover and deadline can come later (on «Книга»).
+  // A new story opens on its text — an imported one too: the author came to keep writing, not to sort cards.
   const create = async (file?: File) => {
     setBusy(true)
     try {
       const id = await createStory({ file })
-      onOpen(id, file ? 'board' : 'text')
+      onOpen(id, 'text')
     } finally {
       setBusy(false)
     }
@@ -51,9 +52,8 @@ export function LibraryView({
       <div className="lib-head row">
         <div style={{ marginRight: 'auto' }}>
           <h1>Истории</h1>
-          <div className="muted">Твои рукописи и черновики</div>
         </div>
-        <label className="btn ghost">
+        <label className="btn">
           {busy ? 'Раскладываю…' : 'Импорт .docx / .txt'}
           <input type="file" hidden accept=".docx,.txt,.md,.html,.htm" onChange={(e) => e.target.files?.[0] && void create(e.target.files[0])} />
         </label>
@@ -66,10 +66,6 @@ export function LibraryView({
         {projects.map((p) => (
           <StoryCard key={p.id} p={p} current={p.id === currentId} stats={stats?.[p.id]} onOpen={() => onOpen(p.id)} />
         ))}
-        <button className="story add" disabled={busy} onClick={() => void create()}>
-          <span className="plus">+</span>
-          Новая история
-        </button>
       </div>
 
     </div>
@@ -100,7 +96,7 @@ function StoryCard({
           </strong>
           <details className="menu">
             <summary className="icon-btn" aria-label="Действия">
-              ⋯
+              <Icon name="more" size={18} />
             </summary>
             <div className="menu-list card story-menu">
               <label className="menu-field">
@@ -137,7 +133,7 @@ function StoryCard({
                 onClick={async () => {
                   if (!confirm(`Удалить историю «${p.title}» со всеми главами и заметками?`)) return
                   await remove('projects', p.id)
-                  toast('История удалена')
+                  toast('История удалена', () => patch('projects', p.id, { deleted: false }))
                 }}
               >
                 Удалить историю
@@ -151,9 +147,9 @@ function StoryCard({
           {' · '}
           {timeAgo(p.updatedAt)}
         </div>
-        {dl && <div className={`deadline ${dl.late ? 'late' : ''}`}>⏳ {dl.text}</div>}
+        {dl && <div className={`deadline ${dl.late ? 'late' : ''}`}><Icon name="clock" size={13} /> {dl.text}</div>}
         <button className="btn sm" style={{ alignSelf: 'flex-start', marginTop: 6 }} onClick={onOpen}>
-          {current ? 'Продолжить' : 'Открыть'}
+          Продолжить
         </button>
       </div>
     </article>

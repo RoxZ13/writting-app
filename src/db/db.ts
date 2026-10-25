@@ -103,10 +103,14 @@ export interface Scene extends Base {
   lineIds?: string[]
   /** Characters present in the scene. */
   characterIds?: string[]
-  /** A key point of the plot (узловая точка) — the scenes in between are placed around these. */
+  /** A key scene, marked by hand: one of the vivid scenes the story is built around. */
   node?: boolean
-  /** Emotional intensity, 1–5: the board draws the story's arc from it. */
+  /** Happens at the same time as the previous scene of the chapter: on «Линия истории» they share one moment. */
+  together?: boolean
+  /** Emotional intensity, 1–5. Old field: the board now asks only for `tempo`. */
   heat?: number
+  /** Pace, only when it stands out: a quiet scene or a tense one. No mark — an ordinary scene. */
+  tempo?: 'calm' | 'tense'
   /** While rewriting: the snapshot holding the text as it was before, shown next to the new draft. */
   rewriteFrom?: string
 }

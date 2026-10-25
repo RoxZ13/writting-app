@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import type { Scene } from '../db/db'
 import { createMarker, ensurePool, mergeSceneIntoPrevious, moveScene, patch, remove, splitChapterAt } from '../db/repo'
 import { go } from '../lib/router'
-import { isLocked, isNode, sceneBranches, sceneName, type ProjectData } from '../lib/hooks'
+import { isLocked, sceneName, type ProjectData } from '../lib/hooks'
 import { STATUSES } from '../lib/status'
 import { toast } from '../lib/ui'
 import { MarkerCard } from './MarkerCard'
 import { RefChips } from './Refs'
-import { Heat } from './Plot'
+import { Icon } from './Icon'
 
 /** Quick edit of a scene from the board: what happens, lines, people, markers. No editor needed. */
 export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene: Scene; onClose: () => void }) {
@@ -67,7 +67,7 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
           <span className="eyebrow">{data.chapterById.get(scene.chapterId)?.title}</span>
           <span className="spacer" />
           <button className="icon-btn" onClick={onClose} aria-label="Закрыть">
-            ×
+            <Icon name="close" size={15} />
           </button>
         </div>
         <input
@@ -91,21 +91,28 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
           Писать эту сцену →
         </button>
         {phone && where}
+        {/* Only what stands out: pace when the scene is quiet or tense, and whether it is a key one. */}
         <div className="sheet-plot">
-          {isNode(scene, data) && (
-            <span className="sheet-node" title="Сцена, где сходятся ветки, — узел истории">
-              ◆ здесь сходятся {sceneBranches(scene, data).map((l) => l.name).join(' и ')}
-            </span>
-          )}
-          <span className="sheet-heat">
-            <span className="muted small">Накал</span>
-            <Heat scene={scene} large />
-          </span>
+          <div className="seg" role="group" aria-label="Темп сцены">
+            {(
+              [
+                ['calm', 'Спокойная'],
+                ['tense', 'Напряжённая'],
+              ] as const
+            ).map(([v, label]) => (
+              <button key={v} aria-pressed={scene.tempo === v} onClick={() => set({ tempo: scene.tempo === v ? undefined : v })}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <button className={`chip-toggle sm ${scene.node ? 'on' : ''}`} onClick={() => set({ node: scene.node ? undefined : true })}>
+            Ключевая
+          </button>
         </div>
 
         {show('lines') && (
           <section className="sheet-section">
-            <h3>Ветки</h3>
+            <h3>Линии</h3>
             <RefChips data={data} sceneId={scene.id} field="lineIds" selected={scene.lineIds ?? []} />
           </section>
         )}
@@ -134,7 +141,7 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
           )}
           {!show('lines') && (
             <button className="pp-add-btn" onClick={() => setOpened((o) => new Set(o).add('lines'))}>
-              ветку
+              линию
             </button>
           )}
           <button

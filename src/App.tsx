@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 import { getSyncStatus, onSyncStatus, startCloudSync, type SyncStatus } from './db/cloud'
-import { markerStatus, useProjectData, useProjects, type ProjectData } from './lib/hooks'
+import { useProjectData, useProjects, type ProjectData } from './lib/hooks'
 import { recountChars, recountWords, tidyImportedScenes } from './db/repo'
 import { go, useRoute, type Route } from './lib/router'
 import { getCurrentProjectId, hotkey, returnFocus, setCurrentProjectId } from './lib/session'
-import { Toaster } from './lib/ui'
+import { toast, Toaster } from './lib/ui'
 import { Icon } from './components/Icon'
 import { QuickCapture } from './components/QuickCapture'
 import { FocusDone } from './components/Focus'
@@ -19,8 +19,6 @@ import { LibraryView } from './views/LibraryView'
 import { BookView } from './views/BookView'
 import { HelpView } from './views/HelpView'
 import { LoreView } from './views/LoreView'
-import { deadlineText } from './lib/stories'
-import { chapterProgress } from './lib/pace'
 import { backupDue, downloadBackup, snoozeBackup } from './lib/backup'
 
 const TABS: { view: Route['view']; label: string; ico: string }[] = [
@@ -34,7 +32,7 @@ export function App() {
   const projects = useProjects()
   const [projectId, setProjectId] = useState(getCurrentProjectId)
   const [capture, setCapture] = useState(false)
-  const [searching, setSearching] = useState(false)
+  const [searching, setSearching] = useState<string | null>(null)
   const [sync, setSync] = useState<SyncStatus>(getSyncStatus)
   const reveal = useReveal(route.view === 'text')
   // A brand-new, still empty story keeps its header in view until the first key: the author sees once where things are.
@@ -98,13 +96,13 @@ export function App() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'j') {
+      if ((e.metaKey || e.ctrlKey) && e.code === 'KeyJ') {
         e.preventDefault()
         setCapture(true)
       }
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'f') {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.code === 'KeyF') {
         e.preventDefault()
-        setSearching(true)
+        setSearching('')
       }
     }
     window.addEventListener('keydown', onKey)
@@ -114,7 +112,13 @@ export function App() {
   if (projects === undefined || (projects.length > 0 && data === undefined)) {
     return <div className="empty" style={{ paddingTop: '30vh' }}>Открываю…</div>
   }
-  if (!projects.length || !data) return <Welcome onCreated={selectProject} sync={sync} />
+  if (!projects.length || !data)
+    return (
+      <>
+        <Welcome onCreated={selectProject} sync={sync} />
+        <Toaster />
+      </>
+    )
 
   const closeCapture = () => {
     setCapture(false)
@@ -137,7 +141,6 @@ export function App() {
             <div className="logo">Manuscript.</div>
             <div className="tagline">тихое место для историй</div>
           </div>
-          <div className="side-label">Menu</div>
           <nav className="lib-nav">
             {(
               [
@@ -153,7 +156,7 @@ export function App() {
             ))}
           </nav>
           <button className="lib-back" onClick={() => go({ view: lastView(data.project.id) })}>
-            ← К истории
+            ← {data.project.title}
           </button>
         </aside>
         <main className="lib-main">
@@ -168,10 +171,10 @@ export function App() {
 
   return (
     <div className={`app app-${route.view} ${reveal || (fresh && route.view === 'text') ? 'reveal' : ''}`}>
-      <AppHeader data={data} route={route} sync={sync} onSearch={() => setSearching(true)} />
+      <AppHeader data={data} route={route} sync={sync} onSearch={() => setSearching('')} />
       {sync.state !== 'ok' && <BackupReminder />}
       {route.view === 'text' && textScene && (
-        <WriteView key={textScene} data={data} sceneId={textScene} onCapture={() => setCapture(true)} onSearch={() => setSearching(true)} />
+        <WriteView key={textScene} data={data} sceneId={textScene} onSearch={(q) => setSearching(q ?? '')} />
       )}
       {route.view === 'text' && !textScene && (
         <main className="page">
@@ -200,7 +203,7 @@ export function App() {
       )}
       <FocusDone data={data} />
       {capture && <QuickCapture data={data} onClose={closeCapture} />}
-      {searching && <SearchModal data={data} onClose={() => setSearching(false)} />}
+      {searching !== null && <SearchModal data={data} initial={searching} onClose={() => setSearching(null)} />}
       <Toaster />
     </div>
   )
@@ -226,12 +229,10 @@ function AppHeader({ data, route, sync, onSearch }: { data: ProjectData; route: 
         </button>
         <span className="slash">/</span>
         <button className="project-name" title="Все истории" onClick={() => go({ view: 'library' })}>
-          {data.project.title} <span className="caret">▾</span>
+          {data.project.title} <span className="caret"><Icon name="down" size={13} /></span>
         </button>
-        <span className="sync-dot" data-state={sync.state} title={syncTitle} />
-        {/* While writing, no counters or dates in sight: they live on the board and the book page. */}
-        {route.view !== 'text' && <MarkerStatus data={data} />}
-        {route.view !== 'text' && <Landmark data={data} />}
+        {/* Calm by default: the dot appears only when something needs attention. Counters and dates live on the board and the story page. */}
+        {(sync.state === 'offline' || sync.state === 'error') && <span className="sync-dot" data-state={sync.state} title={syncTitle} />}
       </div>
       <nav className="tabs">
         {TABS.map((t) => (
@@ -246,7 +247,7 @@ function AppHeader({ data, route, sync, onSearch }: { data: ProjectData; route: 
             <span className="tab-label">{t.label}</span>
           </button>
         ))}
-        <button className="tab-aux hide-on-phone" title={`Поиск по книге${hotkey(' (⌘/Ctrl + Shift + F)')}`} onClick={onSearch}>
+        <button className="tab-aux hide-on-phone" title={`Поиск по истории${hotkey(' (⌘/Ctrl + Shift + F)')}`} onClick={onSearch}>
           <span className="tab-ico">
             <Icon name="search" />
           </span>
@@ -259,32 +260,14 @@ function AppHeader({ data, route, sync, onSearch }: { data: ProjectData; route: 
           <span className="tab-label">Входящие</span>
           {inbox > 0 && <span className="badge">{inbox}</span>}
         </button>
-        <button className="tab-aux" aria-current={route.view === 'book' ? 'page' : undefined} title="О книге: обложка, дедлайн, экспорт" onClick={() => go({ view: 'book' })}>
+        <button className="tab-aux" aria-current={route.view === 'book' ? 'page' : undefined} title="Об истории: обложка, дедлайн, экспорт" onClick={() => go({ view: 'book' })}>
           <span className="tab-ico">
             <Icon name="book" />
           </span>
-          <span className="tab-label">Книга</span>
+          <span className="tab-label">История</span>
         </button>
       </nav>
     </header>
-  )
-}
-
-/** Always visible: are all markers accounted for? One tap shows the ones waiting. */
-function MarkerStatus({ data }: { data: ProjectData }) {
-  if (!data.markers.length) return null
-  const waiting = data.markers.filter((m) => ['hanging', 'late'].includes(markerStatus(m, data))).length
-  return (
-    <button
-      className={`marker-status ${waiting ? 'due' : ''}`}
-      title={waiting ? 'Маячки без места раскрытия или пропущенные' : 'У каждого маячка есть место раскрытия'}
-      onClick={() => {
-        sessionStorage.setItem('manuscript.lens', 'markers')
-        go({ view: 'board' })
-      }}
-    >
-      ✦ {waiting ? `маячки: ${waiting} без раскрытия` : 'маячки на месте'}
-    </button>
   )
 }
 
@@ -319,25 +302,6 @@ function BackupReminder() {
   )
 }
 
-/** The quiet landmark in the header: the deadline, and how many chapters are left. */
-function Landmark({ data }: { data: ProjectData }) {
-  const due = deadlineText(data.project.deadline)
-  const cp = chapterProgress(data.project, data.chapters, data.scenes)
-  const chapters = (data.project.targetChapters || due) && cp.left > 0 ? `ещё ${cp.left} гл.` : ''
-  if (!due && !chapters) return null
-  return (
-    <button
-      className={`deadline hide-sm ${due?.late ? 'late' : ''}`}
-      title={`Написано ${cp.written} из ${cp.of} глав${cp.daysPerChapter ? ` · к дедлайну ≈ глава в ${cp.daysPerChapter} дн.` : ''}`}
-      onClick={() => go({ view: 'book' })}
-    >
-      {due ? `⏳ ${due.text}` : ''}
-      {due && chapters ? ' · ' : ''}
-      {chapters}
-    </button>
-  )
-}
-
 const VIEW_KEY = 'manuscript.view.'
 function lastView(projectId: string): 'text' | 'board' {
   try {
@@ -358,6 +322,7 @@ function rememberView(projectId: string, view: 'text' | 'board') {
  * «Тихий вид» (as in Calmly Writer): while writing, the header and toolbar stay hidden and come back when
  * the mouse goes to the top of the screen, or on Esc. Only with a mouse; phones keep their bars.
  */
+const CALM_HINT_KEY = 'manuscript.calmHint'
 function useReveal(active: boolean) {
   const [reveal, setReveal] = useState(false)
   useEffect(() => {
@@ -374,7 +339,20 @@ function useReveal(active: boolean) {
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('keydown', onKey)
+    // The first time the header hides, say once how to get it back — otherwise it just looks gone.
+    let hint: ReturnType<typeof setTimeout> | undefined
+    try {
+      if (document.documentElement.dataset.calm === 'on' && !localStorage.getItem(CALM_HINT_KEY)) {
+        hint = setTimeout(() => {
+          toast('Шапка спряталась, чтобы не мешать. Подведи мышь к верху экрана или нажми Esc')
+          localStorage.setItem(CALM_HINT_KEY, '1')
+        }, 1500)
+      }
+    } catch {
+      /* ignore */
+    }
     return () => {
+      clearTimeout(hint)
       clearTimeout(timer)
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('keydown', onKey)

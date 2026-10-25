@@ -1,16 +1,31 @@
 import { useState } from 'react'
-import { applyTypo, DEFAULT_TYPO, loadTypo, type Typo } from '../lib/typography'
+import { applyTypo, DEFAULT_TYPO, FONT, loadTypo, type Typo } from '../lib/typography'
 import { hotkey } from '../lib/session'
 
 type Opt<K extends keyof Typo> = [Typo[K], string]
 
-function Choice<K extends keyof Typo>({ label, k, t, set, options }: { label: string; k: K; t: Typo; set: (t: Typo) => void; options: Opt<K>[] }) {
+function Choice<K extends keyof Typo>({
+  label,
+  k,
+  t,
+  set,
+  options,
+  look,
+}: {
+  label: string
+  k: K
+  t: Typo
+  set: (t: Typo) => void
+  options: Opt<K>[]
+  /** How each option is drawn: a font is easier to choose when you see it. */
+  look?: (v: Typo[K]) => React.CSSProperties
+}) {
   return (
     <div className="typo-row">
       <span className="typo-label">{label}</span>
       <div className="seg">
         {options.map(([v, name]) => (
-          <button key={String(v)} aria-pressed={t[k] === v} onClick={() => set({ ...t, [k]: v })}>
+          <button key={String(v)} aria-pressed={t[k] === v} style={look?.(v)} onClick={() => set({ ...t, [k]: v })}>
             {name}
           </button>
         ))}
@@ -39,7 +54,12 @@ export function TypoControls() {
           ['easy', 'Лёгкий'],
           ['mono', 'Машинка'],
         ]}
+        look={(v) => ({ fontFamily: FONT[v] })}
       />
+      {/* A line of real prose in the chosen font and size: easier than guessing from a name. */}
+      <p className="typo-sample" style={{ fontFamily: FONT[t.font], fontSize: t.size }}>
+        — У меня от вас мигрень, Эмилия, — сказал он и закрыл окно.
+      </p>
       <div className="typo-row">
         <span className="typo-label">Размер</span>
         <div className="size">
@@ -53,19 +73,7 @@ export function TypoControls() {
           <span className="small muted">{t.size}</span>
         </div>
       </div>
-      <div className="typo-cheat">
-        <span className="field-label">Пишешь — и оформляется само</span>
-        <div>
-          <code>*слово*</code> → <em>курсив</em> · <code>**слово**</code> → <strong>жирный</strong>
-        </div>
-        <div>
-          <code>---</code> → — · <code>-</code> и пробел в начале строки → «— » · <code>...</code> → … · <code>"</code> → « »
-        </div>
-        <div>
-          <code>// заметка</code> и Enter → уходит на поля
-        </div>
-        <div className="muted">{hotkey('⌘/Ctrl + I — курсив, ⌘/Ctrl + B — жирный: можно нажать и печатать дальше')}</div>
-      </div>
+      {hotkey('x') && <div className="typo-cheat muted">Автозамены и клавиши — ⌘/Ctrl + / в тексте</div>}
       <details className="typo-more">
         <summary>Больше настроек</summary>
         <div className="typo">

@@ -8,7 +8,12 @@ export interface Run {
   strike?: boolean
 }
 
-export type Block = { kind: 'heading'; text: string } | { kind: 'para'; runs: Run[] } | { kind: 'break' }
+export type Block =
+  | { kind: 'heading'; text: string }
+  | { kind: 'para'; runs: Run[] }
+  | { kind: 'break' }
+  /** «Комментарий к Часть N» (Ficbook): everything after it up to the next heading is the author's note, not prose. */
+  | { kind: 'comment' }
 
 export interface ImportedScene {
   title: string
@@ -22,6 +27,8 @@ export interface ImportedScene {
 export interface ImportedChapter {
   title: string
   scenes: ImportedScene[]
+  /** The author's note to readers at the end of the part (Ficbook «Комментарий к…»), paragraphs joined with \n. */
+  comment?: string
 }
 
 const NUMBERED_RE =
@@ -29,8 +36,19 @@ const NUMBERED_RE =
 const NAMED_RE = /^\s*(пролог|эпилог|интерлюдия|prologue|epilogue|interlude)(?![\p{L}])/iu
 const SCENE_BREAK_RE = /^[\s*•·~#—–_=-]+$/
 
-export const isChapterTitle = (s: string) =>
-  s.trim().length > 0 && s.trim().length < 100 && (NUMBERED_RE.test(s) || NAMED_RE.test(s))
+/** After the number / «Пролог» the line must end or go on with a separator and a title — otherwise it is prose. */
+const TITLE_TAIL_RE = /^\s*([.:—–-].*)?$/
+
+function titleLike(s: string, strict: boolean) {
+  const t = s.trim()
+  if (!t.length || t.length >= 100) return false
+  const m = NUMBERED_RE.exec(t) ?? NAMED_RE.exec(t)
+  if (!m) return false
+  return !strict || TITLE_TAIL_RE.test(t.slice(m[0].length))
+}
+
+/** An unframed line that is a chapter heading. */
+export const isChapterTitle = (s: string) => titleLike(s, true)
 const DECOR = '[\\s=*#~_—–-]'
 const DECORATED_RE = new RegExp(`^${DECOR}{2,}(.+?)${DECOR}{2,}$`)
 
@@ -42,7 +60,7 @@ const DECORATED_RE = new RegExp(`^${DECOR}{2,}(.+?)${DECOR}{2,}$`)
 export function chapterTitleOf(line: string): string | null {
   const t = line.trim()
   const framed = t.match(DECORATED_RE)?.[1]?.trim()
-  if (framed && isChapterTitle(framed)) return framed
+  if (framed && titleLike(framed, false)) return framed
   return isChapterTitle(t) ? t : null
 }
 
@@ -53,15 +71,25 @@ export function textToBlocks(raw: string): Block[] {
   // Ficbook uses <i>/<b>/<s> tags in its editor — keep them as formatting.
   const lines = raw.replace(/\r\n?/g, '\n').split('\n')
   const blocks: Block[] = []
+  let part = ''
   for (const line of lines) {
-    const t = line.trim()
+    const t = stripInvisible(line).trim()
     if (!t) continue
+    const heading = chapterTitleOf(t)
     if (isSceneBreak(t) || /^<center>\s*[*•—-]/i.test(t)) blocks.push({ kind: 'break' })
-    else if (chapterTitleOf(t)) blocks.push({ kind: 'heading', text: chapterTitleOf(t)! })
+    else if (heading) {
+      blocks.push({ kind: 'heading', text: heading })
+      part = heading
+    } else if (part && squash(t) === squash(`Комментарий к ${part}`)) blocks.push({ kind: 'comment' })
     else blocks.push({ kind: 'para', runs: parseTaggedRuns(t) })
   }
   return blocks
 }
+
+const squash = (s: string) => s.replace(/\s+/g, ' ').toLowerCase()
+
+/** Zero-width space and BOM defeat trim(), heading and scene-break detection, word counts and search. ZWNJ/ZWJ stay: emoji need them. */
+const stripInvisible = (s: string) => s.replace(/[​﻿]/g, '')
 
 /** Parse `<i>`, `<b>`, `<s>` tags (Ficbook markup) into runs; unknown tags are dropped. */
 export function parseTaggedRuns(line: string): Run[] {
@@ -108,7 +136,7 @@ export function htmlToBlocks(html: string): Block[] {
   const blocks: Block[] = []
   const collectRuns = (node: Node, fmt: Omit<Run, 'text'>, out: Run[]) => {
     if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent ?? ''
+      const text = stripInvisible(node.textContent ?? '')
       if (text) out.push({ text, ...fmt })
       return
     }
@@ -127,7 +155,7 @@ export function htmlToBlocks(html: string): Block[] {
   const visit = (el: Element) => {
     const tag = el.tagName.toLowerCase()
     if (/^h[1-6]$/.test(tag)) {
-      const text = el.textContent?.trim() ?? ''
+      const text = stripInvisible(el.textContent ?? '').trim()
       if (text) blocks.push(isSceneBreak(text) ? { kind: 'break' } : { kind: 'heading', text })
       return
     }
@@ -192,6 +220,13 @@ export function blocksToChapters(blocks: Block[], fallbackTitle = 'Начало 
   const chapters: ImportedChapter[] = []
   let chapter: ImportedChapter | null = null
   let paras: Run[][] = []
+  /** Set after a «Комментарий к…» line: paragraphs go to the chapter's comment, not to a scene. */
+  let comment: string[] | null = null
+
+  const closeComment = () => {
+    if (comment && chapter && comment.length) chapter.comment = comment.join('\n')
+    comment = null
+  }
 
   const flushScene = () => {
     if (!paras.length) return
@@ -218,15 +253,25 @@ export function blocksToChapters(blocks: Block[], fallbackTitle = 'Начало 
   for (const b of blocks) {
     if (b.kind === 'heading') {
       flushScene()
+      closeComment()
       chapter = { title: b.text, scenes: [] }
       chapters.push(chapter)
-    } else if (b.kind === 'break') {
+    } else if (b.kind === 'comment') {
       flushScene()
+      closeComment()
+      if (chapter) comment = []
+    } else if (b.kind === 'break') {
+      if (comment) comment.push('* * *')
+      else flushScene()
+    } else if (comment) {
+      const text = b.runs.map((r) => r.text).join('').trim()
+      if (text) comment.push(text)
     } else {
       paras.push(b.runs)
     }
   }
   flushScene()
+  closeComment()
   return chapters.filter((c) => c.scenes.length > 0 || chapters.length === 1)
 }
 
@@ -249,6 +294,14 @@ export interface ImportedBook {
   chapters: ImportedChapter[]
 }
 
+const HEADER_MARKER_RE = /^(направленность|фэндом|автор|описание|рейтинг)\s*:|ficbook\.net/i
+
+/** Ficbook header lines, or a few short paragraphs (title, tagline) — not a page of story. */
+function looksLikeHeader(paras: string[], hasBreak: boolean): boolean {
+  if (paras.some((p) => HEADER_MARKER_RE.test(p))) return true
+  return !hasBreak && paras.length <= 3 && paras.every((p) => p.length <= 200)
+}
+
 /**
  * Like blocksToChapters, but text before the first chapter heading is treated as the book's
  * header, not as a chapter — as long as the file has chapter headings at all.
@@ -256,11 +309,13 @@ export interface ImportedBook {
 export function parseBook(blocks: Block[]): ImportedBook {
   const first = blocks.findIndex((b) => b.kind === 'heading')
   if (first <= 0) return { preface: '', chapters: blocksToChapters(blocks) }
-  const head = blocks
-    .slice(0, first)
+  const prefix = blocks.slice(0, first)
+  const head = prefix
     .filter((b): b is Extract<Block, { kind: 'para' }> => b.kind === 'para')
     .map((b) => b.runs.map((r) => r.text).join('').trim())
     .filter(Boolean)
+  // A long prefix without header markers is a prologue without a heading: keep it as a chapter.
+  if (!looksLikeHeader(head, prefix.some((b) => b.kind === 'break'))) return { preface: '', chapters: blocksToChapters(blocks) }
   const title = head[0] && head[0].length <= 80 ? head[0] : undefined
   return { title, preface: head.join('\n'), chapters: blocksToChapters(blocks.slice(first)) }
 }

@@ -6,6 +6,7 @@ import { sceneName, type ProjectData } from '../lib/hooks'
 import { whereFound, type Found } from '../lib/mentions'
 import { go } from '../lib/router'
 import { docParagraphs } from '../lib/text'
+import { Icon } from './Icon'
 
 /** Scene texts of the book as plain strings, kept fresh; read only by the pages that show «Где встречается». */
 export function useWhereFound(data: ProjectData): Map<string, Found[]> | undefined {
@@ -49,7 +50,7 @@ export function WhereFound({ data, found, onNotThis }: { data: ProjectData; foun
                 </button>
                 {!f.manual && (
                   <button className="wf-not" title="Не то — здесь это имя о другом" aria-label="Не то" onClick={() => onNotThis(s.id)}>
-                    ×
+                    <Icon name="close" size={15} />
                   </button>
                 )}
               </span>
