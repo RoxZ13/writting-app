@@ -3,6 +3,16 @@ import type { Project } from '../db/db'
 /** A standard page: 1800 characters with spaces. */
 export const PAGE = 1800
 
+/** Characters with spaces per word when the book has no text to measure yet. */
+export const CHARS_PER_WORD = 6.8
+
+// The book's own ratio, set by the project loader, so every «сл.» on screen agrees with the preset that made it.
+let bookCpw = CHARS_PER_WORD
+export const setBookCharsPerWord = (v: number) => {
+  bookCpw = v > 0 ? v : CHARS_PER_WORD
+}
+export const bookCharsPerWord = () => bookCpw
+
 export const pageSize = (p: Project) => p.pageChars || PAGE
 export const hasNorm = (p: Project) => !!(p.chapterMin || p.chapterMax)
 
@@ -18,10 +28,14 @@ export function pages(p: Project, chars: number): string {
   return `${v < 10 ? (Math.round(v * 10) / 10).toLocaleString('ru-RU') : num(v)} стр.`
 }
 
-/** Length the way the author thinks of it: pages or characters. */
-export function lengthText(p: Project, chars: number): string {
+/** Length the way the author thinks of it: pages, characters or words. `cpw` is characters per word of the book. */
+export function lengthText(p: Project, chars: number, cpw = bookCpw): string {
+  if (p.lengthUnit === 'words') return `${num(chars / cpw)} сл.`
   return p.lengthUnit === 'chars' ? `${num(chars)} зн.` : pages(p, chars)
 }
+
+/** The unit suffix lengthText puts at the end. */
+const UNIT_TAIL = / (стр|зн|сл)\.$/
 
 export type LengthState = 'none' | 'short' | 'ok' | 'near' | 'over'
 
@@ -56,7 +70,7 @@ export function chapterLength(p: Project, chars: number) {
 /** «10–20 стр.» / «до 30 000 зн.» — the norm itself, in the author's unit. */
 export function normText(p: Project): string {
   const t = (n: number) => lengthText(p, n)
-  if (p.chapterMin && p.chapterMax) return `${t(p.chapterMin).replace(/ (стр|зн)\.$/, '')}–${t(p.chapterMax)}`
+  if (p.chapterMin && p.chapterMax) return `${t(p.chapterMin).replace(UNIT_TAIL, '')}–${t(p.chapterMax)}`
   if (p.chapterMax) return `до ${t(p.chapterMax)}`
   if (p.chapterMin) return `от ${t(p.chapterMin)}`
   return ''

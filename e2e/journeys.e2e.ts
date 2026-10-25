@@ -404,8 +404,12 @@ test.describe('11. the same scene in two tabs', () => {
     await page.locator('.ProseMirror').click()
     await page.keyboard.press('Control+End')
     await Promise.all([page.keyboard.type(' ФРАГМЕНТ-ИЗ-А'), pageB.keyboard.type(' ФРАГМЕНТ-ИЗ-Б')])
+    // WebKit slows timers in a background page, so each tab gets the front in turn to finish its pending save.
+    await page.bringToFront()
     await waitSaveTick(page)
+    await pageB.bringToFront()
     await waitSaveTick(pageB)
+    await page.bringToFront()
     await page.waitForTimeout(2500) // let remote updates settle on both sides
 
     const texts = (await dbAll<any>(page, 'texts')).filter((t) => t.id === sceneId).map((t) => docText(t.content))

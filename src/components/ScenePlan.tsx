@@ -7,6 +7,7 @@ import { isLocked, markerPayoffChapter, markerStatus, unusedLines, type ProjectD
 import { go } from '../lib/router'
 import { MARKER_STATES, noteKind, STATUSES, timeAgo } from '../lib/status'
 import { hotkey } from '../lib/session'
+import { returnToText } from '../lib/stash'
 import { toast } from '../lib/ui'
 import { RefChips } from './Refs'
 import { loreForScene, type LoreReason } from '../lib/lore'
@@ -93,7 +94,10 @@ export function ScenePlan({
   const { toPay, toPlant, planted, echoed } = sceneMarkers(data, scene)
   const people = scene.characterIds ?? []
   const quotes = unusedLines(data, people)
-  const notes = data.notes.filter((n) => n.sceneId === scene.id && !n.archived && n.kind !== 'quote' && n.kind !== 'dialogue')
+  const sceneNotes = data.notes.filter((n) => n.sceneId === scene.id && !n.archived && n.kind !== 'quote' && n.kind !== 'dialogue')
+  // Pieces put aside with «В запас» keep their own place; the rest are margin notes.
+  const stash = sceneNotes.filter((n) => n.content)
+  const notes = sceneNotes.filter((n) => !n.content)
 
   // Only what is filled in is shown; everything empty waits in one «+ добавить» line.
   const [opened, setOpened] = useState<Set<PlanPart>>(new Set())
@@ -167,6 +171,25 @@ export function ScenePlan({
                 <button className="icon-btn" title="Сделано" onClick={() => void patch<Note>('notes', n.id, { archived: true })}>
                   ✓
                 </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {stash.length > 0 && (
+          <div className="pp-section">
+            <h4>В запасе</h4>
+            {stash.map((n) => (
+              <div key={n.id} className="pp-stash">
+                <div className="pp-stash-text">{n.text}</div>
+                <div className="row" style={{ gap: 4 }}>
+                  <button className="btn sm" onClick={() => void returnToText(n)}>
+                    Вернуть в текст
+                  </button>
+                  <button className="btn sm ghost" title="Не нужно — в архив" onClick={() => void patch<Note>('notes', n.id, { archived: true })}>
+                    В архив
+                  </button>
+                </div>
               </div>
             ))}
           </div>

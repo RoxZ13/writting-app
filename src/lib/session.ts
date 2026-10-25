@@ -6,6 +6,8 @@ export const session: {
   editor?: Editor | null
   /** Text to select once the next scene opens (from book search). */
   find?: string
+  /** A stashed note to put back into the text as soon as its scene's editor is ready («Вернуть в текст»). */
+  restore?: string
 } = {}
 
 export function returnFocus() {

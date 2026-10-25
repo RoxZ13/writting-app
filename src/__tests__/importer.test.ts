@@ -147,7 +147,8 @@ describe('invisible characters', () => {
     expect((blocks[2] as typeof para).runs[0].text).toBe('\u200D')
   })
 
-  it('also in HTML', async () => {
+  // Loading jsdom alone takes seconds under a busy machine; the default 5 s timeout made this test flaky.
+  it('also in HTML', { timeout: 30_000 }, async () => {
     const jsdom = 'jsdom'
     const { JSDOM } = (await import(/* @vite-ignore */ jsdom)) as { JSDOM: new (html: string) => { window: any } }
     const w = new JSDOM('').window

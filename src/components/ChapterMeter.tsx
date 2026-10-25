@@ -91,7 +91,7 @@ export function ChapterMeter({
       </div>
       <div className="cm-text">
         <span className="cm-k">
-          глава · {len(chars)} из {normText(project)}
+          глава · {len(chars)} · норма {normText(project)}
         </span>
         {L.state === 'near' && <span className="cm-say">до конца нормы ≈ {len(L.left ?? 0)} — пора вести главу к концу</span>}
         {L.state === 'over' && (

@@ -4,6 +4,7 @@ import { updateBeats } from '../components/ScenePlan'
 import { createMarker, createNote, patch, remove } from '../db/repo'
 import { sceneLabel, sceneName, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
+import { returnToText } from '../lib/stash'
 import { NOTE_KINDS, noteKind, timeAgo } from '../lib/status'
 import { toast } from '../lib/ui'
 
@@ -121,7 +122,7 @@ function NoteRow({ note, data }: { note: Note; data: ProjectData }) {
             <>
               {' · '}
               <a href="#" onClick={(e) => (e.preventDefault(), go({ view: 'write', sceneId: scene.id }))}>
-                {sceneLabel(data, scene.id)}
+                {note.content ? `из сцены «${sceneName(data, scene)}»` : sceneLabel(data, scene.id)}
               </a>
             </>
           )}
@@ -189,6 +190,11 @@ function NoteRow({ note, data }: { note: Note; data: ProjectData }) {
           </div>
         )}
       </div>
+      {!!note.content && scene && !note.archived && (
+        <button className="btn sm" onClick={() => void returnToText(note)}>
+          Вернуть в текст
+        </button>
+      )}
       <button className="btn sm ghost" onClick={() => setOpen(!open)}>
         {open ? 'Готово' : 'Разобрать'}
       </button>
