@@ -4,6 +4,7 @@ import { createChapter, createScene, ensurePool, moveScene, patch } from '../db/
 import { isPlaceholder, sceneShort, type ProjectData } from '../lib/hooks'
 import { sceneHints } from '../lib/hints'
 import { MAIN } from '../lib/moments'
+import { offerUndo, undoable } from '../lib/undo'
 
 const SLOT = 104 // one scene: a point and its name under it
 const GAP = 24 // between chapters
@@ -135,7 +136,9 @@ export function StoryLine({ data, dim, onOpenScene }: { data: ProjectData; dim: 
     const slot = Math.max(0, Math.min(c.count, Math.round((px - c.x - SLOT / 2) / SLOT)))
     return { c, lane, slot }
   }
-  const drop = async (id: string, px: number, py: number, clientY: number) => {
+  const drop = (id: string, px: number, py: number, clientY: number) =>
+    undoable('перенос сцены', () => place(id, px, py, clientY)).then(() => offerUndo('Сцена перенесена'))
+  const place = async (id: string, px: number, py: number, clientY: number) => {
     const s = data.sceneById.get(id)
     if (!s) return
     const poolTop = poolRef.current?.getBoundingClientRect().top
@@ -156,9 +159,11 @@ export function StoryLine({ data, dim, onOpenScene }: { data: ProjectData; dim: 
   const ghost = drag?.moved ? target(drag.x, drag.y) : null
 
   const addScene = async (chapterId: string, laneId: string) => {
-    const s = await createScene(data.project.id, chapterId, '', { status: 'idea', lineIds: laneId === MAIN ? [] : [laneId] })
+    const s = await undoable('новая сцена', () => createScene(data.project.id, chapterId, '', { status: 'idea', lineIds: laneId === MAIN ? [] : [laneId] }))
     onOpenScene(s.id)
   }
+  const newChapter = () =>
+    void undoable('новая глава', () => createChapter(data.project.id, `Глава ${data.chapters.length + 1}`)).then(() => offerUndo('Глава добавлена'))
   const dragged = drag?.moved ? data.sceneById.get(drag.id) : undefined
 
   return (
@@ -273,8 +278,8 @@ export function StoryLine({ data, dim, onOpenScene }: { data: ProjectData; dim: 
               className="sm-new-chapter"
               role="button"
               tabIndex={0}
-              onClick={() => void createChapter(data.project.id, `Глава ${data.chapters.length + 1}`)}
-              onKeyDown={(e) => e.key === 'Enter' && void createChapter(data.project.id, `Глава ${data.chapters.length + 1}`)}
+              onClick={newChapter}
+              onKeyDown={(e) => e.key === 'Enter' && newChapter()}
             >
               <text x={x + 4} y={26}>
                 + Глава
@@ -295,7 +300,11 @@ export function StoryLine({ data, dim, onOpenScene }: { data: ProjectData; dim: 
         ))}
         <button
           className="sm-chip add"
-          onClick={async () => onOpenScene((await createScene(data.project.id, (await ensurePool(data.project.id)).id, '', { status: 'idea' })).id)}
+          onClick={async () =>
+            onOpenScene(
+              (await undoable('новая сцена', async () => createScene(data.project.id, (await ensurePool(data.project.id)).id, '', { status: 'idea' }))).id,
+            )
+          }
         >
           + сцена из головы
         </button>

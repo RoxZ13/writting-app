@@ -158,8 +158,6 @@ test.describe('4. drag a scene to another chapter', () => {
 test.describe('5. board undo', () => {
   test('Ctrl+Z after a drag puts the scene back', async ({ page, isMobile }) => {
     test.skip(isMobile, 'keyboard shortcut')
-    // audit M1: no undo on the board
-    knownBug('audit M1: no undo on the board')
     await twoChapterBoard(page)
     const before = await sceneChapters(page)
     await dragCardToColumn(page, 'Сцена А', 1)
@@ -170,6 +168,58 @@ test.describe('5. board undo', () => {
     await expect
       .poll(async () => (await sceneChapters(page)).a.chapterId, { timeout: 4000, message: 'scene А is back in chapter 1 after Ctrl+Z' })
       .toBe(before.chapters[0].id)
+    // Ctrl+Shift+Z does it again
+    await page.keyboard.press('Control+Shift+z')
+    await expect.poll(async () => (await sceneChapters(page)).a.chapterId, { timeout: 4000 }).toBe(before.chapters[1].id)
+  })
+
+  /** Scene А in chapter 2, then chapter 2 glued to chapter 1 through its ⋯ menu. */
+  async function mergeSecondChapter(page: Page) {
+    await twoChapterBoard(page)
+    const before = await sceneChapters(page)
+    await dragCardToColumn(page, 'Сцена А', 1)
+    await expect.poll(async () => (await sceneChapters(page)).a.chapterId).toBe(before.chapters[1].id)
+    await page.locator('.column:not(.pool)').nth(1).locator('summary[aria-label="Действия с главой"]').click()
+    await page.getByRole('button', { name: 'Склеить с предыдущей главой' }).click()
+    await expect.poll(async () => (await sceneChapters(page)).a.chapterId, { message: 'merged into chapter 1' }).toBe(before.chapters[0].id)
+    await expect.poll(async () => (await sceneChapters(page)).chapters.length).toBe(1)
+    return before
+  }
+
+  test('«Склеить с предыдущей главой» is undone with Ctrl+Z', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'keyboard shortcut and the chapter menu are desktop-only')
+    const before = await mergeSecondChapter(page)
+    await page.keyboard.press('Control+z')
+    await expect.poll(async () => (await sceneChapters(page)).chapters.length, { timeout: 4000 }).toBe(2)
+    expect((await sceneChapters(page)).a.chapterId, 'scene А is back in chapter 2').toBe(before.chapters[1].id)
+    await expect(page.locator('.column:not(.pool)')).toHaveCount(2)
+  })
+
+  test('«Склеить с предыдущей главой» is undone with the toast «Отменить»', async ({ page, isMobile }) => {
+    test.skip(isMobile, 'the chapter menu is desktop-only; touch screens are covered by 5c')
+    const before = await mergeSecondChapter(page)
+    await page.locator('.toast-undo').click()
+    await expect.poll(async () => (await sceneChapters(page)).chapters.length, { timeout: 4000 }).toBe(2)
+    expect((await sceneChapters(page)).a.chapterId).toBe(before.chapters[1].id)
+  })
+
+  test('5c. touch: moving a scene with «Где стоит» is undone from the toast «Отменить»', async ({ page, isMobile }) => {
+    test.skip(!isMobile, 'desktop undoes with Ctrl+Z, see above')
+    await startStory(page)
+    await board(page)
+    await addSceneOnBoard(page, 'Сцена А')
+    await page.getByRole('button', { name: '+ Глава' }).click()
+    await page.locator('.tl-chapter.open .tl-scene').filter({ hasText: 'Сцена А' }).click()
+    const sheet = page.getByRole('dialog', { name: 'Сцена' })
+    const chapters = (await aliveRows<any>(page, 'chapters')).filter((c) => !c.pool).sort((a, b) => a.order - b.order)
+    await sheet.getByLabel('Где стоит').selectOption(chapters[1].id)
+    await expect
+      .poll(async () => (await aliveRows<any>(page, 'scenes')).find((s) => s.title === 'Сцена А')?.chapterId)
+      .toBe(chapters[1].id)
+    await page.locator('.toast-undo').click()
+    await expect
+      .poll(async () => (await aliveRows<any>(page, 'scenes')).find((s) => s.title === 'Сцена А')?.chapterId, { timeout: 4000 })
+      .toBe(chapters[0].id)
   })
 })
 
@@ -284,8 +334,15 @@ async function newStoryFromLibrary(page: Page) {
 
 async function deleteStoryInLibrary(page: Page, which: string) {
   const card = page.locator(`.story${which}`).first()
-  await card.locator('summary[aria-label="Действия"]').click()
-  await card.getByRole('button', { name: 'Удалить историю' }).click()
+  const actions = card.locator('summary[aria-label="Действия"]')
+  const del = card.getByRole('button', { name: 'Удалить историю' })
+  await actions.click()
+  // Under load WebKit sometimes misses the first tap on <summary>; a person would simply tap again.
+  if (!(await del.isVisible().catch(() => false))) {
+    await page.waitForTimeout(500)
+    if (!(await del.isVisible().catch(() => false))) await actions.click()
+  }
+  await del.click()
 }
 
 const aliveProjects = (page: Page) => aliveRows<any>(page, 'projects')
@@ -429,8 +486,7 @@ test.describe('11. the same scene in two tabs', () => {
 // ---------------------------------------------------------------------------------------------
 test.describe('12. restoring a version updates the counters (B-109)', () => {
   test('after «Вернуть» the stored counters match the restored text', async ({ page }) => {
-    // audit B-109: restoring a version rewrites the text but not the scene's wordCount / charCount / excerpt
-    knownBug('audit B-109: version restore leaves scene counters stale')
+    // audit B-109 (fixed): restoring a version goes through the editor save, which updates the counters
     await startStory(page)
     const v1 = 'Альфа бета гамма дельта эпсилон'
     await typeInEditor(page, v1)
@@ -447,8 +503,8 @@ test.describe('12. restoring a version updates the counters (B-109)', () => {
     await closePlan()
 
     // a completely different, longer text
-    await page.locator('.ProseMirror').click()
-    await page.keyboard.press('Control+a')
+    // A triple click selects the paragraph everywhere; Ctrl+A selects nothing in the iPhone emulation.
+    await page.locator('.ProseMirror p').first().click({ clickCount: 3 })
     await page.keyboard.type('Омега сигма тау ипсилон фи хи пси ро пи омикрон ню')
     await waitSaveTick(page)
     await expect.poll(async () => (await aliveRows<any>(page, 'scenes'))[0].wordCount).toBe(11)

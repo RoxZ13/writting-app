@@ -2,12 +2,14 @@ import {
   closestCorners,
   DndContext,
   DragOverlay,
+  KeyboardCode,
   KeyboardSensor,
   PointerSensor,
   TouchSensor,
   useDroppable,
   useSensor,
   useSensors,
+  type Announcements,
   type DragEndEvent,
   type DragStartEvent,
 } from '@dnd-kit/core'
@@ -46,6 +48,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { go } from '../lib/router'
 import { getBoardLayout } from '../lib/session'
 import { Icon } from '../components/Icon'
+import { offerUndo, once, redo, toastUndo, undo, undoable, undoKey } from '../lib/undo'
 
 type Lens = { kind: 'all' } | { kind: 'line'; id: string } | { kind: 'markers' } | { kind: 'hero'; id: string }
 
@@ -86,9 +89,41 @@ export function BoardView({ data }: { data: ProjectData }) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
-    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+    // Space lifts and drops a card; Enter is kept for opening it (see SortableCard).
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+      keyboardCodes: { start: [KeyboardCode.Space], cancel: [KeyboardCode.Esc], end: [KeyboardCode.Space, KeyboardCode.Enter] },
+    }),
   )
 
+  // Ctrl/⌘ Z takes back the last board action, Ctrl/⌘ Shift Z (and Ctrl Y) does it again. Text fields keep their own undo.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const kind = undoKey(e)
+      if (!kind || e.defaultPrevented || e.isComposing) return
+      const t = e.target as HTMLElement | null
+      if (t?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])')) return
+      e.preventDefault()
+      void (kind === 'undo' ? undo() : redo())
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  // What a screen reader says while a card is moved with the keyboard.
+  const place = (id: unknown) => {
+    const key = String(id)
+    if (key === 'col:pool') return 'Пока без места'
+    if (key.startsWith('col:')) return `глава «${data.chapterById.get(key.slice(4))?.title ?? ''}»`
+    const s = data.sceneById.get(key)
+    return s ? `сцена «${sceneName(data, s)}»` : ''
+  }
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `Поднята ${place(active.id)}. Стрелками выбери место, пробел — положить, Escape — отменить.`,
+    onDragOver: ({ active, over }) => (over && over.id !== active.id ? `${place(active.id)} — над: ${place(over.id)}` : undefined),
+    onDragEnd: ({ active, over }) => (over && over.id !== active.id ? `Сцена положена: ${place(over.id)}` : `${place(active.id)} осталась на месте`),
+    onDragCancel: ({ active }) => `Перенос отменён, ${place(active.id)} на месте`,
+  }
   const onDragStart = (e: DragStartEvent) => setDragging(String(e.active.id))
   const onDragEnd = (e: DragEndEvent) => {
     setDragging(null)
@@ -100,31 +135,33 @@ export function BoardView({ data }: { data: ProjectData }) {
     if (isLocked(data, from) || isLocked(data, to)) return void toast('Глава зафиксирована — сцены в ней не двигаются. Открепить можно в ⋯ у главы')
     const scenesOf = (chapterId: string) =>
       chapterId === data.pool.chapter?.id ? data.pool.scenes : data.scenes.filter((s) => s.chapterId === chapterId)
+    const run = (fn: () => Promise<unknown>) => void undoable('перенос сцены', fn).then(() => offerUndo('Сцена перенесена'))
     if (over === 'col:pool') {
-      void ensurePool(data.project.id).then((pool) => moveScene(sceneId, pool.id, data.pool.scenes.length))
+      run(async () => moveScene(sceneId, (await ensurePool(data.project.id)).id, data.pool.scenes.length))
       return
     }
     if (over.startsWith('col:')) {
       const chapterId = over.slice(4)
       const count = scenesOf(chapterId).filter((s) => s.id !== sceneId).length
-      void moveScene(sceneId, chapterId, count)
+      run(() => moveScene(sceneId, chapterId, count))
       return
     }
     const target = data.sceneById.get(over)
     if (!target) return
-    void moveScene(sceneId, target.chapterId, scenesOf(target.chapterId).indexOf(target))
+    run(() => moveScene(sceneId, target.chapterId, scenesOf(target.chapterId).indexOf(target)))
   }
 
   const hanging = data.markers.filter((m) => ['hanging', 'late'].includes(markerStatus(m, data)))
   const quiet = data.markers.filter((m) => markerQuiet(m, data))
   const filters = data.markers.length > 0 || data.lines.length > 0 || data.characters.length > 0 || lens.kind !== 'all'
 
-  const addChapterAfter = async (i: number) => {
-    const c = await createChapter(data.project.id, `Глава ${i + 2}`)
-    const ids = data.chapters.map((x) => x.id)
-    ids.splice(i + 1, 0, c.id)
-    await reorderChapters(ids)
-  }
+  const addChapterAfter = (i: number) =>
+    undoable('новая глава', async () => {
+      const c = await createChapter(data.project.id, `Глава ${i + 2}`)
+      const ids = data.chapters.map((x) => x.id)
+      ids.splice(i + 1, 0, c.id)
+      await reorderChapters(ids)
+    }).then(() => offerUndo('Глава добавлена'))
 
   const moveChapter = (i: number, dir: -1 | 1) => {
     const ids = data.chapters.map((c) => c.id)
@@ -132,7 +169,7 @@ export function BoardView({ data }: { data: ProjectData }) {
     if (j < 0 || j >= ids.length) return
     if (data.chapters[i].locked || data.chapters[j].locked) return void toast('Зафиксированная глава стоит на своём месте')
     ;[ids[i], ids[j]] = [ids[j], ids[i]]
-    void reorderChapters(ids)
+    void undoable('сдвиг главы', () => reorderChapters(ids)).then(() => offerUndo('Глава сдвинута'))
   }
 
   return (
@@ -207,10 +244,13 @@ export function BoardView({ data }: { data: ProjectData }) {
               onKeyDown={async (e) => {
                 if (e.key === 'Escape') setNewLine(null)
                 if (e.key !== 'Enter' || !newLine.trim()) return
-                const l = await createLine(data.project.id, newLine.trim())
+                const name = newLine.trim()
+                // A second Enter while the first is still writing would make a twin line.
+                const l = await once('new-line', () => undoable('новая линия', () => createLine(data.project.id, name)))
+                if (!l) return
                 setNewLine(null)
                 setLens({ kind: 'line', id: l.id })
-                toast(view === 'line' ? 'Линия создана — перетаскивай в её строку сцены' : 'Линия создана. Сцены отмечай: клик по сцене → «Линии»')
+                toastUndo(view === 'line' ? 'Линия создана — перетаскивай в её строку сцены' : 'Линия создана. Сцены отмечай: клик по сцене → «Линии»')
               }}
             />
           )}
@@ -250,7 +290,13 @@ export function BoardView({ data }: { data: ProjectData }) {
           dim={(s) => dims(lens, s, data)}
         />
       ) : (
-        <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
+        <DndContext
+          sensors={sensors}
+          accessibility={{
+            announcements,
+            screenReaderInstructions: { draggable: 'Пробел поднимает карточку, стрелки двигают, пробел кладёт, Escape отменяет. Enter открывает сцену.' },
+          }}
+          collisionDetection={closestCorners} onDragStart={onDragStart} onDragEnd={onDragEnd}>
           <div className="board">
             <PoolColumn data={data} lens={lens} onOpenScene={setOpenScene} />
             {data.outline.map(({ chapter, scenes }, i) => (
@@ -267,7 +313,7 @@ export function BoardView({ data }: { data: ProjectData }) {
                 onOpenMarker={setOpenMarker}
               />
             ))}
-            <button className="add-column" onClick={() => void createChapter(data.project.id, `Глава ${data.chapters.length + 1}`)}>
+            <button className="add-column" onClick={() => void newChapter(data)}>
               + Глава
             </button>
           </div>
@@ -285,6 +331,11 @@ export function BoardView({ data }: { data: ProjectData }) {
       )}
     </div>
   )
+}
+
+/** «+ Глава» at the end of the book. */
+function newChapter(data: ProjectData) {
+  return undoable('новая глава', () => createChapter(data.project.id, `Глава ${data.chapters.length + 1}`)).then(() => offerUndo('Глава добавлена'))
 }
 
 function Column({
@@ -326,14 +377,18 @@ function Column({
     const title = draft.trim()
     if (!title) return
     setDraft('')
-    await createScene(data.project.id, chapter.id, title, { status: 'idea', lineIds: lens.kind === 'line' ? [lens.id] : [] })
+    await undoable('новая сцена', () => createScene(data.project.id, chapter.id, title, { status: 'idea', lineIds: lens.kind === 'line' ? [lens.id] : [] }))
+    offerUndo('Сцена добавлена')
   }
   const addMarker = async () => {
     const title = markerDraft.trim()
     if (!title) return
     setMarkerDraft('')
-    await createMarker(data.project.id, markerSide === 'setup' ? { title, setupChapterId: chapter.id } : { title, payoffChapterId: chapter.id })
+    await undoable('новый маячок', () =>
+      createMarker(data.project.id, markerSide === 'setup' ? { title, setupChapterId: chapter.id } : { title, payoffChapterId: chapter.id }),
+    )
   }
+  const edit = (label: string, changes: Partial<Chapter>) => void undoable(label, () => patch<Chapter>('chapters', chapter.id, changes))
 
   return (
     <section ref={setNodeRef} className={`column ${isOver ? 'over' : ''} ${folded ? 'folded' : ''} ${locked ? 'locked' : ''}`}>
@@ -342,7 +397,7 @@ function Column({
           <button className="fold-btn" aria-label={folded ? 'Развернуть главу' : 'Свернуть главу'} onClick={() => setFolded(!folded)}>
             {folded ? '▸' : '▾'}
           </button>
-          <InlineEdit className="column-title" value={chapter.title} onSave={(title) => void patch<Chapter>('chapters', chapter.id, { title })} />
+          <InlineEdit className="column-title" label="Название главы" value={chapter.title} onSave={(title) => edit('название главы', { title })} />
           {locked && (
             <span className="lock-mark" title="Глава зафиксирована: сцены не двигаются, текст править можно">
               <Icon name="lock" size={14} />
@@ -368,10 +423,10 @@ function Column({
                   className="input"
                   type="date"
                   defaultValue={chapter.deadline ?? ''}
-                  onChange={(e) => void patch<Chapter>('chapters', chapter.id, { deadline: e.target.value || undefined })}
+                  onChange={(e) => edit('дедлайн главы', { deadline: e.target.value || undefined })}
                 />
               </label>
-              <button onClick={() => void patch<Chapter>('chapters', chapter.id, { locked: !locked || undefined })}>
+              <button onClick={() => edit(locked ? 'открепление главы' : 'фиксация главы', { locked: !locked || undefined })}>
                 {locked ? 'Открепить главу' : 'Зафиксировать главу'}
               </button>
               <button onClick={onAddAfter}>+ Новая глава после этой</button>
@@ -382,14 +437,21 @@ function Column({
                 </>
               )}
               {!isFirst && !locked && !data.chapters[data.chapterIndex.get(chapter.id)! - 1]?.locked && (
-                <button onClick={() => void mergeIntoPrevious(chapter.id).then(() => toast('Сцены перенесены в предыдущую главу'))}>
+                <button
+                  onClick={() =>
+                    void undoable('склейка глав', () => mergeIntoPrevious(chapter.id)).then(() => toastUndo('Сцены перенесены в предыдущую главу'))
+                  }
+                >
                   Склеить с предыдущей главой
                 </button>
               )}
               {!locked && (
                 <button
                   className="danger"
-                  onClick={() => confirm(`Удалить «${chapter.title}» вместе со сценами (${scenes.length})?`) && void deleteChapter(chapter.id)}
+                  onClick={() =>
+                    confirm(`Удалить «${chapter.title}» вместе со сценами (${scenes.length})?`) &&
+                    void undoable('удаление главы', () => deleteChapter(chapter.id)).then(() => toastUndo('Глава удалена'))
+                  }
                 >
                   Удалить главу
                 </button>
@@ -402,7 +464,7 @@ function Column({
           multiline
           placeholder="+ о чём глава"
           value={chapter.goal}
-          onSave={(goal) => void patch<Chapter>('chapters', chapter.id, { goal })}
+          onSave={(goal) => edit('цель главы', { goal })}
         />
         {deadlineText(chapter.deadline) && (
           <div className={`deadline column-deadline ${deadlineText(chapter.deadline)!.late ? 'late' : ''}`}>
@@ -480,15 +542,18 @@ function LineNote({ data, lineId, onGone }: { data: ProjectData; lineId: string;
   const line = data.lineById.get(lineId)!
   const del = async () => {
     if (!confirm(`Удалить линию «${line.name}»? Сцены останутся, с них просто снимется отметка.`)) return
-    for (const s of [...data.scenes, ...data.pool.scenes])
-      if (s.lineIds?.includes(line.id)) await patch<Scene>('scenes', s.id, { lineIds: s.lineIds.filter((x) => x !== line.id) })
-    await remove('lines', line.id)
+    await undoable('удаление линии', async () => {
+      for (const s of [...data.scenes, ...data.pool.scenes])
+        if (s.lineIds?.includes(line.id)) await patch<Scene>('scenes', s.id, { lineIds: s.lineIds.filter((x) => x !== line.id) })
+      await remove('lines', line.id)
+    })
     onGone()
+    toastUndo('Линия удалена')
   }
   return (
     <div className="lens-note line-note">
       <div className="line-note-head">
-        <InlineEdit className="line-name" value={line.name} placeholder="Название линии" onSave={(name) => name.trim() && void patch<Line>('lines', line.id, { name: name.trim() })} />
+        <InlineEdit className="line-name" label="Название линии" value={line.name} placeholder="Название линии" onSave={(name) => name.trim() && void undoable('название линии', () => patch<Line>('lines', line.id, { name: name.trim() }))} />
         <div className="swatches" role="radiogroup" aria-label="Цвет линии">
           {PALETTE.map((c) => (
             <button
@@ -498,7 +563,7 @@ function LineNote({ data, lineId, onGone }: { data: ProjectData; lineId: string;
               aria-label={`Цвет ${c}`}
               className="swatch"
               style={{ background: c }}
-              onClick={() => void patch<Line>('lines', line.id, { color: c })}
+              onClick={() => void undoable('цвет линии', () => patch<Line>('lines', line.id, { color: c }))}
             />
           ))}
         </div>
@@ -521,8 +586,10 @@ function PlanLock({ data }: { data: ProjectData }) {
   const locked = data.chapters.filter((c) => c.locked).length
   const all = locked === data.chapters.length
   const setAll = async (on: boolean) => {
-    for (const c of data.chapters) if (!!c.locked !== on) await patch<Chapter>('chapters', c.id, { locked: on || undefined })
-    toast(on ? 'План зафиксирован: главы и сцены стоят на местах. Текст править можно' : 'План снова можно двигать')
+    await undoable(on ? 'фиксация плана' : 'открепление плана', async () => {
+      for (const c of data.chapters) if (!!c.locked !== on) await patch<Chapter>('chapters', c.id, { locked: on || undefined })
+    })
+    toastUndo(on ? 'План зафиксирован: главы и сцены стоят на местах. Текст править можно' : 'План снова можно двигать')
   }
   return (
     <button
@@ -543,8 +610,10 @@ function AskLock({ data }: { data: ProjectData }) {
   const written = data.outline.filter(({ chapter, scenes }) => !chapter.locked && scenes.length > 0 && scenes.every((s) => s.wordCount > 0))
   if (written.length < 2) return null
   const answer = async (lock: boolean) => {
-    if (lock) for (const { chapter } of written) await patch<Chapter>('chapters', chapter.id, { locked: true })
-    await patch<Project>('projects', data.project.id, { lockAsked: true })
+    await undoable(lock ? 'фиксация написанных глав' : 'ответ «Не надо»', async () => {
+      if (lock) for (const { chapter } of written) await patch<Chapter>('chapters', chapter.id, { locked: true })
+      await patch<Project>('projects', data.project.id, { lockAsked: true })
+    })
   }
   return (
     <div className="lens-note ask-lock">
@@ -604,8 +673,8 @@ function PoolColumn({ data, lens, onOpenScene }: { data: ProjectData; lens: Lens
     const title = draft.trim()
     if (!title) return
     setDraft('')
-    const pool = await ensurePool(data.project.id)
-    await createScene(data.project.id, pool.id, title, { status: 'idea' })
+    await undoable('новая сцена', async () => createScene(data.project.id, (await ensurePool(data.project.id)).id, title, { status: 'idea' }))
+    offerUndo('Сцена добавлена')
   }
   return (
     <section ref={setNodeRef} className={`column pool ${isOver ? 'over' : ''}`}>
@@ -640,15 +709,21 @@ function PoolColumn({ data, lens, onOpenScene }: { data: ProjectData; lens: Lens
 function ThreeParts({ data }: { data: ProjectData }) {
   const planned = data.scenes.some((s) => !isPlaceholder(s, data))
   if (data.pool.scenes.length < 2 || planned || data.chapters.length > 1) return null
+  // A double click would make two «Середина» and two «Финал» (audit B-035), so only one run at a time.
   const make = async () => {
-    const first = data.chapters[0]
-    if (first) await patch<Chapter>('chapters', first.id, { title: 'Начало', goal: first.goal || 'Кто они и что сдвигает историю с места' })
-    else await createChapter(data.project.id, 'Начало')
-    const mid = await createChapter(data.project.id, 'Середина')
-    await patch<Chapter>('chapters', mid.id, { goal: 'Всё усложняется, ставки растут' })
-    const end = await createChapter(data.project.id, 'Финал')
-    await patch<Chapter>('chapters', end.id, { goal: 'Развязка: чем всё кончится' })
-    toast('Перетащи сцены в части. Порядок внутри — тоже перетаскиванием. Потом часть можно разделить на главы')
+    const done = await once('three-parts', () =>
+      undoable('части «Начало · Середина · Финал»', async () => {
+        const first = data.chapters[0]
+        if (first) await patch<Chapter>('chapters', first.id, { title: 'Начало', goal: first.goal || 'Кто они и что сдвигает историю с места' })
+        else await createChapter(data.project.id, 'Начало')
+        const mid = await createChapter(data.project.id, 'Середина')
+        await patch<Chapter>('chapters', mid.id, { goal: 'Всё усложняется, ставки растут' })
+        const end = await createChapter(data.project.id, 'Финал')
+        await patch<Chapter>('chapters', end.id, { goal: 'Развязка: чем всё кончится' })
+        return true
+      }),
+    )
+    if (done) toastUndo('Перетащи сцены в части. Порядок внутри — тоже перетаскиванием. Потом часть можно разделить на главы')
   }
   return (
     <button className="link small three-parts" onClick={() => void make()}>
@@ -678,6 +753,15 @@ function SortableCard({ data, scene, lens, locked, onOpen }: { data: ProjectData
       aria-disabled={undefined}
       {...listeners}
       onClick={onOpen}
+      onKeyDown={(e) => {
+        // Enter opens the scene, as a click does; Space (and the arrows while lifted) belong to dragging.
+        if (e.key === 'Enter' && e.target === e.currentTarget && !isDragging) {
+          e.preventDefault()
+          onOpen()
+          return
+        }
+        listeners?.onKeyDown?.(e)
+      }}
     >
       <Card data={data} scene={scene} lens={lens} />
     </div>
@@ -846,7 +930,7 @@ function Timeline({
           </section>
         )
       })}
-      <button className="btn ghost" onClick={() => void createChapter(data.project.id, `Глава ${data.chapters.length + 1}`)}>
+      <button className="btn ghost" onClick={() => void newChapter(data)}>
         + Глава
       </button>
     </div>
@@ -878,8 +962,11 @@ function TimelineAdd({ data, chapter, lens }: { data: ProjectData; chapter?: Cha
     const title = draft.trim()
     if (!title) return
     setDraft('')
-    const to = chapter ?? (await ensurePool(data.project.id))
-    await createScene(data.project.id, to.id, title, { status: 'idea', lineIds: lens.kind === 'line' ? [lens.id] : [] })
+    await undoable('новая сцена', async () => {
+      const to = chapter ?? (await ensurePool(data.project.id))
+      return createScene(data.project.id, to.id, title, { status: 'idea', lineIds: lens.kind === 'line' ? [lens.id] : [] })
+    })
+    offerUndo('Сцена добавлена')
   }
   return (
     <input

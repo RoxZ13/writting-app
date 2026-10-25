@@ -1,16 +1,20 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { Scene } from '../db/db'
 import { createMarker, ensurePool, mergeSceneIntoPrevious, moveScene, patch, remove, splitChapterAt } from '../db/repo'
 import { go } from '../lib/router'
+import { modalRoot, useModal } from '../lib/ui'
 import { isLocked, sceneName, type ProjectData } from '../lib/hooks'
 import { STATUSES } from '../lib/status'
-import { toast } from '../lib/ui'
+import { toastUndo, undoable } from '../lib/undo'
 import { MarkerCard } from './MarkerCard'
 import { RefChips } from './Refs'
 import { Icon } from './Icon'
 
 /** Quick edit of a scene from the board: what happens, lines, people, markers. No editor needed. */
 export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene: Scene; onClose: () => void }) {
+  const sheetRef = useRef<HTMLDivElement>(null)
+  useModal(sheetRef)
   const [title, setTitle] = useState(scene.title)
   const [goal, setGoal] = useState(scene.goal)
   useEffect(() => {
@@ -23,7 +27,7 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const set = (changes: Partial<Scene>) => void patch<Scene>('scenes', scene.id, changes)
+  const set = (changes: Partial<Scene>, label: string) => void undoable(label, () => patch<Scene>('scenes', scene.id, changes))
   const markers = data.markers.filter((m) => m.setupSceneId === scene.id || m.payoffSceneId === scene.id)
   const inPool = scene.chapterId === data.pool.chapter?.id
   const siblings = inPool ? data.pool.scenes : data.scenes.filter((s) => s.chapterId === scene.chapterId)
@@ -50,19 +54,18 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
   )
   const place = async (to: string) => {
     if (to === 'pool') {
-      const pool = await ensurePool(data.project.id)
-      await moveScene(scene.id, pool.id, data.pool.scenes.length)
-      toast('Сцена в «Пока без места»')
+      await undoable('перенос сцены', async () => moveScene(scene.id, (await ensurePool(data.project.id)).id, data.pool.scenes.length))
+      toastUndo('Сцена в «Пока без места»')
     } else {
-      await moveScene(scene.id, to, data.scenes.filter((s) => s.chapterId === to && s.id !== scene.id).length)
-      toast(`Сцена перенесена в «${data.chapterById.get(to)?.title}»`)
+      await undoable('перенос сцены', () => moveScene(scene.id, to, data.scenes.filter((s) => s.chapterId === to && s.id !== scene.id).length))
+      toastUndo(`Сцена перенесена в «${data.chapterById.get(to)?.title}»`)
     }
   }
 
-  return (
+  return createPortal(
     <>
       <div className="sheet-back" onClick={onClose} />
-      <aside className="sheet" role="dialog" aria-label="Сцена">
+      <div className="sheet" role="dialog" aria-modal="true" aria-label="Сцена" tabIndex={-1} ref={sheetRef}>
         <div className="row" style={{ flexWrap: 'nowrap' }}>
           <span className="eyebrow">{data.chapterById.get(scene.chapterId)?.title}</span>
           <span className="spacer" />
@@ -75,7 +78,7 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
           value={title}
           placeholder={sceneName(data, scene)}
           onChange={(e) => setTitle(e.target.value)}
-          onBlur={() => title !== scene.title && set({ title })}
+          onBlur={() => title !== scene.title && set({ title }, 'название сцены')}
         />
         {scene.epigraph && <div className="card-epigraph">♪ {scene.epigraph}</div>}
         {scene.excerpt && <div className="card-excerpt">{scene.excerpt}</div>}
@@ -85,7 +88,7 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
           placeholder="Кратко: что происходит, что меняется"
           value={goal}
           onChange={(e) => setGoal(e.target.value)}
-          onBlur={() => goal !== scene.goal && set({ goal })}
+          onBlur={() => goal !== scene.goal && set({ goal }, 'описание сцены')}
         />
         <button className="btn primary" onClick={() => go({ view: 'write', sceneId: scene.id })}>
           Писать эту сцену →
@@ -100,12 +103,12 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
                 ['tense', 'Напряжённая'],
               ] as const
             ).map(([v, label]) => (
-              <button key={v} aria-pressed={scene.tempo === v} onClick={() => set({ tempo: scene.tempo === v ? undefined : v })}>
+              <button key={v} aria-pressed={scene.tempo === v} onClick={() => set({ tempo: scene.tempo === v ? undefined : v }, 'темп сцены')}>
                 {label}
               </button>
             ))}
           </div>
-          <button className={`chip-toggle sm ${scene.node ? 'on' : ''}`} onClick={() => set({ node: scene.node ? undefined : true })}>
+          <button className={`chip-toggle sm ${scene.node ? 'on' : ''}`} onClick={() => set({ node: scene.node ? undefined : true }, 'отметка «Ключевая»')}>
             Ключевая
           </button>
         </div>
@@ -146,7 +149,9 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
           )}
           <button
             className="pp-add-btn"
-            onClick={() => void createMarker(data.project.id, { title: 'Новый маячок', setupSceneId: scene.id, setupChapterId: scene.chapterId })}
+            onClick={() =>
+              void undoable('новый маячок', () => createMarker(data.project.id, { title: 'Новый маячок', setupSceneId: scene.id, setupChapterId: scene.chapterId }))
+            }
           >
             маячок
           </button>
@@ -162,8 +167,8 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
                 title="Эта сцена и все после неё в главе уходят в новую главу"
                 onClick={async () => {
                   const at = data.chapters.findIndex((c) => c.id === scene.chapterId)
-                  await splitChapterAt(scene.id, `Глава ${at + 2}`)
-                  toast('Новая глава начинается с этой сцены. Название можно поменять на доске')
+                  await undoable('новая глава с этой сцены', () => splitChapterAt(scene.id, `Глава ${at + 2}`))
+                  toastUndo('Новая глава начинается с этой сцены. Название можно поменять на доске')
                 }}
               >
                 ✂ Новая глава отсюда
@@ -171,7 +176,7 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
             )}
             <label>
               <span className="field-label">Состояние</span>
-              <select className="select" value={scene.status} onChange={(e) => set({ status: e.target.value as Scene['status'] })}>
+              <select className="select" value={scene.status} onChange={(e) => set({ status: e.target.value as Scene['status'] }, 'состояние сцены')}>
                 {STATUSES.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.label}
@@ -184,8 +189,8 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
                 className="btn"
                 onClick={async () => {
                   if (!confirm('Склеить эту сцену с предыдущей? Текст станет одним.')) return
-                  await mergeSceneIntoPrevious(scene.id)
-                  toast('Сцены склеены')
+                  await undoable('склейка сцен', () => mergeSceneIntoPrevious(scene.id))
+                  toastUndo('Сцены склеены')
                   onClose()
                 }}
               >
@@ -195,12 +200,15 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
             {!locked && (
               <button
                 className="btn ghost"
-                style={{ color: 'var(--mk-hanging)' }}
+                style={{ color: 'var(--danger-ink)' }}
                 onClick={async () => {
                   if (!confirm(`Удалить «${sceneName(data, scene)}» вместе с текстом?`)) return
-                  await remove('scenes', scene.id)
-                  await remove('texts', scene.id)
+                  await undoable('удаление сцены', async () => {
+                    await remove('scenes', scene.id)
+                    await remove('texts', scene.id)
+                  })
                   onClose()
+                  toastUndo('Сцена удалена')
                 }}
               >
                 Удалить сцену
@@ -208,7 +216,8 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
             )}
           </div>
         </details>
-      </aside>
-    </>
+      </div>
+    </>,
+    modalRoot(),
   )
 }

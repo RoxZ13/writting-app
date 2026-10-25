@@ -19,7 +19,7 @@ import { hotkey, isTouch, session } from '../lib/session'
 import { clock, useSprint } from '../lib/sprint'
 import { endFocus, FocusStart } from '../components/Focus'
 import { sumChars } from '../lib/length'
-import { ChapterMeter } from '../components/ChapterMeter'
+import { ChapterMeter, splitChapterHere } from '../components/ChapterMeter'
 import { chapterProgress, dayKey, totalWords, wordsOn } from '../lib/pace'
 import { MARKER_STATES } from '../lib/status'
 import { docParagraphs, emptyDoc, formatWords, lastSentences } from '../lib/text'
@@ -402,6 +402,9 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                   {(
                     [
                       ['spark', 'Маячок здесь', '⌘M', () => editor && setAction(selectionForMarker(editor))],
+                      ...(chapter && !chapter.pool && !chapter.locked
+                        ? [['cut', 'Новая глава с этого абзаца', '', () => void splitChapterHere(data.project, scene, editor)] as [string, string, string, () => void]]
+                        : []),
                       ['search', 'Найти и заменить', '⌘F', () => setFind({ replace: true })],
                       ['type', 'Причесать текст', '', typeset],
                       ['focus', 'Фокус с таймером', '', () => setFocusOpen(true)],
@@ -453,7 +456,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
           <SceneNow data={data} scene={scene} onOpenPlan={openPlan} />
         </div>
         {chapter && !chapter.pool && (
-          <ChapterMeter project={data.project} scene={scene} chars={chapterChars} editor={editor} locked={!!chapter.locked} />
+          <ChapterMeter project={data.project} chars={chapterChars} />
         )}
 
         <div className="editor-area">

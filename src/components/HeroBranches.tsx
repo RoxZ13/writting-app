@@ -5,7 +5,8 @@ import { alive, createLine, patch } from '../db/repo'
 import { heroScenes } from '../lib/heroes'
 import type { ProjectData } from '../lib/hooks'
 import { docParagraphs } from '../lib/text'
-import { Modal, toast } from '../lib/ui'
+import { Modal } from '../lib/ui'
+import { once, toastUndo, undoable } from '../lib/undo'
 
 /**
  * «Ветки из героев»: for a book that came in written, its branches are already in the text —
@@ -36,25 +37,32 @@ export function HeroBranches({ data, onClose }: { data: ProjectData; onClose: ()
     )
   const lineOf = (name: string) => data.lines.find((l) => l.name.trim().toLowerCase() === name.trim().toLowerCase())
 
+  // One run at a time: a double click would make every line twice (audit B-062).
   const apply = async () => {
     if (!found) return
-    const add = new Map<string, Set<string>>()
-    for (const c of heroes) {
-      if (!chosen.has(c.id)) continue
-      let line = lineOf(c.name)
-      if (!line) {
-        line = await createLine(data.project.id, c.name)
-        await patch<Line>('lines', line.id, { color: c.color })
-      }
-      for (const sid of found.get(c.id) ?? []) add.set(sid, (add.get(sid) ?? new Set()).add(line.id))
-    }
-    for (const [sid, ids] of add) {
-      const s = data.sceneById.get(sid)
-      if (!s) continue
-      const next = [...new Set([...(s.lineIds ?? []), ...ids])]
-      if (next.length !== (s.lineIds ?? []).length) await patch<Scene>('scenes', sid, { lineIds: next })
-    }
-    toast(`Ветки готовы: ${chosen.size}. Где они сходятся — видно на «Линии»`)
+    const done = await once('hero-branches', () =>
+      undoable('ветки из героев', async () => {
+        const add = new Map<string, Set<string>>()
+        for (const c of heroes) {
+          if (!chosen.has(c.id)) continue
+          let line = lineOf(c.name)
+          if (!line) {
+            line = await createLine(data.project.id, c.name)
+            await patch<Line>('lines', line.id, { color: c.color })
+          }
+          for (const sid of found.get(c.id) ?? []) add.set(sid, (add.get(sid) ?? new Set()).add(line.id))
+        }
+        for (const [sid, ids] of add) {
+          const s = data.sceneById.get(sid)
+          if (!s) continue
+          const next = [...new Set([...(s.lineIds ?? []), ...ids])]
+          if (next.length !== (s.lineIds ?? []).length) await patch<Scene>('scenes', sid, { lineIds: next })
+        }
+        return true
+      }),
+    )
+    if (!done) return
+    toastUndo(`Ветки готовы: ${chosen.size}. Где они сходятся — видно на «Линии»`)
     onClose()
   }
 

@@ -2,7 +2,7 @@ import type { Project } from '../db/db'
 import { stageLabel } from '../lib/stories'
 import { formatWords } from '../lib/text'
 import { coverFromClipboard, coverFromUrl, imageToCover, setCover, useCover } from '../lib/cover'
-import { toast } from '../lib/ui'
+import { FilePick, toast } from '../lib/ui'
 
 /** A book on the shelf: spine, stage tag, title, genre. */
 export function BookCover({ project, words, onClick }: { project: Project; words?: number; onClick?: () => void }) {
@@ -14,10 +14,10 @@ export function BookCover({ project, words, onClick }: { project: Project; words
       style={{ '--cover': color } as React.CSSProperties}
       onClick={onClick}
       tabIndex={onClick ? 0 : -1}
-      aria-label={project.title}
     >
       {/* The author's own cover already carries the title; only the stage and length go on top of it. */}
       {cover && <img className="book-image" src={cover} alt="" loading="lazy" />}
+      {cover && <span className="sr-only">{project.title}</span>}
       <span className="book-spine" />
       <span className="book-face">
         <span className="book-stage">{stageLabel(project.stage)}</span>
@@ -42,10 +42,9 @@ export function CoverPicker({ projectId }: { projectId: string }) {
   }
   return (
     <div className="cover-actions">
-      <label className="btn sm">
+      <FilePick className="btn sm" accept="image/*" onFile={(f) => void run(() => imageToCover(f))}>
         {cover ? 'Другая картинка' : 'Загрузить картинку'}
-        <input type="file" hidden accept="image/*" onChange={(e) => e.target.files?.[0] && void run(() => imageToCover(e.target.files![0]))} />
-      </label>
+      </FilePick>
       <button className="btn sm" onClick={() => void run(coverFromClipboard)} title="Скопируй обложку (на телефоне — долгое нажатие → «Скопировать») и нажми сюда">
         Вставить скопированную
       </button>

@@ -10,7 +10,7 @@ import {
   type ImportedBook,
 } from '../lib/importer'
 import { formatWords } from '../lib/text'
-import { toast } from '../lib/ui'
+import { FilePick, toast } from '../lib/ui'
 
 export async function importBook(projectId: string, book: ImportedBook) {
   const project = await db.projects.get(projectId)
@@ -122,15 +122,9 @@ export function ImportPanel({ projectId, onDone }: { projectId: string; onDone?:
 
   return (
     <div className="stack">
-      <label className="btn" style={{ alignSelf: 'flex-start' }}>
+      <FilePick className="btn" style={{ alignSelf: 'flex-start' }} accept=".docx,.txt,.md,.html,.htm" onFile={(f) => void onFile(f)}>
         {busy ? 'Читаю…' : 'Выбрать файл (.docx, .txt)'}
-        <input
-          type="file"
-          accept=".docx,.txt,.md,.html,.htm"
-          hidden
-          onChange={(e) => void onFile(e.target.files?.[0])}
-        />
-      </label>
+      </FilePick>
       <div className="small muted">
         Google Docs: Файл → Скачать → Microsoft Word (.docx). Фикбук: скопируй текст главы и вставь ниже — курсив
         сохранится.

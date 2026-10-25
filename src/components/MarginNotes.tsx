@@ -57,7 +57,7 @@ export function MarginNotes({ data, editor, onOpen }: { data: ProjectData; edito
   }, [editor, data.notes])
 
   return (
-    <div ref={box} className="margin-notes" aria-label="Заметки на полях">
+    <div ref={box} className="margin-notes" role={placed.length ? 'group' : undefined} aria-label={placed.length ? 'Заметки на полях' : undefined}>
       {placed.map((n) => (
         <button key={n.id} className="margin-note" style={{ top: n.top, width: WIDTH }} onClick={() => onOpen(n.id)}>
           <span className="margin-note-k">на полях</span>

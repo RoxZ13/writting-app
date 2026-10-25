@@ -63,11 +63,11 @@ export function TypoControls() {
       <div className="typo-row">
         <span className="typo-label">Размер</span>
         <div className="size">
-          <button className="icon-btn" onClick={() => set({ ...t, size: Math.max(13, t.size - 1) })} aria-label="Меньше">
+          <button className="icon-btn" onClick={() => set({ ...t, size: Math.max(13, t.size - 1) })} aria-label="A− меньше">
             A−
           </button>
-          <input type="range" min={13} max={26} value={t.size} onChange={(e) => set({ ...t, size: Number(e.target.value) })} />
-          <button className="icon-btn" onClick={() => set({ ...t, size: Math.min(26, t.size + 1) })} aria-label="Больше">
+          <input type="range" aria-label="Размер текста" min={13} max={26} value={t.size} onChange={(e) => set({ ...t, size: Number(e.target.value) })} />
+          <button className="icon-btn" onClick={() => set({ ...t, size: Math.min(26, t.size + 1) })} aria-label="A+ больше">
             A+
           </button>
           <span className="small muted">{t.size}</span>

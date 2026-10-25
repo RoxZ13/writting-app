@@ -9,7 +9,7 @@ import {
   type SyncStatus,
 } from '../db/cloud'
 import { downloadBackup, readBackupFile, restoreBackup } from '../lib/backup'
-import { toast } from '../lib/ui'
+import { FilePick, toast } from '../lib/ui'
 import { ACCENTS, applyAccent, applyTheme, getAccent, getBoardLayout, getTheme, setBoardLayout, type Accent, type BoardLayout, type Theme } from '../lib/session'
 import { TypoControls } from '../components/TypoControls'
 import { CloudDisks } from '../components/CloudDisks'
@@ -116,7 +116,8 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
 
       <CloudDisks />
 
-      <SyncSection sync={sync} />
+      {/* The old Supabase sync: shown only where it was set up, so it does not stand next to the Disk as a second «Устройства». */}
+      {getCloudConfig() && <SyncSection sync={sync} />}
 
       <section className="card settings-section stack">
         <h3>Установить как приложение</h3>
@@ -144,10 +145,9 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
           <button className="btn primary" onClick={() => void downloadBackup()}>
             Скачать копию
           </button>
-          <label className="btn">
+          <FilePick className="btn" accept=".json,application/json" onFile={(f) => void restore(f)}>
             Вернуть из копии…
-            <input type="file" hidden accept=".json,application/json" onChange={(e) => e.target.files?.[0] && void restore(e.target.files[0])} />
-          </label>
+          </FilePick>
         </div>
       </section>
       <div className="small muted app-version">
@@ -269,7 +269,7 @@ export function SyncSection({ sync }: { sync: SyncStatus }) {
         </>
       )}
       {info && <div className="small next-step">{info}</div>}
-      {error && <div className="small" style={{ color: 'var(--mk-hanging)' }}>{error}</div>}
+      {error && <div className="small" style={{ color: 'var(--danger-ink)' }}>{error}</div>}
       {cfg && (
         <button
           className="btn ghost sm"

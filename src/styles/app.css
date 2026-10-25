@@ -6,7 +6,12 @@
   --fill: #f0f0f2;
   --ink: #0b0b0c;
   --ink-2: #4a4a50;
-  --ink-3: #8e8e95;
+  /* Muted text: 4.5:1 or better on every background below (bg, side, paper, surface, fill, accent-soft). Checked by src/__tests__/contrast.test.ts. */
+  --ink-3: #696970;
+  /* Not text: dots, hairlines, strokes and disabled marks. Lighter on purpose; never use for words. */
+  --ink-4: #8e8e95;
+  /* Red for words (a danger button, an error): the plain marker red is too pale for text. */
+  --danger-ink: #bc3b3f;
   --line: #ececef;
   --line-2: #dedee3;
   --accent: #0b0b0c;
@@ -51,6 +56,17 @@
   --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
   --text-font: var(--serif);
   --text-size: 20px;
+  /* One z-index scale for everything that floats. Move a layer here, not with a number in a rule. */
+  --z-page: 6; /* the counter pinned to the page */
+  --z-bar: 10; /* the bars of the text view: toolbar, chapter line */
+  --z-meter: 12; /* the chapter line sits over the toolbar's edge */
+  --z-float: 25; /* the round «+», the «В прошлый раз» bar */
+  --z-nav: 30; /* the header and the phone tab bar */
+  --z-menu-back: 44; /* click-catcher behind a menu */
+  --z-menu: 45; /* menus and popovers: over every bar, under sheets and dialogs */
+  --z-sheet: 50; /* side sheet */
+  --z-modal: 60; /* dialogs */
+  --z-toast: 70; /* toasts: over everything */
   color-scheme: light;
 }
 :root[data-font='sans'] {
@@ -67,7 +83,9 @@
     --fill: #2a282c;
     --ink: #ece6da;
     --ink-2: #bdb7ab;
-    --ink-3: #8a867e;
+    --ink-3: #959189;
+    --ink-4: #8a867e;
+    --danger-ink: #ea696d;
     --line: #2a292d;
     --line-2: #38363b;
     --accent: #ece6da;
@@ -88,7 +106,9 @@
   --fill: #2a282c;
   --ink: #ece6da;
   --ink-2: #bdb7ab;
-  --ink-3: #8a867e;
+  --ink-3: #959189;
+  --ink-4: #8a867e;
+  --danger-ink: #ea696d;
   --line: #2a292d;
   --line-2: #38363b;
   --accent: #ece6da;
@@ -108,7 +128,9 @@
   --fill: #dfdfda;
   --ink: #232326;
   --ink-2: #4f4f55;
-  --ink-3: #85858b;
+  --ink-3: #5d5d63;
+  --ink-4: #85858b;
+  --danger-ink: #a73538;
   --line: #d9d9d3;
   --line-2: #cdcdc6;
   --accent: #232326;
@@ -148,6 +170,11 @@ button {
 }
 a {
   color: inherit;
+}
+/* Hints in empty fields read as muted text, in every theme (Firefox fades them by default). */
+::placeholder {
+  color: var(--ink-3);
+  opacity: 1;
 }
 ::selection {
   background: color-mix(in srgb, var(--accent) 25%, transparent);
@@ -235,7 +262,7 @@ a {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--ink-3);
+  background: var(--ink-4);
   flex: none;
 }
 .sync-dot[data-state='ok'] {
@@ -243,7 +270,8 @@ a {
 }
 .sync-dot[data-state='syncing'] {
   background: var(--focus);
-  animation: pulse 1s infinite alternate;
+  /* A few beats, not forever: a dot that never rests pulls the eye while writing. */
+  animation: pulse 1s 6 alternate;
 }
 .sync-dot[data-state='error'] {
   background: var(--accent);
@@ -327,6 +355,17 @@ h3 {
 .small {
   font-size: var(--fs-ui);
 }
+/* Read by screen readers only. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .eyebrow {
   font-size: var(--fs-sm);
   text-transform: uppercase;
@@ -371,7 +410,7 @@ h3 {
   white-space: nowrap;
 }
 .btn:hover {
-  border-color: var(--ink-3);
+  border-color: var(--ink-4);
 }
 .btn:active {
   transform: translateY(1px);
@@ -791,7 +830,7 @@ details.menu > summary::-webkit-details-marker {
   background: var(--bg);
 }
 .menu-list button.danger {
-  color: var(--mk-hanging);
+  color: var(--danger-ink);
 }
 .arrange-list {
   display: flex;
@@ -889,7 +928,7 @@ details.menu > summary::-webkit-details-marker {
 .write-top {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: var(--z-bar);
   display: flex;
   align-items: center;
   gap: 6px;
@@ -1396,7 +1435,7 @@ details.menu > summary::-webkit-details-marker {
   position: fixed;
   right: 22px;
   bottom: calc(env(safe-area-inset-bottom) + 22px);
-  z-index: 25;
+  z-index: var(--z-float);
   width: 54px;
   height: 54px;
   border-radius: 50%;
@@ -1417,7 +1456,7 @@ details.menu > summary::-webkit-details-marker {
 .modal-back {
   position: fixed;
   inset: 0;
-  z-index: 60;
+  z-index: var(--z-modal);
   background: rgba(20, 15, 10, 0.35);
   display: flex;
   align-items: flex-start;
@@ -1458,7 +1497,7 @@ details.menu > summary::-webkit-details-marker {
   left: 50%;
   bottom: calc(env(safe-area-inset-bottom) + 90px);
   transform: translateX(-50%);
-  z-index: 70;
+  z-index: var(--z-toast);
   background: var(--ink);
   color: var(--bg);
   padding: 10px 18px;
@@ -2034,7 +2073,7 @@ main.page.wide {
   font-weight: 500;
 }
 .mk-count {
-  color: var(--mk-hanging);
+  color: var(--danger-ink);
   font-weight: 500;
 }
 .gap-slot {
@@ -2124,7 +2163,7 @@ main.page.wide {
 }
 .add-column:hover {
   color: var(--ink);
-  border-color: var(--ink-3);
+  border-color: var(--ink-4);
 }
 
 /* ---------- chips & faces ---------- */
@@ -2195,7 +2234,7 @@ main.page.wide {
 .sheet-back {
   position: fixed;
   inset: 0;
-  z-index: 50;
+  z-index: var(--z-sheet);
   background: rgba(10, 10, 12, 0.18);
 }
 .sheet {
@@ -2203,7 +2242,7 @@ main.page.wide {
   top: 12px;
   right: 12px;
   bottom: 12px;
-  z-index: 51;
+  z-index: calc(var(--z-sheet) + 1);
   width: min(420px, calc(100vw - 24px));
   background: var(--surface);
   border-radius: var(--r-lg);
@@ -2291,7 +2330,7 @@ main.page.wide {
 .app-header {
   position: sticky;
   top: 0;
-  z-index: 30;
+  z-index: var(--z-nav);
   height: var(--header-h);
   display: flex;
   align-items: center;
@@ -2401,7 +2440,7 @@ main.page {
     left: 0;
     right: 0;
     bottom: 0;
-    z-index: 30;
+    z-index: var(--z-nav);
     justify-content: space-around;
     margin: 0;
     padding: 6px 4px calc(env(safe-area-inset-bottom) + 6px);
@@ -2433,7 +2472,8 @@ main.page {
     right: 4px;
   }
   main.page {
-    padding: 20px 16px 120px;
+    /* Room under the last row for the round «+» (76px up, 54px tall): it never covers a row at the end of a list. */
+    padding: 20px 16px calc(env(safe-area-inset-bottom) + 150px);
   }
   .app-text .tabs {
     transition: opacity 0.3s;
@@ -2526,7 +2566,7 @@ main.page {
 .resume {
   /* Pinned to the bottom of the screen: the editor may open scrolled to where the author stopped. */
   position: fixed;
-  z-index: 30;
+  z-index: var(--z-float);
   left: 50%;
   bottom: 24px;
   transform: translateX(-50%);
@@ -2885,13 +2925,13 @@ main.page {
 .typo-back {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: var(--z-menu-back);
 }
 .typo-pop {
   position: absolute;
   right: -60px;
   top: 40px;
-  z-index: 41;
+  z-index: var(--z-menu);
   width: 400px;
   max-width: calc(100vw - 24px);
   padding: 18px 20px;
@@ -3081,7 +3121,7 @@ main.page {
 }
 .story.add:hover {
   color: var(--ink);
-  border-color: var(--ink-3);
+  border-color: var(--ink-4);
 }
 .story-menu {
   min-width: 280px;
@@ -3366,7 +3406,7 @@ main.page {
 .pp-hang {
   font-size: var(--fs-xs);
   font-weight: 500;
-  color: var(--mk-hanging);
+  color: var(--danger-ink);
 }
 .link-plain {
   border: 0;
@@ -3640,11 +3680,11 @@ main.page {
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  opacity: 0.7;
+  opacity: 0.85;
 }
 .book-words {
   font-size: var(--fs-sm);
-  opacity: 0.6;
+  opacity: 0.8;
 }
 .story .book {
   margin-bottom: 4px;
@@ -4212,7 +4252,7 @@ main.page {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-bottom: 4px;
-  opacity: 0.7;
+  opacity: 0.85;
 }
 
 .heat {
@@ -4448,7 +4488,7 @@ main.page {
   position: absolute;
   left: 0;
   right: 0;
-  border-top: 1.5px dashed var(--ink-3);
+  border-top: 1.5px dashed var(--ink-4);
 }
 .pace-forecast {
   font-size: var(--fs-md);
@@ -4467,7 +4507,7 @@ main.page {
   font-size: var(--fs-md);
 }
 .publish-next .late {
-  color: var(--mk-hanging);
+  color: var(--danger-ink);
 }
 .publish-list {
   display: flex;
@@ -4711,7 +4751,7 @@ main.page {
   gap: 2px;
 }
 .date-chip .btn.late {
-  color: var(--mk-hanging);
+  color: var(--danger-ink);
 }
 .date-chip-input {
   position: absolute;
@@ -4838,7 +4878,7 @@ button.deadline {
   align-self: flex-start;
   transform: scale(0.92);
   transform-origin: left center;
-  opacity: 0.8;
+  opacity: 0.9;
 }
 /* Plan: only what is filled; the rest waits here. */
 .pp-add {
@@ -4997,7 +5037,7 @@ button.deadline {
 .old-body del {
   color: var(--ink-3);
   text-decoration: line-through;
-  text-decoration-color: var(--ink-3);
+  text-decoration-color: var(--ink-4);
 }
 .old-body ins {
   text-decoration: none;
@@ -5069,7 +5109,6 @@ button.deadline {
 }
 .title-page input::placeholder {
   color: var(--ink-3);
-  opacity: 0.7;
 }
 .title-page .tp-rule {
   width: 40px;
@@ -5320,7 +5359,7 @@ button.deadline {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  opacity: 0.6;
+  opacity: 0.8;
 }
 .continue-t {
   font-size: var(--fs-xl);
@@ -5331,7 +5370,7 @@ button.deadline {
   font-family: var(--text-font);
   font-size: var(--fs-md);
   line-height: 1.5;
-  opacity: 0.8;
+  opacity: 0.9;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -5492,7 +5531,7 @@ button.deadline {
   font-family: var(--text-font);
   font-style: italic;
   font-size: var(--fs-sm);
-  color: #b8860b;
+  color: var(--ink-3);
 }
 .write.typing .margin-note {
   opacity: 0.35;
@@ -5672,7 +5711,7 @@ button.avatar {
   position: fixed;
   right: 16px;
   bottom: calc(env(safe-area-inset-bottom) + 12px);
-  z-index: 6;
+  z-index: var(--z-page);
 }
 .stats-chip {
   display: inline-flex;
@@ -5684,7 +5723,6 @@ button.avatar {
   border-radius: var(--r-md);
   font-size: var(--fs-sm);
   color: var(--ink-3);
-  opacity: 0.7;
   font-variant-numeric: tabular-nums;
   transition: opacity 0.3s, background 0.2s;
 }
@@ -5723,7 +5761,7 @@ button.avatar {
   position: absolute;
   right: 0;
   bottom: calc(100% + 6px);
-  z-index: 41;
+  z-index: var(--z-menu);
   width: 230px;
   padding: 14px 16px;
   display: flex;
@@ -6163,6 +6201,21 @@ button.avatar {
 .menu-modes button {
   padding: 6px 8px;
 }
+/* On a phone the «⋯» menu opens right under its button (the shared popover rule pins it to the bottom, under the resume bar). */
+@media (max-width: 600px) {
+  .typo-pop.write-menu {
+    position: absolute;
+    left: auto;
+    right: 0;
+    top: 40px;
+    bottom: auto;
+    width: min(270px, calc(100vw - 24px));
+  }
+}
+/* A toolbar with an open menu rises over the bars at the bottom of the screen. */
+.write-top:has(.typo-pop) {
+  z-index: var(--z-menu);
+}
 
 /* «В прошлый раз»: one line at the bottom, gone with the first letter or scroll. */
 .resume {
@@ -6350,7 +6403,7 @@ button.avatar {
   margin-bottom: 20px;
 }
 .title-page .tp-title::placeholder {
-  color: var(--line-2);
+  color: var(--ink-3);
 }
 
 /* =====================================================================
@@ -6469,7 +6522,7 @@ button.avatar {
   top: var(--header-h, 64px);
   left: 0;
   right: 0;
-  z-index: 12;
+  z-index: var(--z-meter);
   pointer-events: none;
 }
 .cm-track {
@@ -6480,7 +6533,7 @@ button.avatar {
 }
 .cm-fill {
   height: 100%;
-  background: var(--ink-3);
+  background: var(--ink-4);
   opacity: 0.6;
   transition: width 0.6s ease, background 0.3s;
 }
@@ -6489,22 +6542,24 @@ button.avatar {
   top: -2px;
   width: 1.5px;
   height: 7px;
-  background: var(--ink-3);
+  background: var(--ink-4);
   opacity: 0.5;
 }
 .chapter-meter.ok .cm-fill {
   background: var(--brand);
   opacity: 0.55;
 }
+/* Near and over the norm the bar warms up, calmly: never the alarm red. */
 .chapter-meter.near .cm-fill {
   background: var(--st-draft);
-  opacity: 0.9;
+  opacity: 0.7;
 }
 .chapter-meter.over .cm-fill {
-  background: var(--mk-hanging);
-  opacity: 0.75;
+  background: var(--st-draft);
+  opacity: 0.85;
 }
 .cm-text {
+  transition: opacity 0.2s, visibility 0.2s;
   display: flex;
   /* Centred: the toolbar row below the bar keeps the breadcrumbs on the left and the buttons on the right. */
   justify-content: center;
@@ -6522,26 +6577,22 @@ button.avatar {
 .write:not(.typing) .chapter-meter.ok .cm-k {
   opacity: 0.8;
 }
-/* On a phone the count would sit on the toolbar buttons: the bar and the scene ring say enough. */
+/* While typing nothing but the bar is left. */
+.write.typing .cm-text {
+  opacity: 0;
+  visibility: hidden;
+}
+/* On a phone the words would sit on the toolbar buttons: the bar and the scene ring say enough. */
 @media (max-width: 760px) {
-  .cm-k {
+  .cm-text {
     display: none;
   }
 }
 .cm-say {
-  pointer-events: auto;
   background: var(--paper);
   border-radius: 999px;
   padding: 2px 10px;
-}
-.chapter-meter.near .cm-say {
   color: var(--ink-2);
-}
-.chapter-meter.over .cm-say {
-  color: var(--mk-hanging);
-}
-.chapter-meter.over .cm-say .link {
-  color: var(--ink);
 }
 .length-norm {
   display: flex;
@@ -6569,7 +6620,7 @@ button.avatar {
   color: var(--st-draft);
 }
 .len-tag.over {
-  color: var(--mk-hanging);
+  color: var(--danger-ink);
 }
 .three-parts {
   display: block;
@@ -6677,7 +6728,7 @@ button.avatar {
   padding: 10px 0;
   border-top: 1px solid var(--line);
 }
-.cloud-row.soon {
+.cloud-row.soon .cloud-logo {
   opacity: 0.65;
 }
 .cloud-logo {
@@ -6703,7 +6754,7 @@ button.avatar {
   gap: 2px;
 }
 .cloud-error {
-  color: var(--mk-hanging);
+  color: var(--danger-ink);
 }
 .cloud-steps {
   margin: 8px 0;
@@ -6712,4 +6763,64 @@ button.avatar {
   flex-direction: column;
   gap: 4px;
   word-break: break-word;
+}
+
+/* Reduced motion: no slides, rises, fades or pulses; things simply appear and change. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* =====================================================================
+   Keyboard focus: one ring for everything Tab can reach. The mouse does not show it (:focus-visible),
+   text fields always do. Kept at the end so it wins over the older `outline: none` rules above.
+   ===================================================================== */
+:is(a[href], button, summary, select, input, textarea, [role='button'], [tabindex]:not([tabindex='-1'], .ProseMirror)):focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+/* Fields without a frame of their own (titles, inline notes): the ring hugs them and does not push the line. */
+:is(input, textarea):is(.bare, .quick-add, .sheet-title, .find-input, .ref-input, .capture-text):focus-visible,
+.title-page input:focus-visible,
+.beat textarea:focus-visible {
+  outline-offset: 0;
+  border-radius: var(--r-sm);
+}
+/* The current story already wears a ring: a dashed one tells «you are here» from «focus is here». */
+.story.current .book:focus-visible {
+  outline-style: dashed;
+}
+/* On the dark bubble and other inverted surfaces the ring flips with the surface. */
+.bubble button:focus-visible {
+  outline-color: var(--bg);
+  outline-offset: -2px;
+}
+
+/* =====================================================================
+   Touch: a finger needs about 44 px. The text toolbar keeps its look and gets an invisible
+   bigger hit area; the selection bubble, which floats only while text is selected, grows a little.
+   ===================================================================== */
+@media (pointer: coarse) {
+  .tool {
+    position: relative;
+    min-width: 44px;
+    justify-content: center;
+  }
+  /* Taller than it looks: 34 px of button, 44 px that answer a finger. */
+  .tool::after {
+    content: '';
+    position: absolute;
+    inset: -5px 0;
+  }
+  .bubble button {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0 10px;
+  }
 }

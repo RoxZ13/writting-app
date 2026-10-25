@@ -68,7 +68,7 @@ export function BookView({ data }: { data: ProjectData }) {
         <BookCover project={p} words={words} />
         <div className="stack" style={{ flex: 1, minWidth: 0 }}>
           <span className="eyebrow">Об истории</span>
-          <InlineEdit className="book-title" value={p.title} onSave={(title) => title.trim() && set({ title })} />
+          <InlineEdit className="book-title" label="Название истории" value={p.title} onSave={(title) => title.trim() && set({ title })} />
           <InlineEdit className="book-genre" value={p.genre ?? ''} placeholder="Жанр — например, фэнтези, гет, макси" onSave={(genre) => set({ genre })} />
           <div>
             <span className="field-label">Стадия</span>
@@ -195,7 +195,7 @@ export function BookView({ data }: { data: ProjectData }) {
           </div>
           <button
             className="btn ghost"
-            style={{ color: 'var(--mk-hanging)', alignSelf: 'flex-start' }}
+            style={{ color: 'var(--danger-ink)', alignSelf: 'flex-start' }}
             onClick={async () => {
               if (!confirm(`Удалить историю «${p.title}» со всеми главами и заметками?`)) return
               await remove('projects', p.id)

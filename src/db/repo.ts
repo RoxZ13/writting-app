@@ -17,13 +17,28 @@ import {
 import { docParagraphs, docCharCount, docWordCount, emptyDoc } from '../lib/text'
 import { isEpigraph, makeExcerpt } from '../lib/importer'
 
+/**
+ * Observer of writes, installed by lib/undo.ts only while a board action runs. It gets the row as it was
+ * before (undefined when the row did not exist) and as it is after the write.
+ */
+export type WriteRecorder = (table: SyncedTable, before: Base | undefined, after: Base) => void
+let recorder: WriteRecorder | null = null
+export function setWriteRecorder(fn: WriteRecorder | null) {
+  recorder = fn
+}
+
 /** Write a record locally and queue it for sync. All app writes go through here. */
 export async function save<T extends Base>(table: SyncedTable, record: T): Promise<T> {
   const next = { ...record, updatedAt: Date.now() }
+  // Captured now: a write that starts inside an action belongs to that action, even if it ends later.
+  const rec = recorder
+  let before: Base | undefined
   await db.transaction('rw', db.table(table), db.outbox, async () => {
+    if (rec) before = (await db.table(table).get(next.id)) as Base | undefined
     await db.table(table).put(next)
     await db.outbox.put({ key: `${table}:${next.id}`, table, id: next.id })
   })
+  rec?.(table, before, next)
   notifyChange()
   return next
 }
@@ -302,18 +317,6 @@ export async function toggleSceneRef(sceneId: string, field: 'lineIds' | 'charac
 }
 
 /** Move a scene to a chapter at a position (board drag and drop). */
-/** Write a new arrangement of scenes (from «Линия истории»); returns how to put everything back. */
-export async function arrangeScenes(changes: Pick<Scene, 'id' | 'chapterId' | 'order' | 'together' | 'lineIds'>[]) {
-  const before: typeof changes = []
-  for (const c of changes) {
-    const s = await db.scenes.get(c.id)
-    if (!s) continue
-    before.push({ id: s.id, chapterId: s.chapterId, order: s.order, together: s.together, lineIds: s.lineIds })
-    await save<Scene>('scenes', { ...s, ...c })
-  }
-  return () => arrangeScenes(before)
-}
-
 export async function moveScene(sceneId: string, chapterId: string, index: number) {
   const scene = await db.scenes.get(sceneId)
   if (!scene) return

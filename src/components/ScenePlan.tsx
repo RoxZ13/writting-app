@@ -1,14 +1,15 @@
 import type { Editor } from '@tiptap/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { db, uid, type Beat, type Marker, type Note, type Scene, type SceneText } from '../db/db'
-import { createMarker, createNote, mergeSceneIntoPrevious, patch, remove, save, snapshotScene } from '../db/repo'
+import { db, uid, type Beat, type Marker, type Note, type Scene } from '../db/db'
+import { createMarker, createNote, mergeSceneIntoPrevious, patch, remove, snapshotScene } from '../db/repo'
 import { isLocked, markerPayoffChapter, markerStatus, unusedLines, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { MARKER_STATES, noteKind, STATUSES, timeAgo } from '../lib/status'
 import { hotkey } from '../lib/session'
 import { returnToText } from '../lib/stash'
 import { toast } from '../lib/ui'
+import { toastUndo, undoable } from '../lib/undo'
 import { RefChips } from './Refs'
 import { loreForScene, type LoreReason } from '../lib/lore'
 import { docParagraphs } from '../lib/text'
@@ -395,8 +396,11 @@ function More({ data, scene, editor }: { data: ProjectData; scene: Scene; editor
               className="btn sm"
               onClick={async () => {
                 if (!confirm('Склеить эту сцену с предыдущей? Текст станет одним.')) return
-                const prev = await mergeSceneIntoPrevious(scene.id)
-                if (prev) go({ view: 'text', sceneId: prev })
+                const prev = await undoable('склейка сцен', () => mergeSceneIntoPrevious(scene.id))
+                if (prev) {
+                  go({ view: 'text', sceneId: prev })
+                  toastUndo('Сцены склеены')
+                }
               }}
             >
               Склеить с предыдущей
@@ -404,12 +408,15 @@ function More({ data, scene, editor }: { data: ProjectData; scene: Scene; editor
           )}
           <button
             className="btn sm ghost"
-            style={{ color: 'var(--mk-hanging)' }}
+            style={{ color: 'var(--danger-ink)' }}
             onClick={async () => {
               if (!confirm('Удалить эту сцену вместе с текстом?')) return
-              await remove('scenes', scene.id)
-              await remove('texts', scene.id)
+              await undoable('удаление сцены', async () => {
+                await remove('scenes', scene.id)
+                await remove('texts', scene.id)
+              })
               go({ view: 'board' })
+              toastUndo('Сцена удалена')
             }}
           >
             Удалить сцену
@@ -488,13 +495,13 @@ function Versions({ scene, editor }: { scene: Scene; editor: Editor | null }) {
     await snapshotScene(t, `Версия от ${when}`)
     toast('Версия сохранена')
   }
-  const restore = async (content: unknown, wordCount: number) => {
+  const restore = async (content: unknown) => {
     const t = await db.texts.get(scene.id)
     if (!t || !editor) return
     if (!confirm('Вернуть эту версию? Текущий текст тоже сохранится как версия.')) return
     await snapshotScene(t, 'Перед восстановлением')
-    await save<SceneText>('texts', { ...t, content, wordCount })
-    editor.commands.setContent(content as object, { emitUpdate: false })
+    // Through the editor's own save, so the scene's word and character counts and its card excerpt follow (audit B-109).
+    editor.commands.setContent(content as object, { emitUpdate: true })
     toast('Версия восстановлена')
   }
   return (
@@ -511,7 +518,7 @@ function Versions({ scene, editor }: { scene: Scene; editor: Editor | null }) {
               {timeAgo(s.createdAt)} · {s.wordCount} сл.
             </div>
           </div>
-          <button className="btn sm ghost" onClick={() => void restore(s.content, s.wordCount)}>
+          <button className="btn sm ghost" onClick={() => void restore(s.content)}>
             Вернуть
           </button>
         </div>

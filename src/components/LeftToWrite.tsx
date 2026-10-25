@@ -3,6 +3,7 @@ import { markerPayoffChapter, markerStatus, sceneName, type ProjectData } from '
 import { go } from '../lib/router'
 import { formatScenes } from '../lib/text'
 import { Modal } from '../lib/ui'
+import { once, undoable } from '../lib/undo'
 
 /**
  * «Что осталось дописать»: one list of what the book still lacks, asked for by the author.
@@ -41,7 +42,7 @@ export function LeftToWrite({ data, onClose }: { data: ProjectData; onClose: () 
               className="ltw-row"
               onClick={() => {
                 onClose()
-                document.querySelector('.essence')?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+                document.querySelector('.essence')?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })
               }}
             >
               Чем закончится история, пока не записано — «Замысел» на этой странице
@@ -78,8 +79,14 @@ export function LeftToWrite({ data, onClose }: { data: ProjectData; onClose: () 
               <button
                 className="link"
                 onClick={async () => {
-                  for (let i = 0; i < missing; i++) await createChapter(p.id, `Глава ${data.chapters.length + i + 1}`)
-                  board()
+                  // One run at a time: a double click would add the chapters twice (audit B-079).
+                  const done = await once('missing-chapters', () =>
+                    undoable('новые главы', async () => {
+                      for (let i = 0; i < missing; i++) await createChapter(p.id, `Глава ${data.chapters.length + i + 1}`)
+                      return true
+                    }),
+                  )
+                  if (done) board()
                 }}
               >
                 Завести ещё {missing}

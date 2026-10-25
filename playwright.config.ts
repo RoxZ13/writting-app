@@ -3,7 +3,10 @@ import { defineConfig, devices } from '@playwright/test'
 // End-to-end checks run against the production build (service worker included), not the dev server.
 // E2E_PORT lets parallel runs use their own server; E2E_NO_BUILD reuses the dist/ that is already built.
 const PORT = Number(process.env.E2E_PORT ?? 4175)
-const build = process.env.E2E_NO_BUILD ? '' : 'npm run build && '
+// E2E_DIST builds into and serves from its own folder, so parallel runs never overwrite each other's build.
+const DIST = process.env.E2E_DIST
+const outDir = DIST ? ` --outDir ${DIST}` : ''
+const build = process.env.E2E_NO_BUILD ? '' : DIST ? `npx tsc -b && npx vite build${outDir} && ` : 'npm run build && '
 
 export default defineConfig({
   testDir: 'e2e',
@@ -23,7 +26,7 @@ export default defineConfig({
     { name: 'iphone', use: { ...devices['iPhone 14'] } },
   ],
   webServer: {
-    command: `${build}npm run preview -- --port ${PORT} --strictPort`,
+    command: `${build}npm run preview -- --port ${PORT} --strictPort${outDir}`,
     port: PORT,
     reuseExistingServer: !process.env.CI,
     timeout: 180_000,

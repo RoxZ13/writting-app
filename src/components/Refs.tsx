@@ -3,6 +3,7 @@ import type { Character, Line, Marker } from '../db/db'
 import { createLine, findOrCreateCharacter, patch, toggleSceneRef } from '../db/repo'
 import { ColorDot } from './ColorDot'
 import { sceneName, type ProjectData } from '../lib/hooks'
+import { undoable } from '../lib/undo'
 
 /** Toggleable chips for a scene's story lines (линии) or characters, with inline "+ new". */
 export function RefChips({
@@ -18,6 +19,7 @@ export function RefChips({
 }) {
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
+  const label = field === 'lineIds' ? 'линия сцены' : 'герой в сцене'
   const items = field === 'lineIds' ? data.lines.map((l) => ({ id: l.id, name: l.name, color: l.color })) : data.characters
   const add = async () => {
     const n = name.trim()
@@ -25,9 +27,11 @@ export function RefChips({
     setName('')
     if (!n) return
     const existingLine = field === 'lineIds' ? data.lines.find((l) => l.name.trim().toLowerCase() === n.toLowerCase()) : undefined
-    const created =
-      field === 'lineIds' ? (existingLine ?? (await createLine(data.project.id, n))) : await findOrCreateCharacter(data.project.id, n)
-    if (!selected.includes(created.id)) await toggleSceneRef(sceneId, field, created.id)
+    await undoable(label, async () => {
+      const created =
+        field === 'lineIds' ? (existingLine ?? (await createLine(data.project.id, n))) : await findOrCreateCharacter(data.project.id, n)
+      if (!selected.includes(created.id)) await toggleSceneRef(sceneId, field, created.id)
+    })
   }
   return (
     <div className="chips">
@@ -44,7 +48,7 @@ export function RefChips({
                 void (field === 'lineIds' ? patch<Line>('lines', it.id, { color }) : patch<Character>('characters', it.id, { color }))
               }
             />
-            <button className={`ref-chip ${on ? 'on' : ''}`} style={{ '--c': it.color } as React.CSSProperties} onClick={() => void toggleSceneRef(sceneId, field, it.id)}>
+            <button className={`ref-chip ${on ? 'on' : ''}`} style={{ '--c': it.color } as React.CSSProperties} onClick={() => void undoable(label, () => toggleSceneRef(sceneId, field, it.id))}>
               {it.name}
             </button>
           </span>
