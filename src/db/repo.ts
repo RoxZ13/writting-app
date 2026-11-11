@@ -29,27 +29,42 @@ export function setWriteRecorder(fn: WriteRecorder | null) {
 }
 
 /** Write a record locally and queue it for sync. All app writes go through here. */
-export async function save<T extends Base>(table: SyncedTable, record: T): Promise<T> {
-  let next = { ...record, updatedAt: Date.now() }
+async function write<T extends Base>(
+  table: SyncedTable,
+  id: string,
+  compose: (current: T | undefined) => T | undefined,
+): Promise<T | undefined> {
   // Captured now: a write that starts inside an action belongs to that action, even if it ends later.
   const rec = recorder
   let before: Base | undefined
+  let next: T | undefined
   await db.transaction('rw', db.table(table), db.outbox, db.meta, async () => {
-    const current = (await db.table(table).get(next.id)) as Base | undefined
+    const current = (await db.table(table).get(id)) as T | undefined
+    const candidate = compose(current)
+    if (!candidate) return
     if (rec) before = current
-    next = { ...next, ...(await nextRevision(current ?? record)) }
+    next = {
+      ...candidate,
+      updatedAt: Date.now(),
+      ...(await nextRevision(current ?? candidate)),
+    }
     await db.table(table).put(next)
-    await db.outbox.put({ key: `${table}:${next.id}`, table, id: next.id })
+    await db.outbox.put({ key: `${table}:${id}`, table, id })
   })
+  if (!next) return
   rec?.(table, before, next)
   notifyChange()
   return next
 }
 
+/** Replace a whole record. Prefer patch() when only some fields changed. */
+export async function save<T extends Base>(table: SyncedTable, record: T): Promise<T> {
+  return (await write<T>(table, record.id, () => record))!
+}
+
+/** Merge fields into the freshest stored record in the same transaction as the write. */
 export async function patch<T extends Base>(table: SyncedTable, id: string, changes: Partial<T>) {
-  const current = (await db.table(table).get(id)) as T | undefined
-  if (!current) return
-  return save(table, { ...current, ...changes })
+  return write<T>(table, id, (current) => current && { ...current, ...changes })
 }
 
 export async function remove(table: SyncedTable, id: string) {
@@ -68,15 +83,22 @@ export function notifyChange() {
 
 export const alive = <T extends Base>(rows: T[]) => rows.filter((r) => !r.deleted)
 
+/** Keep multi-record domain operations all-or-nothing, including their outbox and revision writes. */
+function atomic<T>(tables: SyncedTable[], action: () => Promise<T>): Promise<T> {
+  return db.transaction('rw', [...tables.map((table) => db.table(table)), db.outbox, db.meta], action)
+}
+
 // ---------- projects ----------
 
 export async function createProject(title: string): Promise<Project> {
-  const now = Date.now()
-  const project = await save<Project>('projects', { id: uid(), title, createdAt: now, updatedAt: now })
-  const chapter = await createChapter(project.id, 'Глава 1')
-  const scene = await createScene(project.id, chapter.id, 'Первая сцена')
-  await patch<Project>('projects', project.id, { lastSceneId: scene.id })
-  return project
+  return atomic(['projects', 'chapters', 'scenes', 'texts'], async () => {
+    const now = Date.now()
+    const project = await save<Project>('projects', { id: uid(), title, createdAt: now, updatedAt: now })
+    const chapter = await createChapter(project.id, 'Глава 1')
+    const scene = await createScene(project.id, chapter.id, 'Первая сцена')
+    await patch<Project>('projects', project.id, { lastSceneId: scene.id })
+    return project
+  })
 }
 
 // ---------- chapters ----------
@@ -97,12 +119,14 @@ export async function ensurePool(projectId: string): Promise<Chapter> {
 }
 
 export async function deleteChapter(id: string) {
-  const scenes = await db.scenes.where('chapterId').equals(id).toArray()
-  for (const s of scenes) {
-    await remove('scenes', s.id)
-    await remove('texts', s.id)
-  }
-  await remove('chapters', id)
+  return atomic(['chapters', 'scenes', 'texts'], async () => {
+    const scenes = await db.scenes.where('chapterId').equals(id).toArray()
+    for (const s of scenes) {
+      await remove('scenes', s.id)
+      await remove('texts', s.id)
+    }
+    await remove('chapters', id)
+  })
 }
 
 // ---------- scenes ----------
@@ -115,41 +139,47 @@ export async function createScene(
   content: unknown = emptyDoc(),
   wordCount = 0,
 ): Promise<Scene> {
-  const siblings = alive(await db.scenes.where('chapterId').equals(chapterId).toArray())
-  const order = siblings.length ? Math.max(...siblings.map((s) => s.order)) + 1 : 0
-  const scene = await save<Scene>('scenes', {
-    id: uid(),
-    projectId,
-    chapterId,
-    title,
-    order,
-    status: 'idea',
-    goal: '',
-    beats: [],
-    wordCount,
-    charCount: docCharCount(content),
-    updatedAt: 0,
-    ...extra,
+  return atomic(['scenes', 'texts'], async () => {
+    const siblings = alive(await db.scenes.where('chapterId').equals(chapterId).toArray())
+    const order = siblings.length ? Math.max(...siblings.map((s) => s.order)) + 1 : 0
+    const scene = await save<Scene>('scenes', {
+      id: uid(),
+      projectId,
+      chapterId,
+      title,
+      order,
+      status: 'idea',
+      goal: '',
+      beats: [],
+      wordCount,
+      charCount: docCharCount(content),
+      updatedAt: 0,
+      ...extra,
+    })
+    await save<SceneText>('texts', { id: scene.id, projectId, content, wordCount, updatedAt: 0 })
+    return scene
   })
-  await save<SceneText>('texts', { id: scene.id, projectId, content, wordCount, updatedAt: 0 })
-  return scene
 }
 
 /** Persist a new order (and possibly new chapter) for a list of scenes. */
 export async function reorderScenes(chapterId: string, sceneIds: string[]) {
-  for (const [i, id] of sceneIds.entries()) {
-    const s = await db.scenes.get(id)
-    if (s && (s.order !== i || s.chapterId !== chapterId)) {
-      await save<Scene>('scenes', { ...s, order: i, chapterId })
+  return atomic(['scenes'], async () => {
+    for (const [i, id] of sceneIds.entries()) {
+      const s = await db.scenes.get(id)
+      if (s && (s.order !== i || s.chapterId !== chapterId)) {
+        await save<Scene>('scenes', { ...s, order: i, chapterId })
+      }
     }
-  }
+  })
 }
 
 export async function reorderChapters(ids: string[]) {
-  for (const [i, id] of ids.entries()) {
-    const c = await db.chapters.get(id)
-    if (c && c.order !== i) await save<Chapter>('chapters', { ...c, order: i })
-  }
+  return atomic(['chapters'], async () => {
+    for (const [i, id] of ids.entries()) {
+      const c = await db.chapters.get(id)
+      if (c && c.order !== i) await save<Chapter>('chapters', { ...c, order: i })
+    }
+  })
 }
 
 export async function snapshotScene(text: SceneText, reason: string) {
@@ -216,24 +246,26 @@ export type OutlineItem = { type: 'chapter'; id: string } | { type: 'scene'; id:
  * Only records whose chapter or position actually changed are written.
  */
 export async function applyOutline(items: OutlineItem[]) {
-  let chapterOrder = 0
-  let sceneOrder = 0
-  let chapterId: string | undefined
-  for (const item of items) {
-    if (item.type === 'chapter') {
-      chapterId = item.id
-      sceneOrder = 0
-      const c = await db.chapters.get(item.id)
-      if (c && c.order !== chapterOrder) await save<Chapter>('chapters', { ...c, order: chapterOrder })
-      chapterOrder++
-    } else if (chapterId) {
-      const s = await db.scenes.get(item.id)
-      if (s && (s.order !== sceneOrder || s.chapterId !== chapterId)) {
-        await save<Scene>('scenes', { ...s, order: sceneOrder, chapterId })
+  return atomic(['chapters', 'scenes'], async () => {
+    let chapterOrder = 0
+    let sceneOrder = 0
+    let chapterId: string | undefined
+    for (const item of items) {
+      if (item.type === 'chapter') {
+        chapterId = item.id
+        sceneOrder = 0
+        const c = await db.chapters.get(item.id)
+        if (c && c.order !== chapterOrder) await save<Chapter>('chapters', { ...c, order: chapterOrder })
+        chapterOrder++
+      } else if (chapterId) {
+        const s = await db.scenes.get(item.id)
+        if (s && (s.order !== sceneOrder || s.chapterId !== chapterId)) {
+          await save<Scene>('scenes', { ...s, order: sceneOrder, chapterId })
+        }
+        sceneOrder++
       }
-      sceneOrder++
     }
-  }
+  })
 }
 
 async function outlineOf(projectId: string): Promise<OutlineItem[]> {
@@ -253,26 +285,30 @@ async function outlineOf(projectId: string): Promise<OutlineItem[]> {
 
 /** Start a new chapter at this scene: it and every scene after it in its chapter move to the new chapter. */
 export async function splitChapterAt(sceneId: string, title: string): Promise<Chapter | undefined> {
-  const scene = await db.scenes.get(sceneId)
-  if (!scene) return
-  const chapter = await createChapter(scene.projectId, title, 1e6)
-  const items = (await outlineOf(scene.projectId)).filter((i) => i.id !== chapter.id)
-  const at = items.findIndex((i) => i.id === sceneId)
-  items.splice(at, 0, { type: 'chapter', id: chapter.id })
-  await applyOutline(items)
-  return chapter
+  return atomic(['chapters', 'scenes'], async () => {
+    const scene = await db.scenes.get(sceneId)
+    if (!scene) return
+    const chapter = await createChapter(scene.projectId, title, 1e6)
+    const items = (await outlineOf(scene.projectId)).filter((i) => i.id !== chapter.id)
+    const at = items.findIndex((i) => i.id === sceneId)
+    items.splice(at, 0, { type: 'chapter', id: chapter.id })
+    await applyOutline(items)
+    return chapter
+  })
 }
 
 /** Append this chapter's scenes to the previous chapter and delete the now-empty chapter. */
 export async function mergeIntoPrevious(chapterId: string) {
-  const chapter = await db.chapters.get(chapterId)
-  if (!chapter) return
-  const items = await outlineOf(chapter.projectId)
-  const at = items.findIndex((i) => i.id === chapterId)
-  if (at <= 0) return
-  items.splice(at, 1)
-  await applyOutline(items)
-  await remove('chapters', chapterId)
+  return atomic(['chapters', 'scenes'], async () => {
+    const chapter = await db.chapters.get(chapterId)
+    if (!chapter) return
+    const items = await outlineOf(chapter.projectId)
+    const at = items.findIndex((i) => i.id === chapterId)
+    if (at <= 0) return
+    items.splice(at, 1)
+    await applyOutline(items)
+    await remove('chapters', chapterId)
+  })
 }
 
 // ---------- lines & characters ----------
@@ -321,59 +357,63 @@ export async function toggleSceneRef(sceneId: string, field: 'lineIds' | 'charac
 
 /** Move a scene to a chapter at a position (board drag and drop). */
 export async function moveScene(sceneId: string, chapterId: string, index: number) {
-  const scene = await db.scenes.get(sceneId)
-  if (!scene) return
-  // Moved in reading order, the scene leaves its moment of story time; whoever shared it stays put.
-  if (scene.together) await save<Scene>('scenes', { ...scene, together: undefined })
-  else {
-    const old = alive(await db.scenes.where('chapterId').equals(scene.chapterId).toArray()).sort((a, b) => a.order - b.order)
-    const next = old[old.findIndex((s) => s.id === sceneId) + 1]
-    if (next?.together) await save<Scene>('scenes', { ...next, together: undefined })
-  }
-  const siblings = alive(await db.scenes.where('chapterId').equals(chapterId).toArray())
-    .filter((s) => s.id !== sceneId)
-    .sort((a, b) => a.order - b.order)
-  siblings.splice(Math.max(0, Math.min(index, siblings.length)), 0, scene)
-  await reorderScenes(chapterId, siblings.map((s) => s.id))
+  return atomic(['scenes'], async () => {
+    const scene = await db.scenes.get(sceneId)
+    if (!scene) return
+    // Moved in reading order, the scene leaves its moment of story time; whoever shared it stays put.
+    if (scene.together) await save<Scene>('scenes', { ...scene, together: undefined })
+    else {
+      const old = alive(await db.scenes.where('chapterId').equals(scene.chapterId).toArray()).sort((a, b) => a.order - b.order)
+      const next = old[old.findIndex((s) => s.id === sceneId) + 1]
+      if (next?.together) await save<Scene>('scenes', { ...next, together: undefined })
+    }
+    const siblings = alive(await db.scenes.where('chapterId').equals(chapterId).toArray())
+      .filter((s) => s.id !== sceneId)
+      .sort((a, b) => a.order - b.order)
+    siblings.splice(Math.max(0, Math.min(index, siblings.length)), 0, scene)
+    await reorderScenes(chapterId, siblings.map((s) => s.id))
+  })
 }
 
 /** Glue a scene onto the end of the previous scene in its chapter (for "***" that was only a pause). */
 export async function mergeSceneIntoPrevious(sceneId: string): Promise<string | undefined> {
-  const scene = await db.scenes.get(sceneId)
-  if (!scene) return
-  const siblings = alive(await db.scenes.where('chapterId').equals(scene.chapterId).toArray()).sort((a, b) => a.order - b.order)
-  const prev = siblings[siblings.indexOf(siblings.find((s) => s.id === sceneId)!) - 1]
-  if (!prev) return
-  const [a, b] = await Promise.all([db.texts.get(prev.id), db.texts.get(sceneId)])
-  const content = {
-    type: 'doc',
-    content: [
-      ...(((a?.content as { content?: unknown[] })?.content ?? []) as unknown[]),
-      ...(((b?.content as { content?: unknown[] })?.content ?? []) as unknown[]),
-    ],
-  }
-  const wordCount = (a?.wordCount ?? 0) + (b?.wordCount ?? 0)
-  if (a) await save<SceneText>('texts', { ...a, content, wordCount })
-  await save<Scene>('scenes', {
-    ...prev,
-    wordCount,
-    charCount: (prev.charCount ?? 0) + (scene.charCount ?? 0),
-    beats: [...prev.beats, ...scene.beats],
-    lineIds: [...new Set([...(prev.lineIds ?? []), ...(scene.lineIds ?? [])])],
-    characterIds: [...new Set([...(prev.characterIds ?? []), ...(scene.characterIds ?? [])])],
-  })
-  for (const m of alive(await db.markers.where('projectId').equals(scene.projectId).toArray())) {
-    if (m.setupSceneId === sceneId || m.payoffSceneId === sceneId) {
-      await save<Marker>('markers', {
-        ...m,
-        setupSceneId: m.setupSceneId === sceneId ? prev.id : m.setupSceneId,
-        payoffSceneId: m.payoffSceneId === sceneId ? prev.id : m.payoffSceneId,
-      })
+  return atomic(['scenes', 'texts', 'markers'], async () => {
+    const scene = await db.scenes.get(sceneId)
+    if (!scene) return
+    const siblings = alive(await db.scenes.where('chapterId').equals(scene.chapterId).toArray()).sort((a, b) => a.order - b.order)
+    const prev = siblings[siblings.indexOf(siblings.find((s) => s.id === sceneId)!) - 1]
+    if (!prev) return
+    const [a, b] = await Promise.all([db.texts.get(prev.id), db.texts.get(sceneId)])
+    const content = {
+      type: 'doc',
+      content: [
+        ...(((a?.content as { content?: unknown[] })?.content ?? []) as unknown[]),
+        ...(((b?.content as { content?: unknown[] })?.content ?? []) as unknown[]),
+      ],
     }
-  }
-  await remove('scenes', sceneId)
-  await remove('texts', sceneId)
-  return prev.id
+    const wordCount = (a?.wordCount ?? 0) + (b?.wordCount ?? 0)
+    if (a) await save<SceneText>('texts', { ...a, content, wordCount })
+    await save<Scene>('scenes', {
+      ...prev,
+      wordCount,
+      charCount: (prev.charCount ?? 0) + (scene.charCount ?? 0),
+      beats: [...prev.beats, ...scene.beats],
+      lineIds: [...new Set([...(prev.lineIds ?? []), ...(scene.lineIds ?? [])])],
+      characterIds: [...new Set([...(prev.characterIds ?? []), ...(scene.characterIds ?? [])])],
+    })
+    for (const m of alive(await db.markers.where('projectId').equals(scene.projectId).toArray())) {
+      if (m.setupSceneId === sceneId || m.payoffSceneId === sceneId) {
+        await save<Marker>('markers', {
+          ...m,
+          setupSceneId: m.setupSceneId === sceneId ? prev.id : m.setupSceneId,
+          payoffSceneId: m.payoffSceneId === sceneId ? prev.id : m.payoffSceneId,
+        })
+      }
+    }
+    await remove('scenes', sceneId)
+    await remove('texts', sceneId)
+    return prev.id
+  })
 }
 
 /**
@@ -381,19 +421,21 @@ export async function mergeSceneIntoPrevious(sceneId: string): Promise<string | 
  * are appended, and the duplicate is removed.
  */
 export async function mergeCharacters(fromId: string, intoId: string) {
-  if (fromId === intoId) return
-  const [from, into] = await Promise.all([db.characters.get(fromId), db.characters.get(intoId)])
-  if (!from || !into) return
-  const swap = (ids?: string[]) => (ids?.includes(fromId) ? [...new Set(ids.map((x) => (x === fromId ? intoId : x)))] : ids)
-  for (const s of alive(await db.scenes.where('projectId').equals(from.projectId).toArray())) {
-    if (s.characterIds?.includes(fromId)) await save<Scene>('scenes', { ...s, characterIds: swap(s.characterIds) })
-  }
-  for (const n of alive(await db.notes.toArray())) {
-    if (n.characterIds?.includes(fromId)) await save<Note>('notes', { ...n, characterIds: swap(n.characterIds) })
-  }
-  const about = [into.about, from.about].map((x) => x.trim()).filter(Boolean).join('\n\n')
-  await save<Character>('characters', { ...into, about })
-  await remove('characters', fromId)
+  return atomic(['characters', 'scenes', 'notes'], async () => {
+    if (fromId === intoId) return
+    const [from, into] = await Promise.all([db.characters.get(fromId), db.characters.get(intoId)])
+    if (!from || !into) return
+    const swap = (ids?: string[]) => (ids?.includes(fromId) ? [...new Set(ids.map((x) => (x === fromId ? intoId : x)))] : ids)
+    for (const s of alive(await db.scenes.where('projectId').equals(from.projectId).toArray())) {
+      if (s.characterIds?.includes(fromId)) await save<Scene>('scenes', { ...s, characterIds: swap(s.characterIds) })
+    }
+    for (const n of alive(await db.notes.toArray())) {
+      if (n.characterIds?.includes(fromId)) await save<Note>('notes', { ...n, characterIds: swap(n.characterIds) })
+    }
+    const about = [into.about, from.about].map((x) => x.trim()).filter(Boolean).join('\n\n')
+    await save<Character>('characters', { ...into, about })
+    await remove('characters', fromId)
+  })
 }
 
 /**
