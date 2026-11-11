@@ -8,7 +8,7 @@ import {
   syncNow,
   type SyncStatus,
 } from '../db/cloud'
-import { downloadBackup, readBackupFile, restoreBackup } from '../lib/backup'
+import { backupSummary, downloadBackup, readBackupFile, restoreBackup } from '../lib/backup'
 import { FilePick, toast } from '../lib/ui'
 import { ACCENTS, applyAccent, applyTheme, getAccent, getBoardLayout, getTheme, setBoardLayout, type Accent, type BoardLayout, type Theme } from '../lib/session'
 import { TypoControls } from '../components/TypoControls'
@@ -28,7 +28,8 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
   const restore = async (file: File) => {
     try {
       const dump = await readBackupFile(file)
-      if (!confirm('Вернуть из копии? Добавится всё, чего нет на этом устройстве, и обновится то, что в копии новее. Ничего не удаляется.')) return
+      const summary = backupSummary(dump)
+      if (!confirm(`В копии: историй — ${summary.projects}, записей — ${summary.records}. Вернуть её? Добавится всё, чего нет на этом устройстве, и обновится то, что в копии новее. Ничего не удаляется.`)) return
       const { added, updated } = await restoreBackup(dump)
       toast(added + updated ? `Готово: добавлено ${added}, обновлено ${updated}` : 'На устройстве уже всё есть — ничего не поменялось')
     } catch (e) {

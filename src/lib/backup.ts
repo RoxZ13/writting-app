@@ -8,19 +8,33 @@ const LAST_KEY = 'manuscript.backup.last'
 const SNOOZE_KEY = 'manuscript.backup.snooze'
 const FIRST_KEY = 'manuscript.backup.first'
 const DAY = 86400000
+const MAX_BACKUP_BYTES = 50 * 1024 * 1024
+const MAX_BACKUP_RECORDS = 1_000_000
+const BACKUP_FORMAT = 'manuscript-backup'
+const BACKUP_VERSION = 2
 
 export type Backup = Record<string, Base[]>
 export type SyncBase = Partial<Record<SyncedTable, Record<string, string | number>>>
+interface BackupDocument {
+  format: typeof BACKUP_FORMAT
+  version: number
+  createdAt: string
+  tables: Backup
+}
 
 export async function makeBackup(): Promise<Backup> {
   const dump: Backup = {}
-  for (const t of SYNCED_TABLES) dump[t] = (await db.table(t).toArray()) as Base[]
+  const tables = SYNCED_TABLES.map((t) => db.table(t))
+  await db.transaction('r', tables, async () => {
+    for (const t of SYNCED_TABLES) dump[t] = (await db.table(t).toArray()) as Base[]
+  })
   return dump
 }
 
 export async function downloadBackup() {
   const dump = await makeBackup()
-  download(new Blob([JSON.stringify(dump)], { type: 'application/json' }), `manuscript-backup-${new Date().toISOString().slice(0, 10)}.json`)
+  const document: BackupDocument = { format: BACKUP_FORMAT, version: BACKUP_VERSION, createdAt: new Date().toISOString(), tables: dump }
+  download(new Blob([JSON.stringify(document)], { type: 'application/json' }), `manuscript-backup-${new Date().toISOString().slice(0, 10)}.json`)
   try {
     localStorage.setItem(LAST_KEY, String(Date.now()))
   } catch {
@@ -172,10 +186,60 @@ export function mergeSyncedBackup(dump: Backup, base: SyncBase): Promise<{ added
   return mergeBackup(dump, { revive: false, base })
 }
 
+export function parseBackupText(text: string): Backup {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(text)
+  } catch {
+    throw new Error('Файл повреждён: не получилось прочитать JSON')
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) throw new Error('Это не копия Manuscript')
+  const object = parsed as Record<string, unknown>
+  let data: unknown = parsed
+  if (object.format === BACKUP_FORMAT) {
+    if (!Number.isInteger(object.version) || (object.version as number) < 1) throw new Error('У копии нет корректной версии')
+    if ((object.version as number) > BACKUP_VERSION) throw new Error('Копия создана более новой версией Manuscript. Сначала обнови приложение.')
+    data = object.tables
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Это не копия Manuscript')
+  const dump = data as Record<string, unknown>
+  if (!Array.isArray(dump.projects)) throw new Error('Это не копия Manuscript: нет списка историй')
+  let records = 0
+  for (const table of SYNCED_TABLES) {
+    const rows = dump[table]
+    if (rows === undefined) continue // old backups did not yet have newer tables
+    if (!Array.isArray(rows)) throw new Error(`Копия повреждена: раздел «${table}» имеет неверный формат`)
+    records += rows.length
+    if (records > MAX_BACKUP_RECORDS) throw new Error('Копия слишком большая: в ней подозрительно много записей')
+    const ids = new Set<string>()
+    for (const row of rows) {
+      if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error(`Копия повреждена: неверная запись в разделе «${table}»`)
+      const base = row as Record<string, unknown>
+      if (typeof base.id !== 'string' || !base.id) throw new Error(`Копия повреждена: у записи в разделе «${table}» нет id`)
+      if (ids.has(base.id)) throw new Error(`Копия повреждена: запись «${base.id}» повторяется в разделе «${table}»`)
+      ids.add(base.id)
+      if (typeof base.updatedAt !== 'number' || !Number.isFinite(base.updatedAt)) throw new Error(`Копия повреждена: у записи «${base.id}» нет даты изменения`)
+      if (base.syncRev !== undefined && typeof base.syncRev !== 'string') throw new Error(`Копия повреждена: неверная версия записи «${base.id}»`)
+      if (base.syncVersion !== undefined) {
+        if (!base.syncVersion || typeof base.syncVersion !== 'object' || Array.isArray(base.syncVersion)) throw new Error(`Копия повреждена: неверные часы записи «${base.id}»`)
+        for (const value of Object.values(base.syncVersion as Record<string, unknown>)) {
+          if (!Number.isSafeInteger(value) || (value as number) < 0) throw new Error(`Копия повреждена: неверные часы записи «${base.id}»`)
+        }
+      }
+    }
+  }
+  return dump as Backup
+}
+
 export async function readBackupFile(file: File): Promise<Backup> {
-  const data = JSON.parse(await file.text())
-  if (!data || typeof data !== 'object' || !Array.isArray(data.projects)) throw new Error('Это не копия Manuscript')
-  return data as Backup
+  if (file.size > MAX_BACKUP_BYTES) throw new Error('Копия больше 50 МБ. Открой её на компьютере или раздели после проверки.')
+  return parseBackupText(await file.text())
+}
+
+export function backupSummary(dump: Backup) {
+  const projects = (dump.projects ?? []).filter((row) => !row.deleted).length
+  const records = SYNCED_TABLES.reduce((sum, table) => sum + (Array.isArray(dump[table]) ? dump[table].length : 0), 0)
+  return { projects, records }
 }
 
 /** Days since the last backup on this device, when it is time to remind; null when not. */
