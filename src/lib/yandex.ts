@@ -1,5 +1,6 @@
 import type { Backup } from './backup'
 import type { FileStore } from './filesync'
+import { previewCloudError, remoteSyncAllowed } from './environment'
 
 /**
  * Яндекс Диск as a sync store. The app sees only its own folder «Приложения/Manuscript» on the
@@ -63,6 +64,7 @@ interface Token {
   expiresAt: number
 }
 export function getYandexToken(): Token | null {
+  if (!remoteSyncAllowed()) return null
   try {
     const t = JSON.parse(localStorage.getItem(TOKEN_KEY) ?? 'null') as Token | null
     return t && t.expiresAt > Date.now() ? t : null
@@ -83,6 +85,7 @@ export const yandexRedirectUri = () => `${location.origin}${location.pathname}`
 
 /** Off to Yandex's sign-in page; it comes back with the token in the address. */
 export function connectYandex() {
+  if (!remoteSyncAllowed()) throw previewCloudError()
   const id = getYandexClientId()
   if (!id) throw new Error('Подключение к Яндекс Диску ещё не настроено')
   // A fresh random state per sign-in: only a redirect that carries it back is ours (blocks login CSRF).
@@ -103,6 +106,7 @@ export function connectYandex() {
  * Returns true when a fresh sign-in came in (Settings then opens to show it worked).
  */
 export function takeYandexRedirect(): boolean {
+  if (!remoteSyncAllowed()) return false
   const hash = location.hash.replace(/^#/, '')
   if (!hash.includes('access_token=') && !hash.includes('error=')) return false
   const p = new URLSearchParams(hash)

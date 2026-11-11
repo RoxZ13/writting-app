@@ -14,6 +14,7 @@ import { ACCENTS, applyAccent, applyTheme, getAccent, getBoardLayout, getTheme, 
 import { TypoControls } from '../components/TypoControls'
 import { CloudDisks } from '../components/CloudDisks'
 import { timeAgo } from '../lib/status'
+import { remoteSyncAllowed } from '../lib/environment'
 
 /** Settings of the app itself (not of a book): look, devices, installing, backup. */
 export function SettingsView({ sync }: { sync: SyncStatus }) {
@@ -114,10 +115,20 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
         </div>
       </section>
 
-      <CloudDisks />
-
-      {/* The old Supabase sync: shown only where it was set up, so it does not stand next to the Disk as a second «Устройства». */}
-      {getCloudConfig() && <SyncSection sync={sync} />}
+      {remoteSyncAllowed() ? (
+        <>
+          <CloudDisks />
+          {/* The old Supabase sync: shown only where it was set up, so it does not stand next to the Disk as a second «Устройства». */}
+          {getCloudConfig() && <SyncSection sync={sync} />}
+        </>
+      ) : (
+        <section className="card settings-section stack">
+          <h3>Тестовая версия</h3>
+          <div className="small muted">
+            Облачная синхронизация здесь отключена. Эта версия работает только со своей тестовой базой и не может читать или менять основные книги.
+          </div>
+        </section>
+      )}
 
       <section className="card settings-section stack">
         <h3>Установить как приложение</h3>
@@ -151,7 +162,7 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
         </div>
       </section>
       <div className="small muted app-version">
-        {__PREVIEW__ ? 'Тестовая версия · свои данные, книги из основной сюда не попадают · ' : ''}
+        {__PREVIEW__ ? 'Тестовая версия · облако отключено · ' : ''}
         Версия от {new Date(__BUILD__).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
       </div>
     </div>

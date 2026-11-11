@@ -1,6 +1,7 @@
 import { makeBackup, mergeSyncedBackup, type Backup } from './backup'
 import { db } from '../db/db'
 import { onLocalChange } from '../db/repo'
+import { remoteSyncAllowed } from './environment'
 
 const BASE_KEY = 'filesync.base'
 
@@ -77,6 +78,7 @@ let stopLocal: (() => void) | undefined
 
 /** Sync now (or join the round already running). */
 export function syncNow(): Promise<void> {
+  if (!remoteSyncAllowed()) return Promise.resolve()
   if (!store) return Promise.resolve()
   if (running) return running
   const s = store
@@ -97,6 +99,10 @@ export function syncNow(): Promise<void> {
 
 /** Start syncing with a store: now, half a minute after each change, on return to the app and when the network is back. */
 export function startFileSync(s: FileStore) {
+  if (!remoteSyncAllowed()) {
+    setState({ state: 'off' })
+    return
+  }
   stopFileSync()
   store = s
   void syncNow()

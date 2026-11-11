@@ -21,6 +21,7 @@ import { HelpView } from './views/HelpView'
 import { LoreView } from './views/LoreView'
 import { backupDue, downloadBackup, snoozeBackup } from './lib/backup'
 import { clearHistory } from './lib/undo'
+import { remoteSyncAllowed } from './lib/environment'
 
 const TABS: { view: Route['view']; label: string; ico: string }[] = [
   { view: 'text', label: 'Текст', ico: 'pen' },
@@ -50,7 +51,7 @@ export function App() {
   }, [projects])
 
   useEffect(() => {
-    startCloudSync()
+    if (remoteSyncAllowed()) startCloudSync()
     return onSyncStatus(setSync)
   }, [])
 

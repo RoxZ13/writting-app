@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { db } from './db'
 import { onLocalChange } from './repo'
 import { queueEverything, resetSyncCursor, syncOnce, type Remote, type RemoteRow } from './sync'
+import { previewCloudError, remoteSyncAllowed } from '../lib/environment'
 
 const TABLE = 'manuscript_records'
 const CONFIG_KEY = 'manuscript.cloud'
@@ -31,6 +32,7 @@ export function setCloudConfig(cfg: CloudConfig | null) {
 
 let client: SupabaseClient | null = null
 export async function getClient(): Promise<SupabaseClient | null> {
+  if (!remoteSyncAllowed()) return null
   const cfg = getCloudConfig()
   if (!cfg) return null
   if (!client) {
@@ -94,6 +96,7 @@ let running = false
 let again = false
 
 export async function syncNow() {
+  if (!remoteSyncAllowed()) return setStatus({ state: 'off' })
   if (running) {
     again = true
     return
@@ -127,6 +130,7 @@ function scheduleSync(delay = 4000) {
 
 let started = false
 export function startCloudSync() {
+  if (!remoteSyncAllowed()) return
   if (started) return
   started = true
   onLocalChange(() => scheduleSync())
@@ -142,6 +146,7 @@ export function startCloudSync() {
 
 /** Returns 'confirm' when the account was created but the email still has to be confirmed. */
 export async function signIn(email: string, password: string, createAccount: boolean): Promise<'ok' | 'confirm'> {
+  if (!remoteSyncAllowed()) throw previewCloudError()
   const sb = await getClient()
   if (!sb) throw new Error('Облако не настроено')
   const { data, error } = createAccount

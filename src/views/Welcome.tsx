@@ -6,6 +6,7 @@ import { SyncSection } from './SettingsView'
 import { CloudDisks } from '../components/CloudDisks'
 import { readBackupFile, restoreBackup } from '../lib/backup'
 import { FilePick, toast } from '../lib/ui'
+import { remoteSyncAllowed } from '../lib/environment'
 
 export function Welcome({ onCreated, sync }: { onCreated: (id: string, view: 'text' | 'board') => void; sync: SyncStatus }) {
   const [cloud, setCloud] = useState(false)
@@ -55,12 +56,16 @@ export function Welcome({ onCreated, sync }: { onCreated: (id: string, view: 'te
             >
               Вернуть из копии
             </FilePick>
-            <button className="link-plain" onClick={() => setCloud(!cloud)}>
-              Уже пишу на другом устройстве
-            </button>
+            {remoteSyncAllowed() ? (
+              <button className="link-plain" onClick={() => setCloud(!cloud)}>
+                Уже пишу на другом устройстве
+              </button>
+            ) : (
+              <span className="small muted">Тестовая версия — облако отключено</span>
+            )}
           </div>
           {/* Another device already holds the stories: they come from the author's own Disk. */}
-          {cloud && (
+          {remoteSyncAllowed() && cloud && (
             <>
               <CloudDisks />
               {getCloudConfig() && <SyncSection sync={sync} />}
