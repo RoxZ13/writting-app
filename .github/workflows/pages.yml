@@ -8,7 +8,7 @@ on:
     inputs:
       preview:
         description: Branch to publish as the test version under /preview/
-        default: claude/writer-app-adhd-tmceif
+        default: main
 
 permissions:
   contents: read
@@ -45,11 +45,9 @@ jobs:
         # A broken work branch must never stop the main version from going up.
         continue-on-error: true
         env:
-          BRANCH: ${{ inputs.preview || 'claude/writer-app-adhd-tmceif' }}
+          BRANCH: ${{ inputs.preview || 'main' }}
           BASE_PATH: /${{ github.event.repository.name }}/preview/
           VITE_DB_NAME: manuscript-preview
-          VITE_YANDEX_CLIENT_ID: ${{ vars.VITE_YANDEX_CLIENT_ID }}
-          VITE_YANDEX_PROXY_URL: ${{ vars.VITE_YANDEX_PROXY_URL }}
         run: |
           if ! git fetch --depth=1 origin "$BRANCH"; then echo "No branch $BRANCH, no test version"; exit 0; fi
           git worktree add ../preview FETCH_HEAD
