@@ -17,14 +17,18 @@ import { timeAgo } from '../lib/status'
 import { remoteSyncAllowed } from '../lib/environment'
 import { getYandexToken } from '../lib/yandex'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '../db/db'
+import { db, type SyncConflict } from '../db/db'
+import { conflictChanges, dismissConflict, restoreConflict } from '../lib/conflicts'
 
 /** Settings of the app itself (not of a book): look, devices, installing, backup. */
 export function SettingsView({ sync }: { sync: SyncStatus }) {
   const [theme, setTheme] = useState<Theme>(getTheme)
   const [board, setBoard] = useState<BoardLayout>(getBoardLayout)
   const [accent, setAccent] = useState<Accent>(getAccent)
-  const conflictCount = useLiveQuery(() => db.conflicts.count(), []) ?? 0
+  const conflicts = useLiveQuery(
+    () => db.conflicts.filter((conflict) => !conflict.deleted).toArray().then((rows) => rows.sort((a, b) => b.createdAt - a.createdAt)),
+    [],
+  ) ?? []
   const restore = async (file: File) => {
     try {
       const dump = await readBackupFile(file)
@@ -135,18 +139,7 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
         </section>
       )}
 
-      {conflictCount > 0 && (
-        <section className="card settings-section stack">
-          <h3>Сохранены конфликтующие правки</h3>
-          <div className="small muted">
-            На разных устройствах одновременно меняли одни и те же названия, заметки или элементы плана. Manuscript выбрал одну версию, а остальные не удалил:
-            они находятся внутри полной резервной копии. Конфликтов: {conflictCount}.
-          </div>
-          <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void downloadBackup()}>
-            Скачать копию со всеми версиями
-          </button>
-        </section>
-      )}
+      {conflicts.length > 0 && <ConflictSection conflicts={conflicts} />}
 
       <section className="card settings-section stack">
         <h3>Установить как приложение</h3>
@@ -184,6 +177,119 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
         Версия от {new Date(__BUILD__).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
       </div>
     </div>
+  )
+}
+
+const TABLE_NAMES: Record<string, string> = {
+  projects: 'История',
+  chapters: 'Глава',
+  scenes: 'Сцена',
+  markers: 'Маячок',
+  notes: 'Заметка',
+  lines: 'Сюжетная линия',
+  characters: 'Персонаж',
+}
+
+const FIELD_NAMES: Record<string, string> = {
+  title: 'Название',
+  name: 'Имя',
+  text: 'Текст',
+  description: 'Описание',
+  goal: 'Цель',
+  order: 'Порядок',
+  chapterId: 'Глава',
+  status: 'Статус',
+  beats: 'План сцены',
+  note: 'Пояснение',
+  resolved: 'Состояние',
+  archived: 'Архив',
+  about: 'О персонаже',
+  aliases: 'Другие имена',
+  deleted: 'Удаление',
+}
+
+function rowName(conflict: SyncConflict) {
+  const rows = [conflict.winning, conflict.losing] as unknown as Array<Record<string, unknown>>
+  for (const row of rows) {
+    for (const field of ['title', 'name', 'text']) {
+      if (typeof row[field] === 'string' && row[field]) return String(row[field]).slice(0, 80)
+    }
+  }
+  return conflict.recordId.slice(0, 8)
+}
+
+function valueText(value: unknown): string {
+  if (value === undefined || value === null || value === '') return 'не задано'
+  if (typeof value === 'boolean') return value ? 'да' : 'нет'
+  if (typeof value === 'string' || typeof value === 'number') {
+    const text = String(value)
+    return text.length > 120 ? `${text.slice(0, 117)}…` : text
+  }
+  if (Array.isArray(value)) return value.length ? `${value.length} ${value.length === 1 ? 'элемент' : 'элемента'}` : 'пусто'
+  return 'изменено'
+}
+
+function ConflictSection({ conflicts }: { conflicts: SyncConflict[] }) {
+  const [busy, setBusy] = useState<string | null>(null)
+  const act = async (conflict: SyncConflict, restore: boolean) => {
+    const question = restore
+      ? 'Вернуть сохранённый вариант? Заменятся только поля, которые конфликтовали; более поздние правки остальных полей останутся.'
+      : 'Оставить текущий вариант и убрать этот конфликт из списка? Архив останется в резервных копиях.'
+    if (!confirm(question)) return
+    setBusy(conflict.id)
+    try {
+      if (restore) await restoreConflict(conflict)
+      else await dismissConflict(conflict)
+      toast(restore ? 'Сохранённый вариант возвращён' : 'Текущий вариант оставлен')
+    } catch (error) {
+      toast(error instanceof Error ? error.message : 'Не получилось обработать конфликт')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <section className="card settings-section stack conflict-section">
+      <h3>Сохранены конфликтующие правки</h3>
+      <div className="small muted">
+        На разных устройствах одновременно меняли одну запись. Manuscript выбрал текущий вариант, но сохранил второй. Проверьте {conflicts.length === 1 ? 'его' : `все ${conflicts.length}`}.
+      </div>
+      <div className="conflict-list">
+        {conflicts.map((conflict) => {
+          const changes = conflictChanges(conflict)
+          return (
+            <details className="conflict-item" key={conflict.id}>
+              <summary>
+                <span>
+                  <strong>{TABLE_NAMES[conflict.table] ?? 'Запись'}:</strong> {rowName(conflict)}
+                </span>
+                <span className="small muted">{new Date(conflict.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+              </summary>
+              <div className="conflict-fields small">
+                {changes.length ? changes.map((change) => (
+                  <div className="conflict-field" key={change.field}>
+                    <strong>{FIELD_NAMES[change.field] ?? change.field}</strong>
+                    <div><span className="muted">Выбрано Manuscript:</span> {valueText(change.winning)}</div>
+                    <div><span className="muted">Сохранено отдельно:</span> {valueText(change.losing)}</div>
+                  </div>
+                )) : <div className="muted">Различия относятся только к служебной версии записи.</div>}
+              </div>
+              <div className="row conflict-actions">
+                <button className="btn sm primary" disabled={busy === conflict.id || !changes.length} onClick={() => void act(conflict, true)}>
+                  Вернуть сохранённый вариант
+                </button>
+                <button className="btn sm ghost" disabled={busy === conflict.id} onClick={() => void act(conflict, false)}>
+                  Оставить текущий
+                </button>
+              </div>
+            </details>
+          )
+        })}
+      </div>
+      <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void downloadBackup()}>
+        Скачать копию со всеми версиями
+      </button>
+    </section>
   )
 }
 

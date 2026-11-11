@@ -101,7 +101,7 @@ export function syncNow(): Promise<void> {
       } else {
         await syncWithStore(s)
       }
-      const conflicts = await db.conflicts.count()
+      const conflicts = await db.conflicts.filter((conflict) => !conflict.deleted).count()
       setState({ state: 'ok', at: Date.now(), ...(conflicts ? { conflicts } : {}) })
     } catch (e) {
       setState({ state: 'error', message: e instanceof Error ? e.message : String(e) })

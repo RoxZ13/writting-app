@@ -1520,6 +1520,38 @@ details.menu > summary::-webkit-details-marker {
 .settings-section {
   margin-bottom: 20px;
 }
+.conflict-list {
+  display: grid;
+  gap: 8px;
+}
+.conflict-item {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+}
+.conflict-item > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+}
+.conflict-fields {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+}
+.conflict-field {
+  border-left: 2px solid var(--line-2);
+  padding-left: 10px;
+}
+.conflict-field > div {
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+}
+.conflict-actions {
+  flex-wrap: wrap;
+}
 .hr {
   height: 1px;
   background: var(--line);
