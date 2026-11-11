@@ -1,4 +1,5 @@
 import { db, SYNCED_TABLES, uid, type Base, type SceneText, type Snapshot, type SyncedTable } from './db'
+import { compareRows, nextRevision, revisionParts } from '../lib/revision'
 
 /**
  * Local-first sync. Every write lands in IndexedDB and in the outbox first, so the app
@@ -19,7 +20,8 @@ export interface RemoteRow {
 
 export interface Remote {
   pull(sinceSeq: number): Promise<RemoteRow[]>
-  push(rows: { id: string; kind: SyncedTable; data: Base; updated_at: number }[]): Promise<void>
+  /** Returns only rows the server actually accepted. A stale trigger may reject an upsert without an HTTP error. */
+  push(rows: { id: string; kind: SyncedTable; data: Base; updated_at: number }[]): Promise<{ id: string; kind: SyncedTable; updated_at: number }[]>
 }
 
 const CURSOR_KEY = 'sync.cursor'
@@ -35,16 +37,21 @@ export async function syncOnce(remote: Remote): Promise<{ pulled: number; pushed
     if (!SYNCED_TABLES.includes(row.kind)) continue
     const table = db.table(row.kind)
     const key = `${row.kind}:${row.id}`
-    await db.transaction('rw', table, db.outbox, db.snapshots, async () => {
+    await db.transaction('rw', table, db.outbox, db.snapshots, db.meta, async () => {
       const local = (await table.get(row.id)) as Base | undefined
       const dirty = !!(await db.outbox.get(key))
-      if (!local || !dirty) {
+      if (!local) {
         await table.put(row.data)
         return
       }
-      if (local.updatedAt >= row.updated_at) return // ours is newer; it will be pushed
+      const order = compareRows(local, row.data)
+      if (order >= 0) {
+        // Repair a stale server row even if this local record had already left the outbox.
+        if (order > 0) await db.outbox.put({ key, table: row.kind, id: row.id })
+        return
+      }
       // Remote wins. Keep unsynced local scene text so nothing typed is ever lost.
-      if (row.kind === 'texts') {
+      if (dirty && row.kind === 'texts') {
         const s = local as SceneText
         const remoteScene = row.data as SceneText
         if (JSON.stringify(s.content) !== JSON.stringify(remoteScene.content)) {
@@ -58,6 +65,7 @@ export async function syncOnce(remote: Remote): Promise<{ pulled: number; pushed
             reason: 'Версия с этого устройства (конфликт синхронизации)',
             createdAt: now,
             updatedAt: now,
+            ...(await nextRevision()),
           }
           await db.snapshots.put(snap)
           await db.outbox.put({ key: `snapshots:${snap.id}`, table: 'snapshots', id: snap.id })
@@ -73,21 +81,28 @@ export async function syncOnce(remote: Remote): Promise<{ pulled: number; pushed
   const payload: { id: string; kind: SyncedTable; data: Base; updated_at: number }[] = []
   for (const entry of outbox) {
     const data = (await db.table(entry.table).get(entry.id)) as Base | undefined
-    if (data) payload.push({ id: entry.id, kind: entry.table, data, updated_at: data.updatedAt })
+    if (data) payload.push({ id: entry.id, kind: entry.table, data, updated_at: revisionParts(data).clock })
   }
+  const accepted = new Map<string, number>()
   for (let i = 0; i < payload.length; i += 200) {
-    await remote.push(payload.slice(i, i + 200))
+    for (const row of await remote.push(payload.slice(i, i + 200))) accepted.set(`${row.kind}:${row.id}`, row.updated_at)
   }
-  // Only clear entries that were not modified again while we were pushing.
+  // Clear only rows that the server confirmed and that were not modified again while pushing.
   await db.transaction('rw', [db.outbox, ...SYNCED_TABLES.map((t) => db.table(t))], async () => {
     for (const p of payload) {
+      if (accepted.get(`${p.kind}:${p.id}`) !== p.updated_at) continue
       const current = (await db.table(p.kind).get(p.id)) as Base | undefined
-      if (current && current.updatedAt === p.updated_at) await db.outbox.delete(`${p.kind}:${p.id}`)
+      if (current && revisionParts(current).clock === p.updated_at) await db.outbox.delete(`${p.kind}:${p.id}`)
     }
   })
 
+  if (accepted.size < payload.length) {
+    // Force a full pull next time: a server trigger can silently reject a stale upsert without a new seq.
+    await db.meta.put({ key: CURSOR_KEY, value: 0 })
+    throw new Error('Сервер не принял часть изменений. Локальная копия сохранена; при следующей синхронизации Manuscript заново сверит все версии.')
+  }
   await db.meta.put({ key: CURSOR_KEY, value: maxSeq })
-  return { pulled: rows.length, pushed: payload.length, conflicts }
+  return { pulled: rows.length, pushed: accepted.size, conflicts }
 }
 
 export async function resetSyncCursor() {

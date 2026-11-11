@@ -62,8 +62,9 @@ function supabaseRemote(sb: SupabaseClient): Remote {
       return out
     },
     async push(rows) {
-      const { error } = await sb.from(TABLE).upsert(rows, { onConflict: 'user_id,kind,id' })
+      const { data, error } = await sb.from(TABLE).upsert(rows, { onConflict: 'user_id,kind,id' }).select('id, kind, updated_at')
       if (error) throw error
+      return (data ?? []) as { id: string; kind: RemoteRow['kind']; updated_at: number }[]
     },
   }
 }

@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ManuscriptDB, useDatabase, db, type Base, type SceneText, type Project, type SyncedTable } from '../db/db'
 import { createProject, patch } from '../db/repo'
 import { syncOnce, type Remote, type RemoteRow } from '../db/sync'
@@ -13,12 +13,15 @@ function fakeServer() {
       return [...rows.values()].filter((r) => r.seq > since).sort((a, b) => a.seq - b.seq)
     },
     async push(batch) {
+      const accepted: { id: string; kind: SyncedTable; updated_at: number }[] = []
       for (const r of batch) {
         const key = `${r.kind}:${r.id}`
         const old = rows.get(key)
         if (old && r.updated_at < old.updated_at) continue
         rows.set(key, { ...r, data: structuredClone(r.data), seq: ++seq })
+        accepted.push({ id: r.id, kind: r.kind, updated_at: r.updated_at })
       }
+      return accepted
     },
   }
   return { remote, rows }
@@ -55,7 +58,7 @@ describe('sync', () => {
     const server = fakeServer()
     await createProject('Офлайн')
     expect(await db.outbox.count()).toBeGreaterThan(0)
-    const failing: Remote = { pull: async () => { throw new Error('offline') }, push: async () => {} }
+    const failing: Remote = { pull: async () => { throw new Error('offline') }, push: async () => [] }
     await expect(syncOnce(failing)).rejects.toThrow()
     expect(await db.outbox.count()).toBeGreaterThan(0)
     await syncOnce(server.remote)
@@ -98,10 +101,46 @@ describe('sync', () => {
     // simulate an old remote write arriving
     server.rows.set(`projects:${p.id}`, {
       id: p.id, kind: 'projects' as SyncedTable, seq: 999,
-      data: { ...p, title: 'Старое', updatedAt: 1 } as Base, updated_at: 1,
+      data: { id: p.id, title: 'Старое', updatedAt: 1 } as Base, updated_at: 1,
     })
     await patch<Project>('projects', p.id, { title: 'Новое' })
     await syncOnce(server.remote)
     expect((await db.projects.get(p.id))!.title).toBe('Новое')
+  })
+
+  it('keeps an outbox entry when the server silently rejects the upsert', async () => {
+    await createProject('Не терять')
+    const rejecting: Remote = { pull: async () => [], push: async () => [] }
+    await expect(syncOnce(rejecting)).rejects.toThrow('не принял часть изменений')
+    expect(await db.outbox.count()).toBeGreaterThan(0)
+    expect((await db.meta.get('sync.cursor'))?.value).toBe(0)
+  })
+
+  it('accepts a later edit from a device whose wall clock is behind', async () => {
+    const server = fakeServer()
+    const a = db
+    const p = await createProject('Общая')
+    await syncOnce(server.remote)
+    const b = await freshDevice()
+    await syncOnce(server.remote)
+
+    let now = new Date('2026-11-12T02:00:00Z').getTime()
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    try {
+      useDatabase(a)
+      await patch<Project>('projects', p.id, { title: 'Часы спешат' })
+      await syncOnce(server.remote)
+
+      now = new Date('2026-11-12T01:01:00Z').getTime()
+      useDatabase(b)
+      await syncOnce(server.remote)
+      await patch<Project>('projects', p.id, { title: 'Правка после получения' })
+      await syncOnce(server.remote)
+      useDatabase(a)
+      await syncOnce(server.remote)
+      expect((await db.projects.get(p.id))?.title).toBe('Правка после получения')
+    } finally {
+      clock.mockRestore()
+    }
   })
 })
