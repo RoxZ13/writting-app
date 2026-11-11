@@ -110,8 +110,8 @@ describe('Yandex Disk file store', () => {
     const calls = stubFetch(() => new Response(gzipSync(Buffer.from(JSON.stringify(BACKUP)))))
     const { yandexStore } = await import('../lib/yandex')
     const got = await yandexStore().read()
-    expect(got?.version).toBe('7')
-    expect(got?.data).toEqual(BACKUP)
+    expect(got[0].version).toBe('7')
+    expect(got[0].data).toEqual(BACKUP)
     const call = calls.find((c) => c.url === PROXY)!
     expect(call.init?.method).toBe('POST')
     expect((call.init?.headers as Record<string, string>)['Content-Type']).toBe('text/plain')
@@ -124,14 +124,67 @@ describe('Yandex Disk file store', () => {
     setYandexProxyUrl(PROXY)
     stubFetch(() => new Response(JSON.stringify(BACKUP)))
     const { yandexStore } = await import('../lib/yandex')
-    expect((await yandexStore().read())?.data).toEqual(BACKUP)
+    expect((await yandexStore().read())[0].data).toEqual(BACKUP)
   })
 
-  it('returns null when the proxy says there is no file yet', async () => {
+  it('reads every per-device snapshot and does not require the legacy file', async () => {
     setYandexProxyUrl(PROXY)
-    stubFetch(() => new Response('{}', { status: 404 }))
+    const calls: { url: string; init?: RequestInit }[] = []
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      calls.push({ url, init })
+      if (url === PROXY) {
+        const path = JSON.parse(init?.body as string).path as string
+        return new Response(JSON.stringify({ projects: [{ id: path, title: path }] }))
+      }
+      const parsed = new URL(url)
+      const path = parsed.searchParams.get('path')
+      if (path === 'app:/sync-v2') {
+        return new Response(
+          JSON.stringify({
+            _embedded: {
+              items: [
+                { name: 'device-a.json', path: 'app:/sync-v2/device-a.json', type: 'file', revision: 11 },
+                { name: 'device-b.json', path: 'app:/sync-v2/device-b.json', type: 'file', revision: 12 },
+              ],
+            },
+          }),
+        )
+      }
+      if (path === 'app:/manuscript.json') return new Response('{}', { status: 404 })
+      return new Response('{}', { status: 500 })
+    })
     const { yandexStore } = await import('../lib/yandex')
-    expect(await yandexStore().read()).toBeNull()
+    const got = await yandexStore().read()
+    expect(got.map((x) => [x.source, x.version])).toEqual([
+      ['app:/sync-v2/device-a.json', '11'],
+      ['app:/sync-v2/device-b.json', '12'],
+    ])
+    expect(calls.filter((c) => c.url === PROXY)).toHaveLength(2)
+  })
+
+  it('writes only the current device slot, never the shared legacy file', async () => {
+    const calls: { url: string; init?: RequestInit }[] = []
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      calls.push({ url, init })
+      if (url === 'https://uploader.yandex.net/put') return new Response('', { status: 201 })
+      const parsed = new URL(url)
+      if (parsed.pathname.endsWith('/resources') && init?.method === 'PUT') return new Response('', { status: 201 })
+      if (parsed.pathname.endsWith('/resources/upload')) return new Response(JSON.stringify({ href: 'https://uploader.yandex.net/put' }))
+      return new Response('{}', { status: 500 })
+    })
+    const { yandexStore } = await import('../lib/yandex')
+    await yandexStore().write(BACKUP as never, 'device-123')
+    const upload = calls.find((c) => c.url.includes('/resources/upload'))!
+    expect(new URL(upload.url).searchParams.get('path')).toBe('app:/sync-v2/device-123.json')
+    expect(calls.some((c) => c.url.includes('manuscript.json'))).toBe(false)
+    expect(calls.find((c) => c.url === 'https://uploader.yandex.net/put')?.init?.method).toBe('PUT')
+  })
+
+  it('returns an empty list when neither old nor per-device files exist', async () => {
+    setYandexProxyUrl(PROXY)
+    vi.stubGlobal('fetch', async () => new Response('{}', { status: 404 }))
+    const { yandexStore } = await import('../lib/yandex')
+    expect(await yandexStore().read()).toEqual([])
   })
 
   it('forgets the token and asks to sign in again when the proxy says 401', async () => {
@@ -170,7 +223,7 @@ describe('Yandex Disk file store', () => {
     })
     const { yandexStore } = await import('../lib/yandex')
     const got = await yandexStore().read()
-    expect(got?.data).toEqual(BACKUP)
+    expect(got[0].data).toEqual(BACKUP)
     expect(calls.find((c) => c.url.startsWith('https://downloader.'))?.auth).toBe('OAuth tok')
 
     vi.stubGlobal('fetch', async (url: string) => {

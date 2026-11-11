@@ -16,6 +16,7 @@ import {
 } from './db'
 import { docParagraphs, docCharCount, docWordCount, emptyDoc } from '../lib/text'
 import { isEpigraph, makeExcerpt } from '../lib/importer'
+import { nextRevision } from '../lib/revision'
 
 /**
  * Observer of writes, installed by lib/undo.ts only while a board action runs. It gets the row as it was
@@ -29,12 +30,14 @@ export function setWriteRecorder(fn: WriteRecorder | null) {
 
 /** Write a record locally and queue it for sync. All app writes go through here. */
 export async function save<T extends Base>(table: SyncedTable, record: T): Promise<T> {
-  const next = { ...record, updatedAt: Date.now() }
+  let next = { ...record, updatedAt: Date.now() }
   // Captured now: a write that starts inside an action belongs to that action, even if it ends later.
   const rec = recorder
   let before: Base | undefined
-  await db.transaction('rw', db.table(table), db.outbox, async () => {
-    if (rec) before = (await db.table(table).get(next.id)) as Base | undefined
+  await db.transaction('rw', db.table(table), db.outbox, db.meta, async () => {
+    const current = (await db.table(table).get(next.id)) as Base | undefined
+    if (rec) before = current
+    next = { ...next, ...(await nextRevision(current ?? record)) }
     await db.table(table).put(next)
     await db.outbox.put({ key: `${table}:${next.id}`, table, id: next.id })
   })

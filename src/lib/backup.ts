@@ -1,6 +1,8 @@
-import { db, SYNCED_TABLES, uid, type Base, type SceneText, type Snapshot } from '../db/db'
+import { db, SYNCED_TABLES, type Base, type SceneText, type Snapshot, type SyncedTable, type SyncConflict } from '../db/db'
+import type { Table } from 'dexie'
 import { notifyChange } from '../db/repo'
 import { download } from './exporter'
+import { compareCausality, compareRevisionTokens, compareRows, nextRevision, observeRevision, revisionToken } from './revision'
 
 const LAST_KEY = 'manuscript.backup.last'
 const SNOOZE_KEY = 'manuscript.backup.snooze'
@@ -8,6 +10,7 @@ const FIRST_KEY = 'manuscript.backup.first'
 const DAY = 86400000
 
 export type Backup = Record<string, Base[]>
+export type SyncBase = Partial<Record<SyncedTable, Record<string, string | number>>>
 
 export async function makeBackup(): Promise<Backup> {
   const dump: Backup = {}
@@ -32,10 +35,10 @@ interface MergeOptions {
   /** Manual restore: a story deleted here but alive in the copy comes back. File sync never does this. */
   revive: boolean
   /**
-   * File sync: `updatedAt` of every scene text as it was in the file after this device's last write.
+   * File sync: logical revision of every scene text as it was after this device's last write.
    * When given, two different texts that both changed since then are both kept (the loser as a snapshot).
    */
-  textBase?: Record<string, number>
+  base?: SyncBase
 }
 
 async function mergeBackup(dump: Backup, opts: MergeOptions): Promise<{ added: number; updated: number }> {
@@ -44,36 +47,42 @@ async function mergeBackup(dump: Backup, opts: MergeOptions): Promise<{ added: n
   for (const t of SYNCED_TABLES) {
     const rows = dump[t]
     if (!Array.isArray(rows)) continue
-    const tables = t === 'snapshots' ? [db.table(t), db.outbox] : [db.table(t), db.outbox, db.snapshots]
+    const tables: Table[] = [db.table(t), db.outbox, db.meta]
+    if (t !== 'snapshots') tables.push(db.snapshots)
+    if (t !== 'conflicts') tables.push(db.conflicts)
     await db.transaction('rw', tables, async () => {
       for (const row of rows) {
         if (!row || typeof row.id !== 'string') continue
         const here = (await db.table(t).get(row.id)) as Base | undefined
+        await observeRevision(row)
         if (opts.revive && here?.deleted && !row.deleted) {
           // The author asked for this copy: a deleted record that is alive in it comes back, as a fresh edit.
-          const alive: Base = { ...row, updatedAt: Date.now() }
+          const alive: Base = { ...row, updatedAt: Date.now(), ...(await nextRevision(here)) }
           delete alive.deleted
           await db.table(t).put(alive)
           await db.outbox.put({ key: `${t}:${row.id}`, table: t, id: row.id })
           updated++
           continue
         }
-        const hereUpdated = here?.updatedAt ?? 0
-        const rowUpdated = row.updatedAt ?? 0
-        const base = opts.textBase
-        const conflict =
-          t === 'texts' &&
-          base !== undefined &&
-          here !== undefined &&
-          JSON.stringify((here as SceneText).content) !== JSON.stringify((row as SceneText).content)
-        if (conflict) {
-          const b = base[row.id]
-          const localChanged = b === undefined || hereUpdated > b
-          const remoteChanged = b === undefined || rowUpdated > b
-          if (rowUpdated > hereUpdated && localChanged) await keepAsSnapshot(here as SceneText, CONFLICT_HERE)
-          else if (hereUpdated >= rowUpdated && remoteChanged) await keepAsSnapshot(row as SceneText, CONFLICT_THERE)
+        const base = opts.base?.[t]
+        const different = here !== undefined && meaningful(here) !== meaningful(row)
+        if (here !== undefined && different) {
+          const b = base?.[row.id]
+          const localChanged = b === undefined || compareRevisionTokens(revisionToken(here), b) > 0
+          const remoteChanged = b === undefined || compareRevisionTokens(revisionToken(row), b) > 0
+          const remoteWins = compareRows(here, row) < 0
+          const causality = compareCausality(here, row)
+          const isConflict = causality === 'concurrent' || causality === 'equal' || (causality === 'legacy' && base !== undefined && localChanged && remoteChanged)
+          if (isConflict) {
+            if (t === 'texts') {
+              if (remoteWins) await keepAsSnapshot(here as SceneText, CONFLICT_HERE)
+              else await keepAsSnapshot(row as SceneText, CONFLICT_THERE)
+            } else if (t !== 'snapshots' && t !== 'conflicts') {
+              await keepConflict(t, row.id, remoteWins ? here : row, remoteWins ? row : here)
+            }
+          }
         }
-        if (here && hereUpdated >= rowUpdated) continue
+        if (here && compareRows(here, row) >= 0) continue
         await db.table(t).put(row)
         await db.outbox.put({ key: `${t}:${row.id}`, table: t, id: row.id })
         if (here) updated++
@@ -93,7 +102,7 @@ async function keepAsSnapshot(text: SceneText, reason: string) {
   if (same) return // the merge may run twice in one sync round
   const now = Date.now()
   const snap: Snapshot = {
-    id: uid(),
+    id: `sync-text-conflict:${shortHash([text.id, String(revisionToken(text)), content].join('|'))}`,
     sceneId: text.id,
     projectId: text.projectId,
     content: text.content,
@@ -101,9 +110,49 @@ async function keepAsSnapshot(text: SceneText, reason: string) {
     reason,
     createdAt: now,
     updatedAt: now,
+    ...(await nextRevision()),
   }
   await db.snapshots.put(snap)
   await db.outbox.put({ key: `snapshots:${snap.id}`, table: 'snapshots', id: snap.id })
+}
+
+const meaningful = (row: Base) => {
+  const { updatedAt: _updatedAt, syncRev: _syncRev, syncVersion: _syncVersion, ...data } = row
+  return JSON.stringify(data)
+}
+
+const shortHash = (value: string) => {
+  let hash = 2166136261
+  for (let i = 0; i < value.length; i++) hash = Math.imul(hash ^ value.charCodeAt(i), 16777619)
+  return (hash >>> 0).toString(36)
+}
+
+/** Preserve the losing side of a concurrent plan/metadata edit in the synced backup itself. */
+async function keepConflict(table: SyncedTable, recordId: string, losing: Base, winning: Base) {
+  const signature = [table, recordId, String(revisionToken(losing)), String(revisionToken(winning)), meaningful(losing), meaningful(winning)].join('|')
+  const id = `sync-conflict:${shortHash(signature)}`
+  if (await db.conflicts.get(id)) return
+  const now = Date.now()
+  const projectId =
+    typeof (losing as Base & { projectId?: unknown }).projectId === 'string'
+      ? ((losing as Base & { projectId: string }).projectId)
+      : typeof (winning as Base & { projectId?: unknown }).projectId === 'string'
+        ? ((winning as Base & { projectId: string }).projectId)
+        : undefined
+  const conflict: SyncConflict = {
+    id,
+    table,
+    recordId,
+    projectId,
+    losing,
+    winning,
+    reason: 'Одновременная правка на разных устройствах',
+    createdAt: now,
+    updatedAt: now,
+    ...(await nextRevision()),
+  }
+  await db.conflicts.put(conflict)
+  await db.outbox.put({ key: `conflicts:${id}`, table: 'conflicts', id })
 }
 
 /**
@@ -119,8 +168,8 @@ export function restoreBackup(dump: Backup): Promise<{ added: number; updated: n
  * The merge of file sync: like a restore, but a deletion made on another device stays a deletion, and
  * two different versions of one scene text are both kept — the older one as a snapshot.
  */
-export function mergeSyncedBackup(dump: Backup, textBase: Record<string, number>): Promise<{ added: number; updated: number }> {
-  return mergeBackup(dump, { revive: false, textBase })
+export function mergeSyncedBackup(dump: Backup, base: SyncBase): Promise<{ added: number; updated: number }> {
+  return mergeBackup(dump, { revive: false, base })
 }
 
 export async function readBackupFile(file: File): Promise<Backup> {

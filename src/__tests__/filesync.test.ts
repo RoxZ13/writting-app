@@ -1,27 +1,31 @@
 import 'fake-indexeddb/auto'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ManuscriptDB, useDatabase, db, type Project, type SceneText } from '../db/db'
 import { createProject, patch, remove } from '../db/repo'
 import type { Backup } from '../lib/backup'
 import { syncWithStore, type FileStore } from '../lib/filesync'
 
-/** A cloud disk in memory: one file and a version that changes on every write. */
+/** A cloud disk in memory: one independently replaceable snapshot per device. */
 function fakeDisk() {
-  let file: { data: Backup; version: string } | null = null
+  const files = new Map<string, { data: Backup; version: string }>()
+  let last: { data: Backup; version: string } | null = null
   let n = 0
   const store: FileStore = {
     name: 'test',
     async read() {
-      return file && { data: structuredClone(file.data), version: file.version }
+      return [...files.entries()].map(([source, file]) => ({ source, data: structuredClone(file.data), version: file.version }))
     },
-    async version() {
-      return file?.version ?? null
-    },
-    async write(data) {
-      file = { data: structuredClone(data), version: String(++n) }
+    async write(data, slot) {
+      last = { data: structuredClone(data), version: String(++n) }
+      files.set(slot, last)
     },
   }
-  return { store, peek: () => file }
+  return {
+    store,
+    peek: () => last,
+    put: (slot: string, data: Backup) => files.set(slot, { data: structuredClone(data), version: String(++n) }),
+    count: () => files.size,
+  }
 }
 
 let k = 0
@@ -56,30 +60,99 @@ describe('sync through a file in the cloud', () => {
     expect(await titles()).toEqual(['Соль и пепел'])
   })
 
-  it('a write from another device in the middle is taken in, not overwritten', async () => {
+  it('a device with the correct clock can edit after receiving a future-dated change', async () => {
+    let now = new Date('2026-11-11T10:00:00Z').getTime()
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+    try {
+      const disk = fakeDisk()
+      const A = new ManuscriptDB(`filesync-clock-a-${++k}`)
+      const B = new ManuscriptDB(`filesync-clock-b-${++k}`)
+      useDatabase(A)
+      const p = await createProject('Общая')
+      await syncWithStore(disk.store)
+      useDatabase(B)
+      await syncWithStore(disk.store)
+
+      now = new Date('2026-11-11T11:00:00Z').getTime()
+      useDatabase(A)
+      await patch<Project>('projects', p.id, { title: 'Часы спешат' })
+      await syncWithStore(disk.store)
+
+      now = new Date('2026-11-11T10:01:00Z').getTime()
+      useDatabase(B)
+      await syncWithStore(disk.store)
+      await patch<Project>('projects', p.id, { title: 'Правка после синхронизации' })
+      await syncWithStore(disk.store)
+      useDatabase(A)
+      await syncWithStore(disk.store)
+      expect((await db.projects.get(p.id))?.title).toBe('Правка после синхронизации')
+    } finally {
+      clock.mockRestore()
+    }
+  })
+
+  it('a write from another device in the middle remains available and is taken in next round', async () => {
     const disk = fakeDisk()
     device()
     await createProject('Первая')
     await syncWithStore(disk.store)
 
-    // The other device writes right after this one has read the file.
+    // The other device writes right after this one has listed the files.
     let sneaked = false
     const racy: FileStore = {
       ...disk.store,
-      async version() {
+      async read() {
+        const seen = await disk.store.read()
         if (!sneaked) {
           sneaked = true
-          const f = (await disk.store.read())!
-          f.data.projects = [...(f.data.projects as Project[]), { id: 'x', title: 'С телефона', updatedAt: Date.now() } as Project]
-          await disk.store.write(f.data)
+          const first = structuredClone(seen[0].data)
+          first.projects = [...(first.projects as Project[]), { id: 'x', title: 'С телефона', updatedAt: Date.now() } as Project]
+          disk.put('phone', first)
         }
-        return disk.store.version()
+        return seen
       },
     }
     await createProject('Вторая')
     await syncWithStore(racy)
+    expect(disk.count()).toBe(2)
+    await syncWithStore(racy)
     expect(await titles()).toEqual(['Вторая', 'Первая', 'С телефона'])
     expect((disk.peek()!.data.projects as Project[]).length).toBe(3)
+  })
+
+  it('archives the losing side when the same metadata is edited concurrently', async () => {
+    const disk = fakeDisk()
+    const A = new ManuscriptDB(`filesync-conflict-a-${++k}`)
+    const B = new ManuscriptDB(`filesync-conflict-b-${++k}`)
+    useDatabase(A)
+    const p = await createProject('Общая')
+    await syncWithStore(disk.store)
+    useDatabase(B)
+    await syncWithStore(disk.store)
+    const baseline = await disk.store.read()
+    const isolated: FileStore = { ...disk.store, read: async () => structuredClone(baseline) }
+
+    useDatabase(A)
+    await patch<Project>('projects', p.id, { title: 'Вариант с компьютера' })
+    await syncWithStore(isolated)
+    useDatabase(B)
+    await patch<Project>('projects', p.id, { title: 'Вариант с телефона' })
+    await syncWithStore(isolated)
+
+    useDatabase(A)
+    await syncWithStore(disk.store)
+    useDatabase(B)
+    await syncWithStore(disk.store)
+    useDatabase(A)
+    await syncWithStore(disk.store)
+
+    for (const d of [A, B]) {
+      useDatabase(d)
+      const conflicts = await db.conflicts.where('recordId').equals(p.id).toArray()
+      expect(conflicts).toHaveLength(1)
+      const titles = [(conflicts[0].losing as Project).title, (conflicts[0].winning as Project).title].sort()
+      expect(titles).toEqual(['Вариант с компьютера', 'Вариант с телефона'])
+    }
   })
 
   describe('the same scene text edited on two devices', () => {
@@ -99,13 +172,7 @@ describe('sync through a file in the cloud', () => {
       const sceneId = (await B.scenes.toArray())[0].id
       return { disk, A, B, sceneId }
     }
-    const edit = (id: string, t: string, updatedAt?: number) =>
-      updatedAt === undefined
-        ? patch<SceneText>('texts', id, { content: doc(t), wordCount: 1 })
-        : db.transaction('rw', db.texts, db.outbox, async () => {
-            await db.texts.update(id, { content: doc(t), wordCount: 1, updatedAt })
-            await db.outbox.put({ key: `texts:${id}`, table: 'texts', id })
-          })
+    const edit = (id: string, t: string) => patch<SceneText>('texts', id, { content: doc(t), wordCount: 1 })
     const snaps = async (sceneId: string) => (await db.snapshots.where('sceneId').equals(sceneId).toArray()).filter((s) => !s.deleted)
     const allTexts = async (sceneId: string) => [
       textOf((await db.texts.get(sceneId))!.content),
@@ -161,10 +228,17 @@ describe('sync through a file in the cloud', () => {
 
     it('keeps both texts even when the clock of the stale edit is ahead', async () => {
       const { disk, A, B, sceneId } = await twoDevices()
-      useDatabase(A)
-      await edit(sceneId, 'часы спешат', Date.now() + 3_600_000)
-      useDatabase(B)
-      await edit(sceneId, 'часы верные')
+      let now = Date.now() + 3_600_000
+      const clock = vi.spyOn(Date, 'now').mockImplementation(() => now)
+      try {
+        useDatabase(A)
+        await edit(sceneId, 'часы спешат')
+        now -= 3_599_000
+        useDatabase(B)
+        await edit(sceneId, 'часы верные')
+      } finally {
+        clock.mockRestore()
+      }
 
       useDatabase(A)
       await syncWithStore(disk.store)

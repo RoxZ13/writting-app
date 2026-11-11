@@ -1,53 +1,62 @@
-import { makeBackup, mergeSyncedBackup, type Backup } from './backup'
-import { db } from '../db/db'
+import { makeBackup, mergeSyncedBackup, type Backup, type SyncBase } from './backup'
+import { db, SYNCED_TABLES } from '../db/db'
 import { onLocalChange } from '../db/repo'
 import { remoteSyncAllowed } from './environment'
+import { revisionToken, syncDeviceId } from './revision'
 
-const BASE_KEY = 'filesync.base'
+const LEGACY_BASE_KEY = 'filesync.base'
+const BASE_KEY = 'filesync.base.v2'
 
 /**
- * Sync through a single file in the author's own cloud (Яндекс Диск, later Dropbox, Google Drive):
- * the whole story base lives in one JSON file in the app's folder. Every device reads it, merges it
- * into what it has (the newer version of each record wins, nothing is deleted outright — deletions
- * are records too) and writes the merged result back.
+ * Sync through one snapshot per device in the author's own cloud. Devices never overwrite each
+ * other's files: every round reads all snapshots, merges them deterministically and replaces only
+ * this device's slot. The old shared manuscript.json is read during migration but never overwritten.
  */
+export interface RemoteBackup {
+  source: string
+  version: string
+  data: Backup
+}
+
 export interface FileStore {
   /** Shown in Settings: «Яндекс Диск». */
   name: string
-  /** The file and a version mark (its modification time), or null when there is no file yet. */
-  read(): Promise<{ data: Backup; version: string } | null>
-  /** The file's current version mark without downloading it; null when there is none. */
-  version(): Promise<string | null>
-  write(data: Backup): Promise<void>
+  /** The legacy shared file and every device snapshot currently present. */
+  read(): Promise<RemoteBackup[]>
+  /** Replace only this device's snapshot. `slot` is a generated opaque id, never a user path. */
+  write(data: Backup, slot: string): Promise<void>
 }
 
 /**
- * One round: take in what other devices wrote, then write everything back. If another device wrote
- * in the meantime, its changes are taken in first, so nobody's work is overwritten.
+ * One round: take in every device snapshot, then replace only this device's snapshot with the
+ * merged result. A concurrent writer has a different slot, so both sides remain available even
+ * when their requests cross in flight.
  */
-export async function syncWithStore(store: FileStore, tries = 3): Promise<{ added: number; updated: number }> {
+export async function syncWithStore(store: FileStore): Promise<{ added: number; updated: number }> {
   let added = 0
   let updated = 0
-  const textBase = ((await db.meta.get(BASE_KEY))?.value as Record<string, number> | undefined) ?? {}
-  for (let i = 0; i < tries; i++) {
-    const remote = await store.read()
-    if (remote) {
-      const r = await mergeSyncedBackup(remote.data, textBase)
-      added += r.added
-      updated += r.updated
-    }
-    const before = remote?.version ?? null
-    // Someone wrote while we were merging: take that in too before writing.
-    if ((await store.version()) !== before) continue
-    const out = await makeBackup()
-    await store.write(out)
-    // What each scene text looked like in the file we just wrote: the next merge tells «changed here» from «changed there» by it.
-    const base: Record<string, number> = {}
-    for (const row of out.texts ?? []) base[row.id] = row.updatedAt ?? 0
-    await db.meta.put({ key: BASE_KEY, value: base })
-    return { added, updated }
+  let base = (await db.meta.get(BASE_KEY))?.value as SyncBase | undefined
+  if (!base) {
+    const legacyTextBase = (await db.meta.get(LEGACY_BASE_KEY))?.value as Record<string, string | number> | undefined
+    base = legacyTextBase ? { texts: legacyTextBase } : {}
   }
-  throw new Error('Облако всё время меняется с другого устройства. Попробуй ещё раз через минуту.')
+  const remote = await store.read()
+  for (const file of remote.sort((a, b) => a.source.localeCompare(b.source))) {
+    const r = await mergeSyncedBackup(file.data, base)
+    added += r.added
+    updated += r.updated
+  }
+  const out = await makeBackup()
+  await store.write(out, await syncDeviceId())
+  // What each scene text looked like after this round: the next merge can identify two-sided edits.
+  const nextBase: SyncBase = {}
+  for (const table of SYNCED_TABLES) {
+    const rows: Record<string, string | number> = {}
+    for (const row of out[table] ?? []) rows[row.id] = revisionToken(row) ?? 0
+    nextBase[table] = rows
+  }
+  await db.meta.put({ key: BASE_KEY, value: nextBase })
+  return { added, updated }
 }
 
 // ---------------- the running sync, shown in Settings ----------------
@@ -86,7 +95,11 @@ export function syncNow(): Promise<void> {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return setState({ state: 'offline' })
     setState({ state: 'syncing' })
     try {
-      await syncWithStore(s)
+      if (typeof navigator !== 'undefined' && navigator.locks) {
+        await navigator.locks.request('manuscript:file-sync', () => syncWithStore(s))
+      } else {
+        await syncWithStore(s)
+      }
       setState({ state: 'ok', at: Date.now() })
     } catch (e) {
       setState({ state: 'error', message: e instanceof Error ? e.message : String(e) })

@@ -11,9 +11,8 @@ import { connectYandex, getYandexToken, takeYandexRedirect } from '../lib/yandex
 
 describe('preview cloud isolation', () => {
   const read = vi.fn<FileStore['read']>()
-  const version = vi.fn<FileStore['version']>()
   const write = vi.fn<FileStore['write']>()
-  const store: FileStore = { name: 'test', read, version, write }
+  const store: FileStore = { name: 'test', read, write }
 
   beforeEach(() => {
     vi.clearAllMocks()
@@ -24,7 +23,6 @@ describe('preview cloud isolation', () => {
     await syncFile()
     expect(getFileSyncState()).toEqual({ state: 'off' })
     expect(read).not.toHaveBeenCalled()
-    expect(version).not.toHaveBeenCalled()
     expect(write).not.toHaveBeenCalled()
   })
 

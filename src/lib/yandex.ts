@@ -13,6 +13,7 @@ import { previewCloudError, remoteSyncAllowed } from './environment'
 
 const API = 'https://cloud-api.yandex.net/v1/disk'
 const FILE = 'app:/manuscript.json'
+const SYNC_DIR = 'app:/sync-v2'
 const TOKEN_KEY = 'manuscript.yandex.token'
 const CLIENT_KEY = 'manuscript.yandex.client'
 const STATE_KEY = 'manuscript.yandex.state'
@@ -160,61 +161,86 @@ export function yandexStore(): FileStore {
     if (!t) throw new Error('Яндекс Диск не подключён')
     return t.token
   }
-  const meta = async (): Promise<string | null> => {
-    const res = await call(`/resources?path=${encodeURIComponent(FILE)}&fields=modified,revision`, token())
+  const meta = async (path: string): Promise<string | null> => {
+    const res = await call(`/resources?path=${encodeURIComponent(path)}&fields=modified,revision`, token())
     if (res.status === 404) return null
     if (!res.ok) throw new Error(`Яндекс Диск ответил ошибкой ${res.status}`)
     const j = (await res.json()) as { revision?: number; modified?: string }
     return String(j.revision ?? j.modified ?? '')
   }
+
+  const download = async (path: string, version: string) => {
+    const source = path
+    const proxy = getYandexProxyUrl()
+    if (!proxy) {
+      // The old direct path: browsers cannot reach the download host, so this only works outside them.
+      const needProxy = 'Чтение с Яндекс Диска не настроено: нужен прокси (см. proxy/yandex-disk/README.md)'
+      const link = await call(`/resources/download?path=${encodeURIComponent(path)}`, token())
+      if (!link.ok) throw new Error(`Не получилось скачать с Яндекс Диска (${link.status})`)
+      const { href } = (await link.json()) as { href: string }
+      let direct: Response
+      try {
+        direct = await fetch(href, { headers: { Authorization: `OAuth ${token()}` } })
+      } catch {
+        throw new Error(needProxy)
+      }
+      if (!direct.ok) throw new Error(needProxy)
+      return { source, data: (await direct.json()) as Backup, version }
+    }
+    let res: Response
+    try {
+      res = await fetch(proxy, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ token: token(), path }),
+      })
+    } catch {
+      throw new Error('Не получилось скачать файл с Яндекс Диска. Проверь интернет и попробуй ещё раз.')
+    }
+    if (res.status === 401) {
+      forgetYandex()
+      throw reauth()
+    }
+    if (!res.ok) throw new Error(`Не получилось скачать с Яндекс Диска (${res.status})`)
+    let data: Backup
+    try {
+      data = await parseBackup(await res.arrayBuffer())
+    } catch {
+      throw new Error('Не получилось прочитать файл с Яндекс Диска. Попробуй ещё раз.')
+    }
+    return { source, data, version }
+  }
+
+  const slots = async (): Promise<{ path: string; version: string }[]> => {
+    const fields = '_embedded.items.name,_embedded.items.path,_embedded.items.type,_embedded.items.modified,_embedded.items.revision'
+    const res = await call(`/resources?path=${encodeURIComponent(SYNC_DIR)}&limit=1000&fields=${encodeURIComponent(fields)}`, token())
+    if (res.status === 404) return []
+    if (!res.ok) throw new Error(`Яндекс Диск ответил ошибкой ${res.status}`)
+    const json = (await res.json()) as {
+      _embedded?: { items?: { name?: string; path?: string; type?: string; modified?: string; revision?: number }[] }
+    }
+    return (json._embedded?.items ?? [])
+      .filter((item) => item.type !== 'dir' && typeof item.name === 'string' && item.name.endsWith('.json'))
+      .map((item) => ({
+        path: item.path?.startsWith('app:/') ? item.path : `${SYNC_DIR}/${item.name}`,
+        version: String(item.revision ?? item.modified ?? ''),
+      }))
+  }
+
   return {
     name: 'Яндекс Диск',
-    version: meta,
     async read() {
-      const version = await meta()
-      if (version === null) return null
-      const proxy = getYandexProxyUrl()
-      if (!proxy) {
-        // The old direct path: browsers cannot reach the download host, so this only works outside them.
-        const needProxy = 'Чтение с Яндекс Диска не настроено: нужен прокси (см. proxy/yandex-disk/README.md)'
-        const link = await call(`/resources/download?path=${encodeURIComponent(FILE)}`, token())
-        if (!link.ok) throw new Error(`Не получилось скачать с Яндекс Диска (${link.status})`)
-        const { href } = (await link.json()) as { href: string }
-        let direct: Response
-        try {
-          direct = await fetch(href, { headers: { Authorization: `OAuth ${token()}` } })
-        } catch {
-          throw new Error(needProxy)
-        }
-        if (!direct.ok) throw new Error(needProxy)
-        return { data: (await direct.json()) as Backup, version }
-      }
-      let res: Response
-      try {
-        res = await fetch(proxy, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: JSON.stringify({ token: token(), path: FILE }),
-        })
-      } catch {
-        throw new Error('Не получилось скачать файл с Яндекс Диска. Проверь интернет и попробуй ещё раз.')
-      }
-      if (res.status === 404) return null
-      if (res.status === 401) {
-        forgetYandex()
-        throw reauth()
-      }
-      if (!res.ok) throw new Error(`Не получилось скачать с Яндекс Диска (${res.status})`)
-      let data: Backup
-      try {
-        data = await parseBackup(await res.arrayBuffer())
-      } catch {
-        throw new Error('Не получилось прочитать файл с Яндекс Диска. Попробуй ещё раз.')
-      }
-      return { data, version }
+      const found = await slots()
+      const legacy = await meta(FILE)
+      if (legacy !== null) found.unshift({ path: FILE, version: legacy })
+      return Promise.all(found.map(({ path, version }) => download(path, version)))
     },
-    async write(data) {
-      const link = await call(`/resources/upload?path=${encodeURIComponent(FILE)}&overwrite=true`, token())
+    async write(data, slot) {
+      if (!/^[a-zA-Z0-9-]+$/.test(slot)) throw new Error('Некорректный идентификатор устройства')
+      const dir = await call(`/resources?path=${encodeURIComponent(SYNC_DIR)}`, token(), { method: 'PUT' })
+      if (!dir.ok && dir.status !== 409) throw new Error(`Яндекс Диск не дал создать папку синхронизации (${dir.status})`)
+      const path = `${SYNC_DIR}/${slot}.json`
+      const link = await call(`/resources/upload?path=${encodeURIComponent(path)}&overwrite=true`, token())
       if (!link.ok) throw new Error(`Яндекс Диск не дал записать файл (${link.status})`)
       const { href } = (await link.json()) as { href: string }
       let res: Response

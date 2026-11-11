@@ -1,10 +1,13 @@
 import Dexie, { type Table } from 'dexie'
 import type { PlatformId } from '../lib/platforms'
 
-/** Every synced record carries these fields. `updatedAt` is client time in ms. */
+/** Every synced record carries these fields. `syncRev` is the conflict-ordering clock; `updatedAt` is only display time. */
 export interface Base {
   id: string
   updatedAt: number
+  syncRev?: string
+  /** Per-record vector clock: distinguishes a later edit from two truly concurrent edits. */
+  syncVersion?: Record<string, number>
   deleted?: boolean
 }
 
@@ -203,7 +206,18 @@ export interface Snapshot extends Base {
   createdAt: number
 }
 
-export const SYNCED_TABLES = ['projects', 'chapters', 'scenes', 'texts', 'markers', 'notes', 'snapshots', 'lines', 'characters'] as const
+/** A losing side of a concurrent non-text edit. Kept in backups even before a recovery UI is added. */
+export interface SyncConflict extends Base {
+  table: string
+  recordId: string
+  projectId?: string
+  losing: Base
+  winning: Base
+  reason: string
+  createdAt: number
+}
+
+export const SYNCED_TABLES = ['projects', 'chapters', 'scenes', 'texts', 'markers', 'notes', 'snapshots', 'lines', 'characters', 'conflicts'] as const
 export type SyncedTable = (typeof SYNCED_TABLES)[number]
 
 export interface OutboxEntry {
@@ -227,6 +241,7 @@ export class ManuscriptDB extends Dexie {
   snapshots!: Table<Snapshot, string>
   lines!: Table<Line, string>
   characters!: Table<Character, string>
+  conflicts!: Table<SyncConflict, string>
   outbox!: Table<OutboxEntry, string>
   meta!: Table<Meta, string>
 
@@ -247,6 +262,9 @@ export class ManuscriptDB extends Dexie {
     this.version(2).stores({
       lines: 'id, projectId, updatedAt',
       characters: 'id, projectId, updatedAt',
+    })
+    this.version(3).stores({
+      conflicts: 'id, table, recordId, projectId, updatedAt',
     })
   }
 }
