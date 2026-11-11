@@ -273,6 +273,16 @@ a {
   /* A few beats, not forever: a dot that never rests pulls the eye while writing. */
   animation: pulse 1s 6 alternate;
 }
+.sync-dot[data-state='pending'] {
+  background: var(--mk-waiting);
+}
+.sync-dot[data-state='conflict'] {
+  background: var(--mk-late);
+}
+.sync-dot[data-state='offline'],
+.sync-dot[data-state='local'] {
+  background: var(--ink-4);
+}
 .sync-dot[data-state='error'] {
   background: var(--accent);
 }
@@ -2375,6 +2385,29 @@ main.page.wide {
 .crumb .sync-dot {
   align-self: center;
 }
+.data-safety {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  border: 0;
+  border-radius: 999px;
+  padding: 4px 8px;
+  background: var(--fill);
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.data-safety:hover {
+  color: var(--ink);
+  background: var(--line);
+}
+.data-safety[data-state='error'] {
+  color: var(--danger-ink);
+}
+.data-safety[data-state='conflict'] {
+  color: var(--danger-ink);
+}
 .tabs {
   margin-left: auto;
   display: flex;
@@ -2434,6 +2467,13 @@ main.page {
   }
   .app-header {
     padding: env(safe-area-inset-top) 16px 0;
+  }
+  .data-safety {
+    padding: 6px;
+    background: transparent;
+  }
+  .data-safety-label {
+    display: none;
   }
   .tabs {
     position: fixed;

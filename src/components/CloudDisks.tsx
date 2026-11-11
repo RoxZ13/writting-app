@@ -20,10 +20,14 @@ export function CloudDisks() {
   useEffect(() => onFileSyncState(setState), [])
 
   const status =
-    state.state === 'syncing'
+    state.state === 'pending'
+      ? 'Сохранено на устройстве — ждёт отправки'
+      : state.state === 'syncing'
       ? 'Синхронизация…'
       : state.state === 'ok'
-        ? `Синхронизировано ${ago(state.at)}`
+        ? state.conflicts
+          ? `Синхронизировано · конфликтующих правок: ${state.conflicts}`
+          : `Синхронизировано ${ago(state.at)}`
         : state.state === 'offline'
           ? 'Нет интернета — отправится само, когда сеть появится'
           : state.state === 'error'
@@ -61,6 +65,7 @@ export function CloudDisks() {
                 stopFileSync()
                 forgetYandex()
                 setConnected(false)
+                location.reload()
               }}
             >
               Отключить

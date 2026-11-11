@@ -7,6 +7,7 @@ import { CloudDisks } from '../components/CloudDisks'
 import { readBackupFile, restoreBackup } from '../lib/backup'
 import { FilePick, toast } from '../lib/ui'
 import { remoteSyncAllowed } from '../lib/environment'
+import { getYandexToken } from '../lib/yandex'
 
 export function Welcome({ onCreated, sync }: { onCreated: (id: string, view: 'text' | 'board') => void; sync: SyncStatus }) {
   const [cloud, setCloud] = useState(false)
@@ -68,7 +69,7 @@ export function Welcome({ onCreated, sync }: { onCreated: (id: string, view: 'te
           {remoteSyncAllowed() && cloud && (
             <>
               <CloudDisks />
-              {getCloudConfig() && <SyncSection sync={sync} />}
+              {!getYandexToken() && getCloudConfig() && <SyncSection sync={sync} />}
             </>
           )}
         </div>

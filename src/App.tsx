@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { getSyncStatus, onSyncStatus, startCloudSync, type SyncStatus } from './db/cloud'
+import { getCloudConfig, getSyncStatus, onSyncStatus, startCloudSync, type SyncStatus } from './db/cloud'
 import { useProjectData, useProjects, type ProjectData } from './lib/hooks'
 import { recountChars, recountWords, tidyImportedScenes } from './db/repo'
 import { go, useRoute, type Route } from './lib/router'
@@ -22,6 +22,9 @@ import { LoreView } from './views/LoreView'
 import { backupDue, downloadBackup, snoozeBackup } from './lib/backup'
 import { clearHistory } from './lib/undo'
 import { remoteSyncAllowed } from './lib/environment'
+import { getFileSyncState, onFileSyncState, type FileSyncState } from './lib/filesync'
+import { getYandexToken } from './lib/yandex'
+import { dataSafetyStatus, type DataSafetyStatus } from './lib/data-safety'
 
 const TABS: { view: Route['view']; label: string; ico: string }[] = [
   { view: 'text', label: 'Текст', ico: 'pen' },
@@ -36,6 +39,7 @@ export function App() {
   const [capture, setCapture] = useState(false)
   const [searching, setSearching] = useState<string | null>(null)
   const [sync, setSync] = useState<SyncStatus>(getSyncStatus)
+  const [fileSync, setFileSync] = useState<FileSyncState>(getFileSyncState)
   const reveal = useReveal(route.view === 'text')
   // A brand-new, still empty story keeps its header in view until the first key: the author sees once where things are.
   const [fresh, setFresh] = useState(false)
@@ -51,9 +55,23 @@ export function App() {
   }, [projects])
 
   useEffect(() => {
-    if (remoteSyncAllowed()) startCloudSync()
-    return onSyncStatus(setSync)
+    if (remoteSyncAllowed() && !getYandexToken()) startCloudSync()
+    const stopCloud = onSyncStatus(setSync)
+    const stopFile = onFileSyncState(setFileSync)
+    return () => {
+      stopCloud()
+      stopFile()
+    }
   }, [])
+
+  const yandex = remoteSyncAllowed() && !!getYandexToken()
+  const safety = dataSafetyStatus({
+    yandex,
+    supabase: remoteSyncAllowed() && !yandex && !!getCloudConfig(),
+    file: fileSync,
+    cloud: sync,
+    preview: __PREVIEW__,
+  })
 
   // Fall back to the most recently touched project if the remembered one is gone.
   useEffect(() => {
@@ -175,8 +193,8 @@ export function App() {
 
   return (
     <div className={`app app-${route.view} ${reveal || (fresh && route.view === 'text') ? 'reveal' : ''}`}>
-      <AppHeader data={data} route={route} sync={sync} onSearch={() => setSearching('')} />
-      {sync.state !== 'ok' && <BackupReminder />}
+      <AppHeader data={data} route={route} safety={safety} onSearch={() => setSearching('')} />
+      <BackupReminder />
       {route.view === 'text' && textScene && (
         <WriteView key={textScene} data={data} sceneId={textScene} onSearch={(q) => setSearching(q ?? '')} />
       )}
@@ -213,18 +231,8 @@ export function App() {
   )
 }
 
-function AppHeader({ data, route, sync, onSearch }: { data: ProjectData; route: Route; sync: SyncStatus; onSearch: () => void }) {
+function AppHeader({ data, route, safety, onSearch }: { data: ProjectData; route: Route; safety: DataSafetyStatus; onSearch: () => void }) {
   const inbox = data.notes.filter((n) => !n.archived && !n.sceneId && !n.used && !(n.characterIds ?? []).length).length
-  const syncTitle =
-    sync.state === 'ok'
-      ? 'Синхронизировано'
-      : sync.state === 'syncing'
-        ? 'Синхронизация…'
-        : sync.state === 'offline'
-          ? 'Нет интернета — всё сохраняется на устройстве'
-          : sync.state === 'error'
-            ? `Ошибка синхронизации: ${sync.message}`
-            : 'Сохраняется на этом устройстве'
   return (
     <header className="app-header">
       <div className="crumb">
@@ -235,8 +243,10 @@ function AppHeader({ data, route, sync, onSearch }: { data: ProjectData; route: 
         <button className="project-name" title="Все истории" onClick={() => go({ view: 'library' })}>
           {data.project.title} <span className="caret"><Icon name="down" size={13} /></span>
         </button>
-        {/* Calm by default: the dot appears only when something needs attention. Counters and dates live on the board and the story page. */}
-        {(sync.state === 'offline' || sync.state === 'error') && <span className="sync-dot" data-state={sync.state} title={syncTitle} />}
+        <button className="data-safety" data-state={safety.state} title={safety.title} aria-label={safety.title} onClick={() => go({ view: 'settings' })}>
+          <span className="sync-dot" data-state={safety.state} />
+          <span className="data-safety-label">{safety.label}</span>
+        </button>
       </div>
       <nav className="tabs">
         {TABS.map((t) => (

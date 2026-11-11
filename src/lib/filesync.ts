@@ -63,8 +63,9 @@ export async function syncWithStore(store: FileStore): Promise<{ added: number; 
 
 export type FileSyncState =
   | { state: 'off' }
+  | { state: 'pending'; since: number }
   | { state: 'syncing' }
-  | { state: 'ok'; at: number }
+  | { state: 'ok'; at: number; conflicts?: number }
   | { state: 'offline' }
   | { state: 'error'; message: string }
 
@@ -100,7 +101,8 @@ export function syncNow(): Promise<void> {
       } else {
         await syncWithStore(s)
       }
-      setState({ state: 'ok', at: Date.now() })
+      const conflicts = await db.conflicts.count()
+      setState({ state: 'ok', at: Date.now(), ...(conflicts ? { conflicts } : {}) })
     } catch (e) {
       setState({ state: 'error', message: e instanceof Error ? e.message : String(e) })
     }
@@ -121,6 +123,7 @@ export function startFileSync(s: FileStore) {
   void syncNow()
   stopLocal = onLocalChange(() => {
     clearTimeout(timer)
+    setState(typeof navigator !== 'undefined' && navigator.onLine === false ? { state: 'offline' } : { state: 'pending', since: Date.now() })
     timer = setTimeout(() => void syncNow(), 30_000)
   })
   window.addEventListener('online', onBack)

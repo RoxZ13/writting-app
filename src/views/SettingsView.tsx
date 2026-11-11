@@ -15,12 +15,16 @@ import { TypoControls } from '../components/TypoControls'
 import { CloudDisks } from '../components/CloudDisks'
 import { timeAgo } from '../lib/status'
 import { remoteSyncAllowed } from '../lib/environment'
+import { getYandexToken } from '../lib/yandex'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../db/db'
 
 /** Settings of the app itself (not of a book): look, devices, installing, backup. */
 export function SettingsView({ sync }: { sync: SyncStatus }) {
   const [theme, setTheme] = useState<Theme>(getTheme)
   const [board, setBoard] = useState<BoardLayout>(getBoardLayout)
   const [accent, setAccent] = useState<Accent>(getAccent)
+  const conflictCount = useLiveQuery(() => db.conflicts.count(), []) ?? 0
   const restore = async (file: File) => {
     try {
       const dump = await readBackupFile(file)
@@ -119,7 +123,7 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
         <>
           <CloudDisks />
           {/* The old Supabase sync: shown only where it was set up, so it does not stand next to the Disk as a second «Устройства». */}
-          {getCloudConfig() && <SyncSection sync={sync} />}
+          {!getYandexToken() && getCloudConfig() && <SyncSection sync={sync} />}
         </>
       ) : (
         <section className="card settings-section stack">
@@ -127,6 +131,19 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
           <div className="small muted">
             Облачная синхронизация здесь отключена. Эта версия работает только со своей тестовой базой и не может читать или менять основные книги.
           </div>
+        </section>
+      )}
+
+      {conflictCount > 0 && (
+        <section className="card settings-section stack">
+          <h3>Сохранены конфликтующие правки</h3>
+          <div className="small muted">
+            На разных устройствах одновременно меняли одни и те же названия, заметки или элементы плана. Manuscript выбрал одну версию, а остальные не удалил:
+            они находятся внутри полной резервной копии. Конфликтов: {conflictCount}.
+          </div>
+          <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void downloadBackup()}>
+            Скачать копию со всеми версиями
+          </button>
         </section>
       )}
 
