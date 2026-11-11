@@ -59,17 +59,26 @@ export function lastParagraphs(doc: unknown, n = 2): string[] {
     .slice(-n)
 }
 
-export const formatWords = (n: number) => {
-  const mod10 = n % 10
-  const mod100 = n % 100
-  const word =
-    mod10 === 1 && mod100 !== 11
-      ? 'слово'
-      : mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)
-        ? 'слова'
-        : 'слов'
-  return `${n.toLocaleString('ru-RU')} ${word}`
+/** Russian plural form for `n`: 1 → one, 2–4 → few, 5–20 → many, 21 → one again, 11–14 always many. */
+export function pluralRu(n: number, one: string, few: string, many: string): string {
+  const m10 = Math.abs(n) % 10
+  const m100 = Math.abs(n) % 100
+  if (m10 === 1 && m100 !== 11) return one
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few
+  return many
 }
+
+/** The noun that goes with a count: 1 слово, 2 слова, 5 слов. */
+export const wordNoun = (n: number) => pluralRu(n, 'слово', 'слова', 'слов')
+
+/** «1 слово», «3 слова», «12 слов». */
+export const formatWords = (n: number) => `${n.toLocaleString('ru-RU')} ${wordNoun(n)}`
+
+/** A gain: «+1 слово», «+2 слова», «+340 слов». */
+export const formatWordsPlus = (n: number) => `+${formatWords(n)}`
+
+/** The count after «из» (genitive): «из 1 слова», «из 21 слова», «из 500 слов». */
+export const formatWordsOf = (n: number) => `${n.toLocaleString('ru-RU')} ${pluralRu(n, 'слова', 'слов', 'слов')}`
 
 /** The last `n` sentences of a scene: enough to pick up the thread without scrolling. */
 export function lastSentences(doc: unknown, n = 2): string {

@@ -151,6 +151,58 @@ test.describe('«В запас»', () => {
     await expect.poll(async () => (await stashNotes(page))[0]?.archived).toBe(true)
   })
 
+  /** Two plain paragraphs, then select all of the second one (and nothing of the first). */
+  async function writeAndSelectLastParagraph(page: Page) {
+    await startStory(page)
+    await typeInEditor(page, 'Он ждал долго у моста.')
+    await page.keyboard.press('Enter')
+    await page.keyboard.type(P2)
+    await waitSaveTick(page)
+    await waitTextInDb(page, P2)
+    for (let i = 0; i < P2.length; i++) await page.keyboard.press('Shift+ArrowLeft')
+  }
+  const paragraphs = (page: Page) => page.locator('.ProseMirror > p')
+
+  test('f. a whole paragraph goes without an empty one left behind', async ({ page }) => {
+    await writeAndSelectLastParagraph(page)
+    await expect(paragraphs(page)).toHaveCount(2)
+    await stash(page)
+
+    await expect(paragraphs(page)).toHaveCount(1)
+    expect(await editorText(page)).toContain('Он ждал долго у моста.')
+    expect(await editorText(page)).not.toContain(P2)
+    // Saved the same way: one paragraph, no trailing line break from an empty one.
+    await expect.poll(async () => await sceneText(page)).toBe('Он ждал долго у моста.')
+    const [note] = await stashNotes(page)
+    expect(note.text).toBe(P2)
+  })
+
+  test('f2. Ctrl+Z after a whole paragraph: both paragraphs are back exactly, the note is deleted', async ({ page }, info) => {
+    test.skip(info.project.name !== 'desktop', 'a hardware keyboard shortcut')
+    await writeAndSelectLastParagraph(page)
+    const before = await editorText(page)
+    await stash(page)
+    await expect(paragraphs(page)).toHaveCount(1)
+    await page.keyboard.press('Control+z')
+
+    await expect.poll(() => editorText(page)).toBe(before)
+    await expect(paragraphs(page)).toHaveCount(2)
+    await expect.poll(async () => (await stashNotes(page))[0]?.deleted).toBe(true)
+    await expect.poll(async () => await sceneText(page)).toBe(`Он ждал долго у моста.
+${P2}`)
+  })
+
+  test('f3. the toast «Отменить» after a whole paragraph: both paragraphs are back', async ({ page }) => {
+    await writeAndSelectLastParagraph(page)
+    await stash(page)
+    await expect(paragraphs(page)).toHaveCount(1)
+    await page.locator('.toast-undo').click()
+
+    await expect(paragraphs(page)).toHaveCount(2)
+    await expect.poll(async () => await sceneText(page)).toBe(`Он ждал долго у моста.
+${P2}`)
+  })
+
   test('e. the selection menu is reachable with a touch selection too', async ({ page }, info) => {
     test.skip(info.project.name === 'desktop', 'touch devices only')
     await startStory(page)

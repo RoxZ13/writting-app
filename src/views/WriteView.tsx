@@ -22,7 +22,7 @@ import { sumChars } from '../lib/length'
 import { ChapterMeter, splitChapterHere } from '../components/ChapterMeter'
 import { chapterProgress, dayKey, totalWords, wordsOn } from '../lib/pace'
 import { MARKER_STATES } from '../lib/status'
-import { docParagraphs, emptyDoc, formatWords, lastSentences } from '../lib/text'
+import { docParagraphs, emptyDoc, formatWords, formatWordsOf, lastSentences, wordNoun } from '../lib/text'
 import { loadTypo } from '../lib/typography'
 import { diffParagraphs } from '../lib/diff'
 import { InlineEdit, Modal, toast } from '../lib/ui'
@@ -401,14 +401,15 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                   </div>
                   {(
                     [
-                      ['spark', 'Маячок здесь', '⌘M', () => editor && setAction(selectionForMarker(editor))],
+                      ['spark', 'Маячок здесь', isMac ? '⌘M' : 'Ctrl+M', () => editor && setAction(selectionForMarker(editor))],
                       ...(chapter && !chapter.pool && !chapter.locked
                         ? [['cut', 'Новая глава с этого абзаца', '', () => void splitChapterHere(data.project, scene, editor)] as [string, string, string, () => void]]
                         : []),
-                      ['search', 'Найти и заменить', '⌘F', () => setFind({ replace: true })],
+                      ['search', 'Найти и заменить', isMac ? '⌘⇧H' : 'Ctrl+H', () => setFind({ replace: true })],
                       ['type', 'Причесать текст', '', typeset],
                       ['focus', 'Фокус с таймером', '', () => setFocusOpen(true)],
                       ['check', 'Закончить на сегодня', '', () => setFinishing(true)],
+                      ['help', 'Справка', '', () => go({ view: 'help' })],
                     ] as [string, string, string, () => void][]
                   ).map(([ico, label, keys, run]) => (
                     <button
@@ -421,7 +422,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                     >
                       <Icon name={ico} size={17} />
                       <span>{label}</span>
-                      {keys && <kbd className="menu-keys">{hotkey(keys.replace('⌘', isMac ? '⌘' : 'Ctrl+'))}</kbd>}
+                      {keys && <kbd className="menu-keys">{hotkey(keys)}</kbd>}
                     </button>
                   ))}
                   {!isTouch() && (
@@ -815,7 +816,7 @@ function FinishSession({ project, onClose }: { project: Project; onClose: () => 
         <h2>На сегодня всё?</h2>
         {today > 0 && (
           <div className="day-total">
-            Сегодня <strong>+{today.toLocaleString('ru-RU')}</strong> {goal ? `из ${goal.toLocaleString('ru-RU')} ` : ''}слов
+            Сегодня <strong>+{today.toLocaleString('ru-RU')}</strong> {goal ? `из ${formatWordsOf(goal)}` : wordNoun(today)}
             {goal && today >= goal ? ' — цель дня есть' : ''}
           </div>
         )}

@@ -1,6 +1,7 @@
 import type { Editor } from '@tiptap/react'
 import { Fragment, Slice } from '@tiptap/pm/model'
 import { closeHistory } from '@tiptap/pm/history'
+import { TextSelection, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { uid, db, type Note, type Scene } from '../db/db'
 import { createNote, patch, remove } from '../db/repo'
 import { go } from './router'
@@ -46,6 +47,24 @@ export function createStashNote(projectId: string, sceneId: string, text: string
 /** The piece has gone back into the text: the note is done (soft, nothing is deleted). */
 export const archiveStash = (noteId: string) => patch<Note>('notes', noteId, { archived: true })
 
+/**
+ * The step that takes [from, to) out of the text. When the piece was whole paragraphs (it starts where a paragraph
+ * starts and ends where one ends), the empty paragraph that would be left behind goes too — in the same step,
+ * so one undo brings back exactly what was there. The last paragraph of the scene stays: a scene is never without one.
+ */
+export function stashTransaction(state: EditorState, from: number, to: number): Transaction {
+  const tr = state.tr.delete(from, to)
+  const $from = state.doc.resolve(from)
+  const $to = state.doc.resolve(to)
+  if ($from.parentOffset !== 0 || $to.parentOffset !== $to.parent.content.size) return tr
+  const $at = tr.doc.resolve(tr.mapping.map(from))
+  const block = $at.parent
+  if ($at.depth === 0 || !block.isTextblock || block.content.size > 0 || tr.doc.childCount < 2) return tr
+  const start = $at.before()
+  tr.delete(start, $at.after())
+  return tr.setSelection(TextSelection.near(tr.doc.resolve(Math.min(start, tr.doc.content.size)), -1))
+}
+
 /** «Убрать в запас»: the selection leaves the text in one step and becomes a note of this scene. */
 export function stashSelection(editor: Editor, scene: Scene) {
   const { from, to, empty } = editor.state.selection
@@ -57,7 +76,7 @@ export function stashSelection(editor: Editor, scene: Scene) {
 
   // Closed on both sides, so one Ctrl+Z takes back exactly this step, not the typing around it.
   editor.view.dispatch(closeHistory(state.tr))
-  editor.view.dispatch(editor.state.tr.delete(from, to))
+  editor.view.dispatch(stashTransaction(editor.state, from, to))
   editor.view.dispatch(closeHistory(editor.state.tr))
   const written = createStashNote(scene.projectId, scene.id, text, nodes, noteId)
   const entry: StashMemory = { noteId, written, docAfter: editor.state.doc, from, nodes }
@@ -82,7 +101,9 @@ export async function revertStash(editor: Editor, entry: StashMemory) {
 /** Insert paragraphs like a paste does: the first and last join the paragraph at the cursor. */
 function insertNodes(editor: Editor, nodes: unknown[], at?: number) {
   const { schema } = editor.state
-  const slice = new Slice(Fragment.fromJSON(schema, nodes), 1, 1)
+  // Between two paragraphs (a whole paragraph was stashed) the pieces go in as paragraphs of their own, not joined to a neighbour.
+  const open = at !== undefined && !editor.state.doc.resolve(at).parent.isTextblock ? 0 : 1
+  const slice = new Slice(Fragment.fromJSON(schema, nodes), open, open)
   const tr = editor.state.tr
   if (at === undefined) tr.replaceSelection(slice)
   else tr.replaceRange(at, at, slice)

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ProjectData } from '../lib/hooks'
 import { totalWords } from '../lib/pace'
 import { getSprint, startSprint, stopSprint, useSprint } from '../lib/sprint'
+import { wordNoun } from '../lib/text'
 import { Modal } from '../lib/ui'
 
 /**
@@ -171,7 +172,7 @@ export function FocusDone({ data }: { data: ProjectData }) {
     <Modal onClose={() => endFocus()} label="Фокус закончился">
       <div className="stack" style={{ textAlign: 'center' }}>
         <div className="sprint-big">+{written.toLocaleString('ru-RU')}</div>
-        <div className="muted">{written ? `слов за ${sprint.minutes} минут. Отлично.` : `${sprint.minutes} минут прошли. Даже думать над сценой — работа.`}</div>
+        <div className="muted">{written ? `${wordNoun(written)} за ${sprint.minutes} минут. Отлично.` : `${sprint.minutes} минут прошли. Даже думать над сценой — работа.`}</div>
         <div className="row" style={{ justifyContent: 'center' }}>
           <button
             className="btn ghost"

@@ -1,10 +1,12 @@
+import { go } from '../lib/router'
 import { Modal } from '../lib/ui'
 
 const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 const MOD = mac ? '⌘' : 'Ctrl'
 const ALT = mac ? '⌥' : 'Alt'
 
-const GROUPS: [string, [string, string][]][] = [
+/** Every key the app knows, by group. The help page shows the same list. */
+export const SHORTCUT_GROUPS: [string, [string, string][]][] = [
   [
     'Текст',
     [
@@ -23,7 +25,15 @@ const GROUPS: [string, [string, string][]][] = [
       [`${MOD} + ⇧ + F`, 'Поиск по всей истории'],
       [`${MOD} + M`, 'Маячок там, где курсор'],
       [`${MOD} + J`, 'Быстрая запись'],
+      [`${MOD} + /`, 'Эти клавиши'],
       ['Esc', 'Показать шапку в тихом виде'],
+    ],
+  ],
+  [
+    'Доска',
+    [
+      [`${MOD} + Z`, 'Отменить последнее действие с главами, сценами и линиями'],
+      [mac ? '⌘ + ⇧ + Z' : 'Ctrl + Shift + Z', 'Вернуть отменённое'],
     ],
   ],
   [
@@ -46,7 +56,7 @@ export function Shortcuts({ onClose }: { onClose: () => void }) {
     <Modal onClose={onClose} label="Горячие клавиши">
       <div className="stack keys">
         <h2>Горячие клавиши</h2>
-        {GROUPS.map(([title, rows]) => (
+        {SHORTCUT_GROUPS.map(([title, rows]) => (
           <section key={title}>
             <div className="field-label">{title}</div>
             {rows.map(([k, what]) => (
@@ -57,6 +67,16 @@ export function Shortcuts({ onClose }: { onClose: () => void }) {
             ))}
           </section>
         ))}
+        <button
+          className="link"
+          style={{ alignSelf: 'flex-start' }}
+          onClick={() => {
+            onClose()
+            go({ view: 'help' })
+          }}
+        >
+          Вся справка →
+        </button>
       </div>
     </Modal>
   )

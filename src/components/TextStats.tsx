@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import type { Project, Scene } from '../db/db'
 import { budgetState, sceneBudget } from '../lib/budget'
 import { lengthText } from '../lib/length'
-import { formatChars, formatSheets, formatWords, textStats } from '../lib/text'
+import { formatChars, formatSheets, formatWords, formatWordsPlus, textStats } from '../lib/text'
 
 /**
  * The counter in the corner, as in iA Writer and Ulysses: words of the scene, or of the selection
@@ -81,7 +81,7 @@ export function TextStats({
             />
             <StatsBlock title="Глава" rows={[formatWords(chapterWords)]} />
             <StatsBlock title="История" rows={[formatWords(bookWords)]} />
-            <div className="stats-today">Сегодня +{today.toLocaleString('ru-RU')}</div>
+            <div className="stats-today">Сегодня {formatWordsPlus(today)}</div>
           </div>
         </>
       )}
