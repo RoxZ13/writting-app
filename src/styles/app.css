@@ -1520,6 +1520,45 @@ details.menu > summary::-webkit-details-marker {
 .settings-section {
   margin-bottom: 20px;
 }
+.fatal-page {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.fatal-card {
+  width: min(560px, 100%);
+  padding: clamp(24px, 5vw, 40px);
+}
+.fatal-card h1 {
+  margin: 10px 0;
+}
+.fatal-card p {
+  line-height: 1.55;
+}
+.fatal-mark {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: var(--danger-ink);
+  background: color-mix(in srgb, var(--danger-ink) 12%, transparent);
+  font-size: 24px;
+  font-weight: 700;
+}
+.fatal-actions {
+  flex-wrap: wrap;
+  margin: 20px 0;
+}
+.fatal-details {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 8px 0 0;
+  padding: 10px;
+  border-radius: var(--r-md);
+  background: var(--fill);
+}
 .conflict-list {
   display: grid;
   gap: 8px;

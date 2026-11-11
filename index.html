@@ -26,14 +26,24 @@
       setTimeout(function () {
         var root = document.getElementById('root')
         if (root && root.getAttribute('data-ready')) return
-        root.innerHTML =
-          '<div style="font-family:system-ui,sans-serif;max-width:520px;margin:15vh auto;padding:0 16px;color:#1c1c1e">' +
-          '<h2 style="margin:0 0 8px">Manuscript не запустился</h2>' +
-          '<p style="color:#545458">Сделай скриншот этого экрана и отправь его — по нему видно, что сломалось.</p>' +
-          '<pre style="white-space:pre-wrap;background:#f2f2f4;padding:12px;border-radius:8px;font-size:13px">' +
-          (window.__bootErrors.join('\n') || 'Ошибок нет, но приложение не ответило за 10 секунд.') +
-          '\n\n' + navigator.userAgent + '</pre>' +
-          '<button onclick="location.reload()" style="padding:8px 14px;border-radius:8px;border:1px solid #ccc;background:#fff">Перезагрузить</button></div>'
+        if (!root) return
+        var panel = document.createElement('main')
+        panel.style.cssText = 'font-family:system-ui,sans-serif;max-width:520px;margin:15vh auto;padding:0 16px;color:#1c1c1e'
+        var title = document.createElement('h2')
+        title.style.margin = '0 0 8px'
+        title.textContent = 'Manuscript не запустился'
+        var note = document.createElement('p')
+        note.style.color = '#545458'
+        note.textContent = 'Данные на устройстве не удалены. Сделайте скриншот этого экрана и отправьте его — по нему видно, что сломалось.'
+        var details = document.createElement('pre')
+        details.style.cssText = 'white-space:pre-wrap;background:#f2f2f4;padding:12px;border-radius:8px;font-size:13px'
+        details.textContent = (window.__bootErrors.join('\n') || 'Ошибок нет, но приложение не ответило за 10 секунд.') + '\n\n' + navigator.userAgent
+        var reload = document.createElement('button')
+        reload.style.cssText = 'padding:8px 14px;border-radius:8px;border:1px solid #ccc;background:#fff'
+        reload.textContent = 'Перезагрузить'
+        reload.addEventListener('click', function () { location.reload() })
+        panel.append(title, note, details, reload)
+        root.replaceChildren(panel)
       }, 10000)
     </script>
     <script type="module" src="/src/main.tsx"></script>

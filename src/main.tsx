@@ -13,6 +13,7 @@ import { registerSW } from 'virtual:pwa-register'
 import { getYandexToken, takeYandexRedirect, yandexStore } from './lib/yandex'
 import { startFileSync } from './lib/filesync'
 import { remoteSyncAllowed } from './lib/environment'
+import { AppErrorBoundary } from './components/AppErrorBoundary'
 
 showTheme(getTheme())
 applyAccent(getAccent())
@@ -45,6 +46,8 @@ document.addEventListener('visibilitychange', () => {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <AppErrorBoundary>
+      <App />
+    </AppErrorBoundary>
   </StrictMode>,
 )
