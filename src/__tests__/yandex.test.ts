@@ -127,6 +127,28 @@ describe('Yandex Disk file store', () => {
     expect((await yandexStore().read())[0].data).toEqual(BACKUP)
   })
 
+  it('reassembles a cloud snapshot returned in multiple proxy responses', async () => {
+    setYandexProxyUrl(PROXY)
+    const gz = gzipSync(Buffer.from(JSON.stringify(BACKUP)))
+    const cut = Math.floor(gz.length / 2)
+    const calls: { url: string; init?: RequestInit }[] = []
+    vi.stubGlobal('fetch', async (url: string, init?: RequestInit) => {
+      calls.push({ url, init })
+      if (url === PROXY) {
+        const body = JSON.parse(init?.body as string) as { offset?: number; fileId?: string }
+        return body.offset
+          ? new Response(gz.subarray(cut), { headers: { 'X-Manuscript-Total': String(gz.length), 'X-Manuscript-File': 'file-1' } })
+          : new Response(gz.subarray(0, cut), { headers: { 'X-Manuscript-Next': String(cut), 'X-Manuscript-Total': String(gz.length), 'X-Manuscript-File': 'file-1' } })
+      }
+      if (url.includes('/resources?')) return new Response(JSON.stringify({ revision: 7 }))
+      return new Response('', { status: 404 })
+    })
+    const { yandexStore } = await import('../lib/yandex')
+    expect((await yandexStore().read())[0].data).toEqual(BACKUP)
+    const second = calls.filter((call) => call.url === PROXY)[1]
+    expect(JSON.parse(second.init?.body as string)).toMatchObject({ offset: cut, fileId: 'file-1' })
+  })
+
   it('reads every per-device snapshot and does not require the legacy file', async () => {
     setYandexProxyUrl(PROXY)
     const calls: { url: string; init?: RequestInit }[] = []

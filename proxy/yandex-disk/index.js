@@ -12,12 +12,15 @@
  */
 
 const zlib = require('node:zlib')
+const crypto = require('node:crypto')
 
 const API = 'https://cloud-api.yandex.net/v1/disk'
 const DEFAULT_ORIGINS = 'https://roxz13.github.io,http://localhost:5173,http://localhost:4173'
 const MAX_REQUEST_BYTES = positiveInt('MAX_REQUEST_BYTES', 16 * 1024)
 const MAX_FILE_BYTES = positiveInt('MAX_FILE_BYTES', 50 * 1024 * 1024)
 const REQUEST_TIMEOUT_MS = positiveInt('REQUEST_TIMEOUT_MS', 20_000)
+// Base64 adds ~33%; 1.5 MiB stays well below Cloud Functions' fixed 3.5 MB JSON response limit.
+const RESPONSE_CHUNK_BYTES = positiveInt('RESPONSE_CHUNK_BYTES', 1536 * 1024)
 
 class TooLargeError extends Error {}
 
@@ -45,6 +48,7 @@ function cors(origin) {
     Vary: 'Origin',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Expose-Headers': 'X-Manuscript-Next, X-Manuscript-Total, X-Manuscript-File',
   }
 }
 
@@ -125,8 +129,11 @@ module.exports.handler = async (event) => {
     }
     const token = req && typeof req.token === 'string' ? req.token.trim() : ''
     const path = req && typeof req.path === 'string' ? req.path : ''
+    const offset = req && req.offset !== undefined ? Number(req.offset) : 0
+    const expectedFile = req && typeof req.fileId === 'string' ? req.fileId : ''
     if (path.length > 1024 || !path.startsWith('app:/') || path.includes('..')) return json(400, origin, { error: 'path' })
     if (!token || token.length > 4096) return json(401, origin, { error: 'token' })
+    if (!Number.isSafeInteger(offset) || offset < 0) return json(400, origin, { error: 'offset' })
 
     const auth = { Authorization: `OAuth ${token}` }
     const link = await fetch(`${API}/resources/download?path=${encodeURIComponent(path)}`, {
@@ -142,10 +149,23 @@ module.exports.handler = async (event) => {
     if (!file.ok) return json(file.status === 404 ? 404 : 502, origin, { error: 'download' })
     const bytes = await readLimited(file, MAX_FILE_BYTES)
     const gz = bytes.length >= 2 && bytes[0] === 0x1f && bytes[1] === 0x8b ? bytes : zlib.gzipSync(bytes)
+    const fileId = crypto.createHash('sha256').update(gz).digest('base64url').slice(0, 22)
+    if (expectedFile && expectedFile !== fileId) return json(409, origin, { error: 'file-changed' })
+    if (offset > gz.length) return json(416, origin, { error: 'offset' })
+    const end = Math.min(offset + RESPONSE_CHUNK_BYTES, gz.length)
+    const chunk = gz.subarray(offset, end)
+    const responseHeaders = {
+      ...cors(origin),
+      'Content-Type': 'application/octet-stream',
+      'Cache-Control': 'no-store',
+      'X-Manuscript-Total': String(gz.length),
+      'X-Manuscript-File': fileId,
+    }
+    if (end < gz.length) responseHeaders['X-Manuscript-Next'] = String(end)
     return {
       statusCode: 200,
-      headers: { ...cors(origin), 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' },
-      body: gz.toString('base64'),
+      headers: responseHeaders,
+      body: chunk.toString('base64'),
       isBase64Encoded: true,
     }
   } catch (e) {

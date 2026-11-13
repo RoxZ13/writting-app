@@ -1,4 +1,5 @@
 import { createRequire } from 'node:module'
+import { randomBytes } from 'node:crypto'
 import { gunzipSync, gzipSync } from 'node:zlib'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
@@ -66,6 +67,7 @@ describe('Yandex Disk proxy', () => {
     expect(res.headers.Vary).toBe('Origin')
     expect(res.headers['Access-Control-Allow-Methods']).toBe('POST, OPTIONS')
     expect(res.headers['Access-Control-Allow-Headers']).toBe('Content-Type')
+    expect(res.headers['Access-Control-Expose-Headers']).toContain('X-Manuscript-Next')
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
@@ -122,6 +124,35 @@ describe('Yandex Disk proxy', () => {
     const res = await handler(post({ token: 't', path: 'app:/manuscript.json' }))
     expect(res.statusCode).toBe(200)
     expect(Buffer.from(res.body, 'base64').equals(gz)).toBe(true)
+  })
+
+  it('returns a large file in verifiable chunks below the platform response limit', async () => {
+    const gz = randomBytes(1600 * 1024)
+    gz[0] = 0x1f
+    gz[1] = 0x8b
+    vi.stubGlobal('fetch', vi.fn(async (url: string) =>
+      String(url).startsWith('https://cloud-api.yandex.net/')
+        ? new Response(JSON.stringify({ href: 'https://downloader.disk.yandex.ru/disk/abc' }))
+        : new Response(gz),
+    ))
+    const first = await handler(post({ token: 't', path: 'app:/manuscript.json' }))
+    expect(first.statusCode).toBe(200)
+    expect(Buffer.byteLength(first.body, 'utf8')).toBeLessThan(3.5 * 1024 * 1024)
+    const next = Number(first.headers['X-Manuscript-Next'])
+    const fileId = first.headers['X-Manuscript-File']
+    expect(next).toBeGreaterThan(0)
+    const second = await handler(post({ token: 't', path: 'app:/manuscript.json', offset: next, fileId }))
+    expect(second.statusCode).toBe(200)
+    expect(second.headers['X-Manuscript-Next']).toBeUndefined()
+    const joined = Buffer.concat([Buffer.from(first.body, 'base64'), Buffer.from(second.body, 'base64')])
+    expect(joined.equals(gz)).toBe(true)
+  })
+
+  it('refuses to join chunks from a file that changed', async () => {
+    stubDisk()
+    const res = await handler(post({ token: 't', path: 'app:/manuscript.json', offset: 1, fileId: 'old-file' }))
+    expect(res.statusCode).toBe(409)
+    expect(JSON.parse(res.body).error).toBe('file-changed')
   })
 
   it('rejects a download whose declared size exceeds the limit', async () => {

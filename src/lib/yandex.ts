@@ -215,24 +215,62 @@ export function yandexStore(): FileStore {
       }
       return { source, data, version }
     }
-    let res: Response
-    try {
-      res = await fetch(proxy, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ token: token(), path }),
-      })
-    } catch {
-      throw new Error('Не получилось скачать файл с Яндекс Диска. Проверь интернет и попробуй ещё раз.')
+    const requestChunk = async (offset?: number, fileId?: string) => {
+      let response: Response
+      try {
+        response = await fetch(proxy, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify({ token: token(), path, ...(offset ? { offset } : {}), ...(fileId ? { fileId } : {}) }),
+        })
+      } catch {
+        throw new Error('Не получилось скачать файл с Яндекс Диска. Проверь интернет и попробуй ещё раз.')
+      }
+      if (response.status === 401) {
+        forgetYandex()
+        throw reauth()
+      }
+      if (response.status === 409) throw new Error('Файл на Яндекс Диске изменился во время скачивания. Нажми «Синхронизировать» ещё раз.')
+      if (!response.ok) throw new Error(`Не получилось скачать с Яндекс Диска (${response.status})`)
+      return response
     }
-    if (res.status === 401) {
-      forgetYandex()
-      throw reauth()
+    const parts: Uint8Array[] = []
+    let received = 0
+    let next: number | undefined
+    let fileId: string | undefined
+    let expectedTotal: number | undefined
+    do {
+      const res = await requestChunk(next, fileId)
+      const part = new Uint8Array(await res.arrayBuffer())
+      received += part.byteLength
+      if (received > MAX_SYNC_BYTES) throw new Error('Файл синхронизации больше 50 МБ')
+      parts.push(part)
+      const responseFile = res.headers.get('X-Manuscript-File') || undefined
+      if (fileId && responseFile && responseFile !== fileId) throw new Error('Файл на Яндекс Диске изменился во время скачивания')
+      fileId = fileId ?? responseFile
+      const totalValue = res.headers.get('X-Manuscript-Total')
+      if (totalValue !== null) {
+        const totalHeader = Number(totalValue)
+        if (Number.isSafeInteger(totalHeader) && totalHeader >= 0) expectedTotal = totalHeader
+      }
+      const nextHeader = res.headers.get('X-Manuscript-Next')
+      if (!nextHeader) next = undefined
+      else {
+        const value = Number(nextHeader)
+        if (!Number.isSafeInteger(value) || value !== received) throw new Error('Прокси вернул части файла в неверном порядке')
+        next = value
+      }
+    } while (next !== undefined)
+    if (expectedTotal !== undefined && expectedTotal !== received) throw new Error('Прокси вернул файл не полностью')
+    const combined = new Uint8Array(received)
+    let at = 0
+    for (const part of parts) {
+      combined.set(part, at)
+      at += part.byteLength
     }
-    if (!res.ok) throw new Error(`Не получилось скачать с Яндекс Диска (${res.status})`)
     let data: Backup
     try {
-      data = await parseBackup(await res.arrayBuffer())
+      data = await parseBackup(combined.buffer)
     } catch {
       throw new Error('Не получилось прочитать файл с Яндекс Диска. Попробуй ещё раз.')
     }
