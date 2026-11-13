@@ -90,7 +90,7 @@ describe('Yandex Disk file store', () => {
   })
   afterEach(() => vi.unstubAllGlobals())
 
-  const BACKUP = { projects: [{ id: 'p1', title: 'Книга' }] }
+  const BACKUP = { projects: [{ id: 'p1', title: 'Книга', updatedAt: 1 }] }
   const PROXY = 'https://proxy.test/fn'
 
   /** Disk API answers the version request; the proxy answers with whatever the test hands it. */
@@ -134,7 +134,7 @@ describe('Yandex Disk file store', () => {
       calls.push({ url, init })
       if (url === PROXY) {
         const path = JSON.parse(init?.body as string).path as string
-        return new Response(JSON.stringify({ projects: [{ id: path, title: path }] }))
+        return new Response(JSON.stringify({ projects: [{ id: path, title: path, updatedAt: 1 }] }))
       }
       const parsed = new URL(url)
       const path = parsed.searchParams.get('path')
@@ -200,6 +200,13 @@ describe('Yandex Disk file store', () => {
     stubFetch(() => new Response('{}', { status: 502 }))
     const { yandexStore } = await import('../lib/yandex')
     await expect(yandexStore().read()).rejects.toThrow('502')
+  })
+
+  it('rejects a malformed cloud snapshot before it reaches IndexedDB', async () => {
+    setYandexProxyUrl(PROXY)
+    stubFetch(() => new Response(JSON.stringify({ projects: [{ id: 'p1', title: 'Без версии' }] })))
+    const { yandexStore } = await import('../lib/yandex')
+    await expect(yandexStore().read()).rejects.toThrow('Не получилось прочитать файл')
   })
 
   it('shows a network message when the proxy cannot be reached', async () => {

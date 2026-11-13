@@ -37,7 +37,10 @@ function stubDisk(opts: { link?: Response; file?: Response } = {}) {
   return fetchMock
 }
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.unstubAllGlobals()
+})
 
 describe('Yandex Disk proxy', () => {
   it('refuses a foreign origin without reading anything', async () => {
@@ -83,6 +86,14 @@ describe('Yandex Disk proxy', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('rejects an oversized request before contacting Yandex', async () => {
+    const fetchMock = stubDisk()
+    const res = await handler(post('x'.repeat(17 * 1024)))
+    expect(res.statusCode).toBe(413)
+    expect(JSON.parse(res.body).error).toBe('request-too-large')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('returns the file as base64 gzip with CORS', async () => {
     const fetchMock = stubDisk()
     const res = await handler(post({ token: 'secret', path: 'app:/manuscript.json' }))
@@ -111,6 +122,27 @@ describe('Yandex Disk proxy', () => {
     const res = await handler(post({ token: 't', path: 'app:/manuscript.json' }))
     expect(res.statusCode).toBe(200)
     expect(Buffer.from(res.body, 'base64').equals(gz)).toBe(true)
+  })
+
+  it('rejects a download whose declared size exceeds the limit', async () => {
+    const fetchMock = stubDisk({ file: new Response('small', { headers: { 'content-length': String(51 * 1024 * 1024) } }) })
+    const res = await handler(post({ token: 't', path: 'app:/manuscript.json' }))
+    expect(res.statusCode).toBe(413)
+    expect(JSON.parse(res.body).error).toBe('file-too-large')
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('aborts a stalled Yandex request on timeout', async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('fetch', vi.fn((_url: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+    })))
+    const pending = handler(post({ token: 't', path: 'app:/manuscript.json' }))
+    await vi.advanceTimersByTimeAsync(20_001)
+    const res = await pending
+    expect(res.statusCode).toBe(504)
+    expect(JSON.parse(res.body).error).toBe('timeout')
+    vi.useRealTimers()
   })
 
   it('passes a Disk 404 through with CORS', async () => {

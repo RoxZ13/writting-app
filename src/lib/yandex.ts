@@ -1,4 +1,4 @@
-import type { Backup } from './backup'
+import { parseBackupText, type Backup } from './backup'
 import type { FileStore } from './filesync'
 import { previewCloudError, remoteSyncAllowed } from './environment'
 
@@ -19,6 +19,7 @@ const CLIENT_KEY = 'manuscript.yandex.client'
 const STATE_KEY = 'manuscript.yandex.state'
 const PROXY_KEY = 'manuscript.yandex.proxy'
 const STATE_TTL = 15 * 60 * 1000
+const MAX_SYNC_BYTES = 50 * 1024 * 1024
 
 export function getYandexClientId(): string | null {
   try {
@@ -136,14 +137,35 @@ export function takeYandexRedirect(): boolean {
 
 const reauth = () => new Error('Яндекс Диск попросил войти заново. Нажми «Подключить» ещё раз.')
 
-/** Gzip bytes (from the proxy) or plain JSON text. */
+async function textFromStream(stream: ReadableStream<Uint8Array>, max = MAX_SYNC_BYTES): Promise<string> {
+  const reader = stream.getReader()
+  const decoder = new TextDecoder()
+  let total = 0
+  let text = ''
+  try {
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > max) throw new Error('Файл синхронизации больше 50 МБ')
+      text += decoder.decode(value, { stream: true })
+    }
+    return text + decoder.decode()
+  } catch (error) {
+    await reader.cancel().catch(() => {})
+    throw error
+  }
+}
+
+/** Gzip bytes (from the proxy) or plain JSON text, with the same validation as a manual backup. */
 async function parseBackup(buf: ArrayBuffer): Promise<Backup> {
   const bytes = new Uint8Array(buf)
   if (bytes.length > 2 && bytes[0] === 0x1f && bytes[1] === 0x8b) {
     const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))
-    return JSON.parse(await new Response(stream).text()) as Backup
+    return parseBackupText(await textFromStream(stream))
   }
-  return JSON.parse(new TextDecoder().decode(bytes)) as Backup
+  if (bytes.byteLength > MAX_SYNC_BYTES) throw new Error('Файл синхронизации больше 50 МБ')
+  return parseBackupText(new TextDecoder().decode(bytes))
 }
 
 async function call(path: string, token: string, init?: RequestInit): Promise<Response> {
@@ -185,7 +207,13 @@ export function yandexStore(): FileStore {
         throw new Error(needProxy)
       }
       if (!direct.ok) throw new Error(needProxy)
-      return { source, data: (await direct.json()) as Backup, version }
+      let data: Backup
+      try {
+        data = await parseBackup(await direct.arrayBuffer())
+      } catch {
+        throw new Error('Не получилось прочитать файл с Яндекс Диска. Попробуй ещё раз.')
+      }
+      return { source, data, version }
     }
     let res: Response
     try {
