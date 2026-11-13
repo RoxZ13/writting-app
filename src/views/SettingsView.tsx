@@ -19,6 +19,7 @@ import { getYandexToken } from '../lib/yandex'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type SyncConflict } from '../db/db'
 import { conflictChanges, dismissConflict, restoreConflict } from '../lib/conflicts'
+import { StorageDiagnostics } from '../components/StorageDiagnostics'
 
 /** Settings of the app itself (not of a book): look, devices, installing, backup. */
 export function SettingsView({ sync }: { sync: SyncStatus }) {
@@ -172,6 +173,7 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
           </FilePick>
         </div>
       </section>
+      <StorageDiagnostics sync={sync} />
       <div className="small muted app-version">
         {__PREVIEW__ ? 'Тестовая версия · облако отключено · ' : ''}
         Версия от {new Date(__BUILD__).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
