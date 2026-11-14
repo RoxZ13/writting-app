@@ -62,15 +62,23 @@ export function CharactersView({ data }: { data: ProjectData }) {
         {data.characters.map((c) => (
           <Person key={c.id} data={data} c={c} found={found?.get(c.id) ?? (found ? [] : undefined)} />
         ))}
-        <div className="person add">
+        <form
+          className="person add person-add"
+          onSubmit={(e) => {
+            e.preventDefault()
+            void add()
+          }}
+        >
           <input
             className="quick-add"
             placeholder="+ Новый герой"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && void add()}
           />
-        </div>
+          <button className="btn primary sm" type="submit" disabled={!name.trim()}>
+            Добавить героя
+          </button>
+        </form>
       </div>
       <Branches data={data} />
     </div>

@@ -5941,6 +5941,132 @@ button.avatar {
     display: block;
   }
 }
+
+/* =====================================================================
+   Mobile reliability: actions stay reachable and the scene navigator is
+   a temporary bottom sheet instead of a permanent side column.
+   ===================================================================== */
+.person.add.person-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+.person-add .quick-add {
+  min-width: 0;
+}
+.scene-delete-mobile,
+.mobile-danger {
+  color: var(--danger-ink) !important;
+}
+.scene-delete-mobile {
+  width: 100%;
+}
+.tl-head-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.tl-head-row .tl-head {
+  flex: 1;
+  min-width: 0;
+}
+.tl-actions {
+  margin-right: 8px;
+}
+.chapter-actions-mobile .btn {
+  width: 100%;
+  min-height: 44px;
+}
+
+@media (max-width: 900px) {
+  .tabs > button,
+  .tabs .tab-aux {
+    flex: 1 1 0;
+    min-width: 0;
+    padding-left: 2px;
+    padding-right: 2px;
+    overflow: hidden;
+  }
+  .tabs .tab-label {
+    display: block;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: center;
+  }
+}
+
+@media (max-width: 760px) {
+  .write-side {
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: min(70dvh, 600px);
+    border: 0;
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    clip-path: inset(100% 0 0 0);
+    background: var(--side);
+  }
+  .write-side::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    margin: 10px auto 0;
+    border-radius: 3px;
+    background: var(--line-2);
+  }
+  .write-side .inner {
+    width: 100%;
+    height: calc(100% - 14px);
+    padding: 8px 12px calc(env(safe-area-inset-bottom) + 24px);
+    overflow-y: auto;
+  }
+  .write.nav-open .write-side {
+    clip-path: inset(0 0 0 0);
+    visibility: visible;
+  }
+  .write-top .scene-nav-tool .tool-label {
+    display: inline;
+  }
+}
+
+@media (max-width: 600px) {
+  .write-top {
+    flex-wrap: nowrap;
+    gap: 0;
+    min-height: 48px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+  .write-top .crumbs,
+  .write-top .hints-bar {
+    display: none;
+  }
+  .write-top > .spacer {
+    display: block;
+    flex: 1 1 auto;
+  }
+  .write-top .tool {
+    min-width: 44px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+  .write-top .scene-nav-tool {
+    min-width: auto;
+  }
+  .person.add.person-add {
+    grid-template-columns: 1fr;
+  }
+  .person-add .btn {
+    width: 100%;
+    min-height: 44px;
+  }
+}
 /* On the phone the tab bar takes the bottom edge: the counter sits above it (the same place as the round button). */
 @media (max-width: 760px) {
   .text-stats {

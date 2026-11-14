@@ -308,9 +308,14 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
 
       <div className="write-center">
         <div className="write-top">
-          <button className={`tool ${panels.nav ? 'on' : ''}`} title={panels.nav ? 'Скрыть главы' : 'Показать главы'} onClick={() => togglePanel('nav')}>
+          <button
+            className={`tool scene-nav-tool ${panels.nav ? 'on' : ''}`}
+            title={panels.nav ? 'Скрыть сцены' : 'Показать сцены'}
+            aria-expanded={panels.nav}
+            onClick={() => togglePanel('nav')}
+          >
             <Icon name="panel" size={17} />
-            <span className="tool-label">Главы</span>
+            <span className="tool-label">Сцены</span>
           </button>
           <div className="crumbs">
             <span className="hide-sm" style={{ whiteSpace: 'nowrap' }}>

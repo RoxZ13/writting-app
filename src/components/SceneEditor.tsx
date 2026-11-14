@@ -74,7 +74,7 @@ export function SceneEditor({
         const charCount = docCharCount(content)
         // Another device's (or tab's) text arrived while this one was being typed: keep it in versions before writing over it.
         // Check and write in one transaction, so no other write can slip in between them.
-        const saved = await db.transaction('rw', db.texts, db.snapshots, db.outbox, async () => {
+        const saved = await db.transaction('rw', db.texts, db.snapshots, db.outbox, db.meta, async () => {
           const stored = await db.texts.get(scene.id)
           if (stored && stored.updatedAt > lastSavedAt.current && JSON.stringify(stored.content) !== JSON.stringify(content)) {
             await snapshotScene(stored, 'Версия с другого устройства (конфликт синхронизации)')

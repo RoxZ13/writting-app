@@ -61,6 +61,15 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
       toastUndo(`Сцена перенесена в «${data.chapterById.get(to)?.title}»`)
     }
   }
+  const deleteScene = async () => {
+    if (!confirm(`Удалить «${sceneName(data, scene)}» вместе с текстом?`)) return
+    await undoable('удаление сцены', async () => {
+      await remove('scenes', scene.id)
+      await remove('texts', scene.id)
+    })
+    onClose()
+    toastUndo('Сцена удалена')
+  }
 
   return createPortal(
     <>
@@ -94,6 +103,11 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
           Писать эту сцену →
         </button>
         {phone && where}
+        {phone && !locked && (
+          <button className="btn ghost scene-delete-mobile" onClick={() => void deleteScene()}>
+            Удалить сцену
+          </button>
+        )}
         {/* Only what stands out: pace when the scene is quiet or tense, and whether it is a key one. */}
         <div className="sheet-plot">
           <div className="seg" role="group" aria-label="Темп сцены">
@@ -201,15 +215,7 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
               <button
                 className="btn ghost"
                 style={{ color: 'var(--danger-ink)' }}
-                onClick={async () => {
-                  if (!confirm(`Удалить «${sceneName(data, scene)}» вместе с текстом?`)) return
-                  await undoable('удаление сцены', async () => {
-                    await remove('scenes', scene.id)
-                    await remove('texts', scene.id)
-                  })
-                  onClose()
-                  toastUndo('Сцена удалена')
-                }}
+                onClick={() => void deleteScene()}
               >
                 Удалить сцену
               </button>

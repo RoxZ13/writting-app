@@ -243,7 +243,13 @@ function AppHeader({ data, route, safety, onSearch }: { data: ProjectData; route
         <button className="project-name" title="Все истории" onClick={() => go({ view: 'library' })}>
           {data.project.title} <span className="caret"><Icon name="down" size={13} /></span>
         </button>
-        <button className="data-safety" data-state={safety.state} title={safety.title} aria-label={safety.title} onClick={() => go({ view: 'settings' })}>
+        <button
+          className="data-safety"
+          data-state={safety.state}
+          title={safety.title}
+          aria-label={`${safety.label}. ${safety.title}`}
+          onClick={() => go({ view: 'settings' })}
+        >
           <span className="sync-dot" data-state={safety.state} />
           <span className="data-safety-label">{safety.label}</span>
         </button>

@@ -853,6 +853,7 @@ function Timeline({
   const [open, setOpen] = useState<Set<string>>(
     () => new Set([...(here ? [here] : data.chapters.slice(0, 1).map((c) => c.id)), ...(storyEmpty(data) ? ['pool'] : [])]),
   )
+  const [chapterActions, setChapterActions] = useState<string | null>(null)
   const toggle = (id: string) =>
     setOpen((prev) => {
       const next = new Set(prev)
@@ -887,23 +888,28 @@ function Timeline({
         const isOpen = open.has(chapter.id)
         return (
           <section key={chapter.id} className={`tl-chapter ${isOpen ? 'open' : ''} ${lineMissing ? 'missing' : ''} ${chapter.locked ? 'locked' : ''}`}>
-            <button className="tl-head" aria-expanded={isOpen} onClick={() => toggle(chapter.id)}>
-              <span className="tl-caret">{isOpen ? '▾' : '▸'}</span>
-              <span className="tl-title">{chapter.title}</span>
-              {chapter.locked && (
-                <span className="lock-mark" title="Глава зафиксирована">
-                  <Icon name="lock" size={13} />
+            <div className="tl-head-row">
+              <button className="tl-head" aria-expanded={isOpen} onClick={() => toggle(chapter.id)}>
+                <span className="tl-caret">{isOpen ? '▾' : '▸'}</span>
+                <span className="tl-title">{chapter.title}</span>
+                {chapter.locked && (
+                  <span className="lock-mark" title="Глава зафиксирована">
+                    <Icon name="lock" size={13} />
+                  </span>
+                )}
+                {chapter.id === here && !isOpen && !storyEmpty(data) && <span className="here">ты здесь</span>}
+                <span className="spacer" />
+                {pay.length > 0 && <span className="tl-mk">◎ {pay.length}</span>}
+                {plant.length > 0 && <span className="tl-mk">✦ {plant.length}</span>}
+                <span className="tl-meta">
+                  {formatScenes(scenes.filter((s) => !isPlaceholder(s, data)).length)}
+                  <LenTag data={data} chars={sumChars(scenes)} />
                 </span>
-              )}
-              {chapter.id === here && !isOpen && !storyEmpty(data) && <span className="here">ты здесь</span>}
-              <span className="spacer" />
-              {pay.length > 0 && <span className="tl-mk">◎ {pay.length}</span>}
-              {plant.length > 0 && <span className="tl-mk">✦ {plant.length}</span>}
-              <span className="tl-meta">
-                {formatScenes(scenes.filter((s) => !isPlaceholder(s, data)).length)}
-                <LenTag data={data} chars={sumChars(scenes)} />
-              </span>
-            </button>
+              </button>
+              <button className="icon-btn tl-actions" aria-label={`Действия с главой «${chapter.title}»`} onClick={() => setChapterActions(chapter.id)}>
+                <Icon name="more" size={18} />
+              </button>
+            </div>
             {lineMissing && <div className="tl-gap">нет сцен этой линии</div>}
             {isOpen && (
               <div className="tl-body">
@@ -933,7 +939,73 @@ function Timeline({
       <button className="btn ghost" onClick={() => void newChapter(data)}>
         + Глава
       </button>
+      {chapterActions && data.chapterById.get(chapterActions) && (
+        <TimelineChapterActions
+          data={data}
+          chapter={data.chapterById.get(chapterActions)!}
+          scenes={data.scenes.filter((s) => s.chapterId === chapterActions)}
+          onClose={() => setChapterActions(null)}
+        />
+      )}
     </div>
+  )
+}
+
+/** Chapter operations that the desktop keeps in its column menu, exposed as a touch-friendly dialog. */
+function TimelineChapterActions({ data, chapter, scenes, onClose }: { data: ProjectData; chapter: Chapter; scenes: Scene[]; onClose: () => void }) {
+  const index = data.chapters.findIndex((c) => c.id === chapter.id)
+  const previous = index > 0 ? data.chapters[index - 1] : undefined
+  const addAfter = async () => {
+    await undoable('новая глава', async () => {
+      const created = await createChapter(data.project.id, `Глава ${index + 2}`)
+      const ids = data.chapters.map((c) => c.id)
+      ids.splice(index + 1, 0, created.id)
+      await reorderChapters(ids)
+    })
+    onClose()
+    toastUndo('Глава добавлена')
+  }
+  const del = async () => {
+    if (!confirm(`Удалить «${chapter.title}» вместе со сценами (${scenes.length})?`)) return
+    await undoable('удаление главы', () => deleteChapter(chapter.id))
+    onClose()
+    toastUndo('Глава удалена')
+  }
+  return (
+    <Modal onClose={onClose} label={`Действия с главой «${chapter.title}»`}>
+      <div className="stack chapter-actions-mobile">
+        <h2>{chapter.title}</h2>
+        <button
+          className="btn"
+          onClick={async () => {
+            await undoable(chapter.locked ? 'открепление главы' : 'фиксация главы', () => patch<Chapter>('chapters', chapter.id, { locked: !chapter.locked || undefined }))
+            onClose()
+          }}
+        >
+          {chapter.locked ? 'Открепить главу' : 'Зафиксировать главу'}
+        </button>
+        <button className="btn" onClick={() => void addAfter()}>
+          + Новая глава после этой
+        </button>
+        {previous && !chapter.locked && !previous.locked && (
+          <button
+            className="btn"
+            onClick={async () => {
+              await undoable('склейка глав', () => mergeIntoPrevious(chapter.id))
+              onClose()
+              toastUndo('Сцены перенесены в предыдущую главу')
+            }}
+          >
+            Склеить с предыдущей главой
+          </button>
+        )}
+        {!chapter.locked && (
+          <button className="btn ghost mobile-danger" onClick={() => void del()}>
+            Удалить главу
+          </button>
+        )}
+      </div>
+    </Modal>
   )
 }
 

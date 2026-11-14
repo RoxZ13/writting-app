@@ -398,7 +398,8 @@ test.describe('9. backup round trip', () => {
     const [download] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Скачать копию' }).click()])
     const file = testInfo.outputPath('backup.json')
     await download.saveAs(file)
-    const dump = JSON.parse(fs.readFileSync(file, 'utf8'))
+    const document = JSON.parse(fs.readFileSync(file, 'utf8'))
+    const dump = document.tables ?? document
     expect(dump.projects.filter((p: any) => !p.deleted)).toHaveLength(2)
     expect(dump.texts.some((t: any) => docText(t.content).includes(phrase))).toBe(true)
 
