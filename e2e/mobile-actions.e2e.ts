@@ -9,10 +9,11 @@ test.describe('mobile actions stay reachable', () => {
   test('a hero is added with a visible button, not only the keyboard Enter key', async ({ page }) => {
     await startStory(page)
     await openTab(page, 'Герои')
+    await page.getByRole('button', { name: 'Добавить героя' }).click()
     await page.getByPlaceholder('Имя нового героя').fill('Арина')
     await page.getByRole('button', { name: 'Добавить', exact: true }).click()
     await expect(page.locator('.hero-row').filter({ hasText: 'Арина' })).toBeVisible()
-    await expect(page.getByPlaceholder('Имя нового героя')).toBeFocused()
+    await expect(page.getByPlaceholder('Имя нового героя')).toHaveCount(0)
     await expect.poll(async () => (await aliveRows<any>(page, 'characters')).map((c) => c.name)).toContain('Арина')
   })
 
@@ -81,6 +82,7 @@ test.describe('mobile actions stay reachable', () => {
     await startStory(page)
     await openTab(page, 'Герои')
     for (const name of ['Арина', 'Макс', 'Наставник']) {
+      await page.getByRole('button', { name: 'Добавить героя' }).click()
       await page.getByPlaceholder('Имя нового героя').fill(name)
       await page.getByRole('button', { name: 'Добавить', exact: true }).click()
     }

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import type { Note } from '../db/db'
 import { createNote, patch, remove } from '../db/repo'
 import type { ProjectData } from '../lib/hooks'
@@ -8,6 +8,7 @@ import { useWhereFound, WhereFound } from '../components/WhereFound'
 import type { Found } from '../lib/mentions'
 import { InlineEdit, toast } from '../lib/ui'
 import { Icon } from '../components/Icon'
+import { pluralRu } from '../lib/text'
 
 /** "Герои · Матчасть": two sides of the same world, one tab. */
 export function WorldNav({ current }: { current: 'characters' | 'lore' }) {
@@ -30,8 +31,8 @@ export function LoreView({ data }: { data: ProjectData }) {
   const [q, setQ] = useState('')
   const [topic, setTopic] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
+  const [adding, setAdding] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(null)
-  const addInput = useRef<HTMLInputElement>(null)
   const found = useWhereFound(data)
   const topics = [...new Set(data.lore.map((n) => n.topic?.trim()).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, 'ru'))
   const shown = data.lore.filter(
@@ -44,7 +45,7 @@ export function LoreView({ data }: { data: ProjectData }) {
     setDraft('')
     const n = await createNote('', 'lore', data.project.id)
     await patch<Note>('notes', n.id, { title, topic: topic ?? undefined })
-    requestAnimationFrame(() => addInput.current?.focus())
+    setAdding(false)
   }
 
   const active = activeId ? data.lore.find((note) => note.id === activeId) : undefined
@@ -57,11 +58,17 @@ export function LoreView({ data }: { data: ProjectData }) {
       <div className={`lore-layout ${active ? 'has-active' : ''}`}>
         <section className="lore-master card">
           <div className="lore-master-head">
-            <div><h1>Мир истории</h1></div>
+            <div>
+              <h1>Мир истории</h1>
+              <div className="small muted">
+                {data.lore.length ? `${data.lore.length} ${pluralRu(data.lore.length, 'запись', 'записи', 'записей')}` : 'Пока пусто'}
+              </div>
+            </div>
+            <button className="icon-btn lore-add-toggle" aria-label={adding ? 'Закрыть добавление записи' : 'Добавить запись'} onClick={() => setAdding((value) => !value)}>{adding ? '×' : '+'}</button>
           </div>
-          <form className="lore-add" onSubmit={(e) => { e.preventDefault(); void add() }}>
+          {adding && <form className="lore-add" onSubmit={(e) => { e.preventDefault(); void add() }}>
             <input
-              ref={addInput}
+              autoFocus
               className="quick-add"
               placeholder={topic ? `Новая запись в «${topic}»` : 'Новая запись'}
               value={draft}
@@ -70,7 +77,7 @@ export function LoreView({ data }: { data: ProjectData }) {
             <button className="btn primary sm compact-add" type="submit" disabled={!draft.trim()} aria-label="Добавить">
               <span aria-hidden="true">+</span>
             </button>
-          </form>
+          </form>}
           {data.lore.length > 4 && <input className="input lore-search" placeholder="Найти запись" value={q} onChange={(e) => setQ(e.target.value)} />}
           {topics.length > 0 && (
             <div className="lore-topics">
@@ -101,28 +108,34 @@ export function LoreView({ data }: { data: ProjectData }) {
 
 function LoreCard({ n, data, found, onDeleted }: { n: Note; data: ProjectData; found?: Found[]; onDeleted?: () => void }) {
   const set = (changes: Partial<Note>) => void patch<Note>('notes', n.id, changes)
+  const removeNote = () => {
+    if (!confirm(`Удалить «${n.title}» из мира?`)) return
+    void remove('notes', n.id)
+    onDeleted?.()
+    toast('Запись удалена')
+  }
   return (
-    <article className="card lore-card">
-      <div className="row" style={{ flexWrap: 'nowrap' }}>
+    <article className="card lore-card lore-profile">
+      <header className="lore-identity">
         <InlineEdit className="lore-title" value={n.title ?? ''} placeholder="Название" onSave={(title) => title.trim() && set({ title })} />
-        <button
-          className="icon-btn"
-          title="Удалить запись"
-          onClick={() => {
-            if (!confirm(`Удалить «${n.title}» из мира?`)) return
-            void remove('notes', n.id)
-            onDeleted?.()
-            toast('Запись удалена')
-          }}
-        >
-          <Icon name="close" size={15} />
-        </button>
+        <InlineEdit className="lore-topic" value={n.topic ?? ''} placeholder="Тема: место, правило, событие" onSave={(topic) => set({ topic: topic.trim() || undefined })} />
+      </header>
+      <div className="lore-core">
+        <span className="hero-section-label">Что важно</span>
+        <InlineEdit className="lore-text" multiline value={n.text} placeholder="Запишите главное об этом элементе мира" onSave={(text) => set({ text })} />
       </div>
-      <InlineEdit className="lore-topic" value={n.topic ?? ''} placeholder="тема: места, магия, даты…" onSave={(topic) => set({ topic: topic.trim() || undefined })} />
-      <InlineEdit className="lore-text" multiline value={n.text} placeholder="Что важно помнить" onSave={(text) => set({ text })} />
-      <InlineEdit className="aliases" value={n.aliases ?? ''} placeholder="ещё называют: …" onSave={(aliases) => set({ aliases: aliases.trim() || undefined })} />
-      <LorePins n={n} data={data} />
-      <WhereFound data={data} found={found} onNotThis={(sid) => set({ ignoreSceneIds: [...(n.ignoreSceneIds ?? []), sid] })} />
+      <details className="hero-fold lore-fold">
+        <summary>Связи и упоминания</summary>
+        <div className="hero-fold-body stack">
+          <InlineEdit className="aliases" value={n.aliases ?? ''} placeholder="Другие названия" onSave={(aliases) => set({ aliases: aliases.trim() || undefined })} />
+          <LorePins n={n} data={data} />
+          {!!found?.length && <WhereFound data={data} found={found} onNotThis={(sid) => set({ ignoreSceneIds: [...(n.ignoreSceneIds ?? []), sid] })} />}
+        </div>
+      </details>
+      <details className="hero-fold lore-fold">
+        <summary>Настроить запись</summary>
+        <div className="hero-fold-body"><button className="btn ghost mobile-danger" onClick={removeNote}>Удалить запись</button></div>
+      </details>
     </article>
   )
 }

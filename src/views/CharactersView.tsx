@@ -1,25 +1,23 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { db, type Scene } from '../db/db'
 import { alive, save } from '../db/repo'
 import { countMentions, heroesFromDescription, mentionPatterns } from '../lib/heroes'
 import { docParagraphs, pluralRu } from '../lib/text'
 import { Modal } from '../lib/ui'
-import type { Character, Line, Note } from '../db/db'
-import { createLine, createNote, findOrCreateCharacter, mergeCharacters, patch, remove } from '../db/repo'
+import type { Character, Note } from '../db/db'
+import { createNote, findOrCreateCharacter, mergeCharacters, patch, remove } from '../db/repo'
 import type { ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { InlineEdit, toast } from '../lib/ui'
 import { WorldNav } from './LoreView'
 import { ColorDot } from '../components/ColorDot'
-import { HeroBranches } from '../components/HeroBranches'
 import { useWhereFound, WhereFound } from '../components/WhereFound'
 import type { Found } from '../lib/mentions'
-import { Icon } from '../components/Icon'
 
 /** People of the story: a few free lines about each, their own story line, their quotes. */
 export function CharactersView({ data }: { data: ProjectData }) {
   const [name, setName] = useState('')
-  const addInput = useRef<HTMLInputElement>(null)
+  const [adding, setAdding] = useState(false)
   const [activeId, setActiveId] = useState<string | null>(() =>
     typeof matchMedia !== 'undefined' && matchMedia('(max-width: 760px)').matches ? null : (data.characters[0]?.id ?? null),
   )
@@ -30,7 +28,7 @@ export function CharactersView({ data }: { data: ProjectData }) {
     const alreadyExists = data.characters.some((character) => character.name.trim().toLocaleLowerCase('ru') === entered.toLocaleLowerCase('ru'))
     await findOrCreateCharacter(data.project.id, entered)
     if (alreadyExists) toast('Такой герой уже есть')
-    requestAnimationFrame(() => addInput.current?.focus())
+    setAdding(false)
   }
   const norm = (x: string) => x.trim().toLowerCase().replace(/ё/g, 'е')
   const known = new Set(data.characters.map((c) => norm(c.name)))
@@ -70,19 +68,22 @@ export function CharactersView({ data }: { data: ProjectData }) {
               <h1>Герои</h1>
               <div className="small muted">{characters.length ? `${characters.length} ${pluralRu(characters.length, 'герой', 'героя', 'героев')}` : 'Пока никого'}</div>
             </div>
+            <button className="icon-btn character-add-toggle" aria-label={adding ? 'Закрыть добавление героя' : 'Добавить героя'} onClick={() => setAdding((value) => !value)}>
+              {adding ? '×' : '+'}
+            </button>
           </div>
-          <form
+          {adding && <form
             className="person add person-add"
             onSubmit={(e) => {
               e.preventDefault()
               void add()
             }}
           >
-            <input ref={addInput} className="quick-add" placeholder="Имя нового героя" value={name} onChange={(e) => setName(e.target.value)} />
+            <input autoFocus className="quick-add" placeholder="Имя нового героя" value={name} onChange={(e) => setName(e.target.value)} />
             <button className="btn primary sm compact-add" type="submit" disabled={!name.trim()} aria-label="Добавить">
               <span aria-hidden="true">+</span>
             </button>
-          </form>
+          </form>}
           <div className="character-list">
             {characters.map((character) => (
               <HeroRow
@@ -104,7 +105,6 @@ export function CharactersView({ data }: { data: ProjectData }) {
           </section>
         )}
       </div>
-      <Branches data={data} />
     </div>
   )
 }
@@ -127,60 +127,11 @@ function HeroRow({ character, active, onOpen }: { character: Character; active: 
   )
 }
 
-/** Story branches (the lines on the board): their colour, name and removal, next to the people. */
-function Branches({ data }: { data: ProjectData }) {
-  const [name, setName] = useState('')
-  const [fromHeroes, setFromHeroes] = useState(false)
-  const count = (id: string) => [...data.scenes, ...data.pool.scenes].filter((s) => s.lineIds?.includes(id)).length
-  const del = async (id: string, title: string) => {
-    if (!confirm(`Удалить линию «${title}»? Сцены останутся, с них просто снимется отметка.`)) return
-    for (const s of [...data.scenes, ...data.pool.scenes])
-      if (s.lineIds?.includes(id)) await patch<Scene>('scenes', s.id, { lineIds: s.lineIds.filter((x) => x !== id) })
-    await remove('lines', id)
-  }
-  return (
-    <details className="branches card">
-      <summary className="branches-summary"><span>Сюжетные линии</span><span className="small muted">{data.lines.length ? `${data.lines.length} ${pluralRu(data.lines.length, 'линия', 'линии', 'линий')}` : 'Не добавлены'}</span></summary>
-      <div className="branches-body">
-      <div className="branches-intro">
-        <span className="small muted">Отдельные ветки сюжета, которые проходят через несколько сцен.</span>
-        {data.characters.length > 0 && (
-          <button className="link small" onClick={() => setFromHeroes(true)}>
-            Линии из героев
-          </button>
-        )}
-      </div>
-      {fromHeroes && <HeroBranches data={data} onClose={() => setFromHeroes(false)} />}
-      {data.lines.map((l) => (
-        <div key={l.id} className="branch-row">
-          <div className="branch-main">
-            <ColorDot color={l.color} label={l.name} onChange={(color) => void patch<Line>('lines', l.id, { color })} />
-            <InlineEdit className="branch-name" label="Название ветки" value={l.name} onSave={(n) => n.trim() && void patch<Line>('lines', l.id, { name: n.trim() })} />
-          </div>
-          <span className="branch-usage">{count(l.id) ? `Используется в ${count(l.id)} ${count(l.id) === 1 ? 'сцене' : 'сценах'}` : 'Пока без сцен'}</span>
-          <button className="icon-btn" aria-label={`Удалить линию «${l.name}»`} title="Удалить линию" onClick={() => void del(l.id, l.name)}>
-            <Icon name="close" size={15} />
-          </button>
-        </div>
-      ))}
-      <form className="branch-add" onSubmit={async (e) => {
-        e.preventDefault()
-        if (!name.trim()) return
-        await createLine(data.project.id, name.trim())
-        setName('')
-      }}>
-        <input className="quick-add" placeholder="Название новой линии" value={name} onChange={(e) => setName(e.target.value)} />
-        <button className="btn sm" type="submit" disabled={!name.trim()}>Добавить</button>
-      </form>
-      </div>
-    </details>
-  )
-}
-
 function Person({ data, c, found, onDeleted }: { data: ProjectData; c: Character; found?: Found[]; onDeleted?: () => void }) {
   const [quote, setQuote] = useState('')
   const line = data.lines.find((l) => l.name === c.name)
   const lines = data.notes.filter((n) => (n.kind === 'quote' || n.kind === 'dialogue') && n.characterIds?.includes(c.id) && !n.archived)
+  const sceneCount = [...data.scenes, ...data.pool.scenes].filter((scene) => scene.characterIds?.includes(c.id)).length
   const set = (changes: Partial<Character>) => void patch<Character>('characters', c.id, changes)
   // Scenes and quotes stay; they just no longer name this hero.
   const delHero = async () => {
@@ -192,95 +143,83 @@ function Person({ data, c, found, onDeleted }: { data: ProjectData; c: Character
   }
 
   return (
-    <article className="person card">
-      <div className="row" style={{ flexWrap: 'nowrap' }}>
+    <article className="person card hero-profile">
+      <div className="hero-identity">
         <ColorDot
           className="avatar"
           color={c.color}
           label={c.name}
-          onChange={(color) => {
-            set({ color })
-            // The hero's own branch follows the hero's colour.
-            if (line) void patch<Line>('lines', line.id, { color })
-          }}
+          onChange={(color) => set({ color })}
         >
           {c.name.trim()[0]?.toUpperCase()}
         </ColorDot>
-        <InlineEdit className="person-name" label="Имя героя" value={c.name} onSave={(name) => set({ name })} />
-        <details className="menu">
-          <summary className="btn sm ghost" aria-label="Действия с героем">
-            Действия
-          </summary>
-          <div className="menu-list card">
-            {data.characters.length > 1 && <div className="menu-label">Это тот же человек, что…</div>}
-            {data.characters
-              .filter((o) => o.id !== c.id)
-              .map((o) => (
-                <button
-                  key={o.id}
-                  onClick={async () => {
-                    if (!confirm(`Слить «${c.name}» в «${o.name}»? Сцены, цитаты и заметки перейдут к «${o.name}», карточка «${c.name}» исчезнет.`)) return
-                    await mergeCharacters(c.id, o.id)
-                    toast(`Теперь это один герой — «${o.name}»`)
-                  }}
-                >
-                  ⇢ {o.name}
-                </button>
-              ))}
-            {!line && (
-              <button
-                onClick={async () => {
-                  await createLine(data.project.id, c.name)
-                  toast(`Линия «${c.name}» создана — отмечай её сцены на доске`)
-                }}
-              >
-                Своя сюжетная линия
-              </button>
-            )}
-            <button className="danger" onClick={() => void delHero()}>
-              Удалить героя
-            </button>
-          </div>
-        </details>
-      </div>
-      <div className="hero-role seg" role="group" aria-label="Роль героя">
-        {(Object.entries(ROLE_LABELS) as [NonNullable<Character['role']>, string][]).map(([role, label]) => (
-          <button key={role} aria-pressed={c.role === role} onClick={() => set({ role })}>{label}</button>
-        ))}
-      </div>
-      <InlineEdit
-        className="person-about"
-        multiline
-        placeholder="Кто это, чего хочет, что скрывает…"
-        value={c.about}
-        onSave={(about) => set({ about })}
-      />
-      <InlineEdit className="aliases" value={c.aliases ?? ''} placeholder="другие имена: фамилия, прозвище…" onSave={(aliases) => set({ aliases: aliases.trim() || undefined })} />
-      <WhereFound data={data} found={found} onNotThis={(sid) => set({ ignoreSceneIds: [...(c.ignoreSceneIds ?? []), sid] })} />
-      {line && (
-        <div className="person-meta">
-          <span className="chip" style={{ color: line.color }}>
-            ● линия «{line.name}»
-          </span>
+        <div className="hero-identity-main">
+          <InlineEdit className="person-name" label="Имя героя" value={c.name} onSave={(name) => set({ name })} />
+          <select className="hero-role-select" aria-label="Роль героя" value={c.role ?? ''} onChange={(event) => set({ role: (event.target.value || undefined) as Character['role'] })}>
+            <option value="">Роль не выбрана</option>
+            {(Object.entries(ROLE_LABELS) as [NonNullable<Character['role']>, string][]).map(([role, label]) => <option key={role} value={role}>{label}</option>)}
+          </select>
         </div>
-      )}
-      <div className="person-quotes">
-        {lines.map((n) => (
-          <QuoteRow key={n.id} n={n} data={data} />
-        ))}
-        <input
-          className="quick-add small"
-          placeholder="+ цитата или реплика"
-          value={quote}
-          onChange={(e) => setQuote(e.target.value)}
-          onKeyDown={async (e) => {
-            if (e.key !== 'Enter' || !quote.trim()) return
-            const n = await createNote(quote.trim(), 'quote', data.project.id)
-            await patch<Note>('notes', n.id, { characterIds: [c.id] })
-            setQuote('')
-          }}
+      </div>
+      <div className="hero-core">
+        <span className="hero-section-label">Суть героя</span>
+        <InlineEdit
+          className="person-about"
+          multiline
+          placeholder="Чего хочет — и что ему мешает?"
+          value={c.about}
+          onSave={(about) => set({ about })}
         />
       </div>
+      <section className="hero-in-story">
+        <div className="hero-section-label">В истории</div>
+        <div className="hero-story-facts">
+          <span>{sceneCount ? `${sceneCount} ${pluralRu(sceneCount, 'сцена', 'сцены', 'сцен')}` : 'Ещё не добавлен в сцены'}</span>
+          {line && <span style={{ color: line.color }}>● линия «{line.name}»</span>}
+        </div>
+        {!!found?.length && <WhereFound data={data} found={found} onNotThis={(sid) => set({ ignoreSceneIds: [...(c.ignoreSceneIds ?? []), sid] })} />}
+      </section>
+      <details className="hero-fold">
+        <summary><span>Имена и реплики</span><span className="small muted">{lines.length || ''}</span></summary>
+        <div className="hero-fold-body">
+          <InlineEdit className="aliases" value={c.aliases ?? ''} placeholder="Фамилия, прозвище, другие имена" onSave={(aliases) => set({ aliases: aliases.trim() || undefined })} />
+          <div className="person-quotes">
+            {lines.map((n) => <QuoteRow key={n.id} n={n} data={data} />)}
+            <input
+              className="quick-add small"
+              placeholder="Новая цитата или реплика"
+              value={quote}
+              onChange={(e) => setQuote(e.target.value)}
+              onKeyDown={async (e) => {
+                if (e.key !== 'Enter' || !quote.trim()) return
+                const n = await createNote(quote.trim(), 'quote', data.project.id)
+                await patch<Note>('notes', n.id, { characterIds: [c.id] })
+                setQuote('')
+              }}
+            />
+          </div>
+        </div>
+      </details>
+      <details className="hero-fold hero-settings">
+        <summary>Настроить героя</summary>
+        <div className="hero-fold-body stack">
+          {data.characters.length > 1 && <label>
+            <span className="field-label">Объединить с другим героем</span>
+            <select className="select" defaultValue="" onChange={async (event) => {
+              const target = data.characters.find((other) => other.id === event.target.value)
+              if (!target) return
+              event.currentTarget.value = ''
+              if (!confirm(`Слить «${c.name}» в «${target.name}»? Сцены, цитаты и заметки перейдут к «${target.name}», карточка «${c.name}» исчезнет.`)) return
+              await mergeCharacters(c.id, target.id)
+              toast(`Теперь это один герой — «${target.name}»`)
+            }}>
+              <option value="">Выбрать…</option>
+              {data.characters.filter((other) => other.id !== c.id).map((other) => <option key={other.id} value={other.id}>{other.name}</option>)}
+            </select>
+          </label>}
+          <button className="btn ghost mobile-danger" onClick={() => void delHero()}>Удалить героя</button>
+        </div>
+      </details>
     </article>
   )
 }

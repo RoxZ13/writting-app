@@ -3920,6 +3920,11 @@ main.page {
   font-size: var(--fs-md);
   color: var(--ink-2);
 }
+.book-hero-progress {
+  margin-top: 12px;
+  color: var(--ink-3);
+  font-size: var(--fs-sm);
+}
 @media (max-width: 700px) {
   .book-hero {
     flex-direction: column;
@@ -7838,7 +7843,13 @@ button.avatar {
    not a stack of explanatory cards.
    ===================================================================== */
 .book-mobile-section {
-  display: none;
+  display: block;
+}
+.book-mobile-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  padding-top: 18px;
 }
 .essence-book-bar {
   width: 100%;
@@ -8247,5 +8258,288 @@ button.avatar {
   }
   .board-filter-fold.has-filters > .lens {
     margin-top: 8px;
+  }
+}
+
+/* =====================================================================
+   Object hierarchy: a hero is the subject, not a spreadsheet row.
+   The list only navigates; optional metadata stays behind named folds.
+   ===================================================================== */
+.characters-layout {
+  grid-template-columns: minmax(210px, 270px) minmax(0, 760px);
+  gap: 32px;
+}
+.character-master {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.character-list-head {
+  min-height: 52px;
+  padding: 0 4px 12px;
+}
+.character-list-head h1 {
+  font-size: 26px;
+}
+.character-add-toggle {
+  width: 40px;
+  height: 40px;
+  font-size: 22px;
+}
+.character-master .person-add {
+  margin: 0 0 10px;
+  padding: 8px;
+  border-style: solid;
+  background: var(--surface);
+}
+.hero-row {
+  min-height: 52px;
+  padding: 8px 10px;
+  border-radius: 0;
+  border-bottom: 1px solid var(--line);
+}
+.hero-row.active {
+  box-shadow: inset 3px 0 var(--brand);
+}
+.hero-row-title > span {
+  display: none;
+}
+.character-find {
+  display: inline-block;
+  margin: 14px 4px 0;
+  color: var(--ink-3);
+}
+.hero-profile {
+  min-height: 0 !important;
+  gap: 0;
+  padding: 28px 32px;
+  border-color: var(--line);
+  box-shadow: none;
+}
+.hero-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.hero-identity .avatar {
+  width: 52px;
+  height: 52px;
+  font-size: var(--fs-lg);
+}
+.hero-identity-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: baseline;
+  gap: 12px;
+}
+.hero-profile .person-name {
+  min-width: 0;
+  flex: 1;
+  font-size: 28px;
+  font-weight: 700;
+}
+.hero-role-select {
+  max-width: 190px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-3);
+  font: inherit;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.hero-core {
+  margin: 28px 0 24px;
+}
+.hero-section-label {
+  display: block;
+  margin-bottom: 8px;
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.hero-profile .person-about {
+  width: 100%;
+  min-height: 88px;
+  color: var(--ink);
+  font-family: var(--text-font);
+  font-size: 20px;
+  line-height: 1.55;
+}
+.hero-in-story {
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+}
+.hero-story-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+.hero-in-story .where-found {
+  margin-top: 12px;
+}
+.hero-fold {
+  border-top: 1px solid var(--line);
+}
+.hero-fold > summary {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  font-weight: 550;
+  list-style: none;
+}
+.hero-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.hero-fold > summary::after {
+  content: '›';
+  color: var(--ink-3);
+  font-size: 20px;
+}
+.hero-fold[open] > summary::after {
+  transform: rotate(90deg);
+}
+.hero-fold-body {
+  padding: 2px 0 18px;
+}
+.hero-fold .aliases {
+  width: 100%;
+  min-height: 40px;
+}
+.hero-fold .person-quotes {
+  margin-top: 6px;
+  border: 0;
+}
+.hero-settings .mobile-danger {
+  align-self: flex-start;
+}
+
+@media (max-width: 760px) {
+  .characters-layout {
+    display: block;
+  }
+  .hero-profile {
+    padding: 18px 4px;
+    border: 0;
+    background: transparent;
+  }
+  .hero-identity-main {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .hero-profile .person-name {
+    font-size: 24px;
+  }
+  .hero-role-select {
+    max-width: 100%;
+    margin-left: -4px;
+  }
+  .hero-core {
+    margin: 24px 0 18px;
+  }
+  .hero-profile .person-about {
+    min-height: 74px;
+    font-size: 18px;
+  }
+}
+
+.lore-layout {
+  grid-template-columns: minmax(210px, 270px) minmax(0, 760px);
+  gap: 32px;
+}
+.lore-master {
+  padding: 0 !important;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.lore-master-head {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px 12px;
+}
+.lore-master-head h1 {
+  font-size: 26px;
+}
+.lore-add-toggle {
+  width: 40px;
+  height: 40px;
+  font-size: 22px;
+}
+.lore-add {
+  margin: 0 0 10px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+}
+.lore-row {
+  min-height: 52px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+}
+.lore-row.active {
+  box-shadow: inset 3px 0 var(--brand);
+}
+.lore-profile {
+  min-height: 0;
+  padding: 28px 32px;
+  border-color: var(--line);
+  box-shadow: none;
+}
+.lore-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.lore-profile .lore-title {
+  width: 100%;
+  font-size: 28px;
+  font-weight: 700;
+}
+.lore-profile .lore-topic {
+  width: 100%;
+  color: var(--ink-3);
+  font-size: var(--fs-sm);
+}
+.lore-core {
+  margin: 28px 0 24px;
+}
+.lore-profile .lore-text {
+  width: 100%;
+  min-height: 110px;
+  color: var(--ink);
+  font-family: var(--text-font);
+  font-size: 20px;
+  line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+  .lore-layout {
+    display: block;
+  }
+  .lore-profile {
+    padding: 18px 4px;
+    border: 0;
+    background: transparent;
+  }
+  .lore-profile .lore-title {
+    font-size: 24px;
+  }
+  .lore-profile .lore-text {
+    min-height: 86px;
+    font-size: 18px;
   }
 }

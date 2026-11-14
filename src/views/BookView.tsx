@@ -64,78 +64,14 @@ export function BookView({ data }: { data: ProjectData }) {
 
   return (
     <div className="book-page">
+      <h1 className="sr-only">Параметры книги «{p.title}»</h1>
       <div className="book-hero">
         <BookCover project={p} words={words} />
         <div className="stack" style={{ flex: 1, minWidth: 0 }}>
           <span className="eyebrow">Параметры книги</span>
           <InlineEdit className="book-title" label="Название истории" value={p.title} onSave={(title) => title.trim() && set({ title })} />
           <InlineEdit className="book-genre" value={p.genre ?? ''} placeholder="Жанр — например, фэнтези, гет, макси" onSave={(genre) => set({ genre })} />
-          <div>
-            <span className="field-label">Стадия</span>
-            <div className="seg book-stage">
-              {STAGES.map((s) => (
-                <button key={s.id} aria-pressed={(p.stage ?? 'writing') === s.id} onClick={() => set({ stage: s.id })}>
-                  {s.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="row" style={{ gap: 20, alignItems: 'flex-start' }}>
-            <div>
-              <span className="field-label">Обложка</span>
-              <CoverPicker projectId={p.id} />
-              {!cover && (
-                <div className="covers" style={{ marginTop: 8 }}>
-                  {COVERS.map((c) => (
-                    <button key={c} className={`swatch ${c === (p.color ?? COVERS[0]) ? 'on' : ''}`} style={{ background: c }} aria-label="Цвет обложки" onClick={() => set({ color: c })} />
-                  ))}
-                </div>
-              )}
-            </div>
-            <div>
-              <span className="field-label">Дедлайн</span>
-              <DateChip value={p.deadline} empty="+ поставить дату" onChange={(deadline) => set({ deadline })} />
-            </div>
-            <div>
-              <span className="field-label">Главы</span>
-              {!early && (
-                <div className="chapters-landmark">
-                  <strong>
-                    {cp.written} из {cp.of}
-                  </strong>{' '}
-                  написано{cp.unknown ? '' : cp.left > 0 ? ` · осталось ${cp.left}` : p.targetChapters ? ' · все' : ''}
-                  {cp.daysPerChapter && <span className="muted"> · к дедлайну ≈ глава в {cp.daysPerChapter} дн.</span>}
-                </div>
-              )}
-              {/* «Не знаю» is an answer too: the total shows as «?» and nothing counts down. */}
-              <div className="row small muted" style={{ gap: 8, marginTop: 6 }}>
-                {p.targetChapters === 0 ? (
-                  <>
-                    всего будет <strong className="chapters-unknown">?</strong>
-                    <button className="link" onClick={() => set({ targetChapters: undefined })}>
-                      указать число
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <label className="row" style={{ gap: 8 }}>
-                      всего будет
-                      <NumberField key={p.targetChapters ?? 'none'} value={p.targetChapters} placeholder="сколько?" onSave={(targetChapters) => set({ targetChapters })} />
-                    </label>
-                    <button className="link" onClick={() => set({ targetChapters: 0 })}>
-                      не знаю
-                    </button>
-                  </>
-                )}
-              </div>
-              <LengthNorm project={p} />
-              {!early && (
-                <button className="link small ltw-open" onClick={() => setLeft(true)}>
-                  Что осталось дописать
-                </button>
-              )}
-            </div>
-          </div>
+          {!early && <div className="book-hero-progress">{cp.written} из {cp.of} глав написано{cp.left > 0 ? ` · осталось ${cp.left}` : ''}</div>}
         </div>
       </div>
 

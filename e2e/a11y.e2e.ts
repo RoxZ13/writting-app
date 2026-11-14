@@ -35,10 +35,12 @@ async function seedStory(page: Page, { extras }: { extras?: boolean } = {}) {
   await expect(page.locator('.board, .timeline')).toBeVisible({ timeout: 30_000 })
   if (extras) {
     await page.goto('/#/characters')
+    await page.getByRole('button', { name: 'Добавить героя' }).click()
     await page.getByPlaceholder('Имя нового героя').fill('Ирина')
     await page.keyboard.press('Enter')
     await expect(seen(page, 'Ирина')).toBeVisible()
     await page.goto('/#/lore')
+    await page.getByRole('button', { name: 'Добавить запись' }).click()
     await page.getByPlaceholder(/^Новая запись/).fill('Невский дом')
     await page.keyboard.press('Enter')
     await expect(seen(page, 'Невский дом')).toBeVisible()
