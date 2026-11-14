@@ -35,6 +35,8 @@ export function BookView({ data }: { data: ProjectData }) {
   const cover = useCover(p.id)
   const cp = chapterProgress(p, data.chapters, data.scenes)
   const early = words < 1000 && !data.chapters.some((c) => c.publishedAt)
+  const planPeek = [p.deadline ? `до ${p.deadline}` : '', p.targetChapters ? `${p.targetChapters} глав` : ''].filter(Boolean).join(' · ')
+  const descriptionPeek = (p.description ?? '').split('\n').find((line) => line.trim())?.trim()
   const [left, setLeft] = useState(false)
 
   const exportWord = async () => download(await exportDocx(p.title, await loadChapters(data)), `${p.title}.docx`)
@@ -75,112 +77,119 @@ export function BookView({ data }: { data: ProjectData }) {
         </div>
       </div>
 
-      <details className="card settings-section book-fold book-mobile-section">
-        <summary>
-          <span>План</span>
-          <span className="muted small book-fold-peek">
-            {p.deadline || 'без дедлайна'}{p.targetChapters ? ` · ${p.targetChapters} глав` : ''}
-          </span>
-        </summary>
-        <div className="book-mobile-fields">
-          <label>
-            <span className="field-label">Дедлайн</span>
-            <DateChip value={p.deadline} empty="Поставить дату" onChange={(deadline) => set({ deadline })} />
-          </label>
-          <label>
-            <span className="field-label">Количество глав</span>
-            <NumberField value={p.targetChapters || undefined} placeholder="Не задано" onSave={(targetChapters) => set({ targetChapters })} />
-          </label>
-          <LengthNorm project={p} />
-          {!early && <button className="link small" onClick={() => setLeft(true)}>Что осталось дописать</button>}
-        </div>
-      </details>
-
-      <details className="card settings-section book-fold book-mobile-section">
-        <summary><span>Вид книги</span><span className="muted small book-fold-peek">обложка и стадия</span></summary>
-        <div className="book-mobile-fields">
-          <label>
-            <span className="field-label">Стадия</span>
-            <select className="input" value={p.stage ?? 'writing'} onChange={(event) => set({ stage: event.target.value as Project['stage'] })}>
-              {STAGES.map((stage) => <option key={stage.id} value={stage.id}>{stage.label}</option>)}
-            </select>
-          </label>
-          <BookCover project={p} words={words} />
-          <CoverPicker projectId={p.id} />
-          {!cover && <div className="covers">{COVERS.map((color) => (
-            <button key={color} className={`swatch ${color === (p.color ?? COVERS[0]) ? 'on' : ''}`} style={{ background: color }} aria-label="Цвет обложки" onClick={() => set({ color })} />
-          ))}</div>}
-        </div>
-      </details>
-
       <Essence project={p} embedded />
       {left && <LeftToWrite data={data} onClose={() => setLeft(false)} />}
+
+      <section className="book-section-list card" aria-label="Настройки книги">
+        <details className="settings-section book-fold book-mobile-section">
+          <summary>
+            <span>План</span>
+            {planPeek && <span className="muted small book-fold-peek">{planPeek}</span>}
+          </summary>
+          <div className="book-mobile-fields">
+            <label>
+              <span className="field-label">Дедлайн</span>
+              <DateChip value={p.deadline} empty="Поставить дату" onChange={(deadline) => set({ deadline })} />
+            </label>
+            <label>
+              <span className="field-label">Количество глав</span>
+              <NumberField value={p.targetChapters || undefined} placeholder="Не задано" onSave={(targetChapters) => set({ targetChapters })} />
+            </label>
+            <LengthNorm project={p} />
+            {!early && <button className="link small" onClick={() => setLeft(true)}>Что осталось дописать</button>}
+          </div>
+        </details>
+
+        <details className="settings-section book-fold">
+          <summary>
+            <span>Описание</span>
+            {descriptionPeek && <span className="muted small book-fold-peek">{descriptionPeek}</span>}
+          </summary>
+          <InlineEdit className="input book-desc" multiline placeholder="Фандом, пэйринг, аннотация — что угодно" value={p.description ?? ''} onSave={(description) => set({ description })} />
+        </details>
+
+        <details className="settings-section book-fold book-mobile-section">
+          <summary><span>О книге</span></summary>
+          <div className="book-mobile-fields">
+            <div className="book-mobile-identity-fields">
+              <label>
+                <span className="field-label">Название</span>
+                <InlineEdit className="input" label="Название истории" value={p.title} onSave={(title) => title.trim() && set({ title })} />
+              </label>
+              <label>
+                <span className="field-label">Жанр</span>
+                <InlineEdit className="input" value={p.genre ?? ''} placeholder="Например, фэнтези" onSave={(genre) => set({ genre })} />
+              </label>
+            </div>
+            <label>
+              <span className="field-label">Стадия</span>
+              <select className="input" value={p.stage ?? 'writing'} onChange={(event) => set({ stage: event.target.value as Project['stage'] })}>
+                {STAGES.map((stage) => <option key={stage.id} value={stage.id}>{stage.label}</option>)}
+              </select>
+            </label>
+            <BookCover project={p} words={words} />
+            <CoverPicker projectId={p.id} />
+            {!cover && <div className="covers">{COVERS.map((color) => (
+              <button key={color} className={`swatch ${color === (p.color ?? COVERS[0]) ? 'on' : ''}`} style={{ background: color }} aria-label="Цвет обложки" onClick={() => set({ color })} />
+            ))}</div>}
+          </div>
+        </details>
+
+        <details className="settings-section book-fold">
+          <summary><span>Файлы и версии</span></summary>
+          <div className="stack book-file-actions">
+            <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void exportWord()}>
+              Вся история в Word (.docx)
+            </button>
+            <div>
+              <span className="field-label">Добавить текст</span>
+              <div className="small muted">Главы из файла встанут в конец истории.</div>
+              <ImportPanel projectId={p.id} onDone={() => go({ view: 'board' })} />
+            </div>
+            <div>
+              <span className="field-label">Переписать книгу заново</span>
+              <div className="small muted">
+                Новая история с тем же скелетом: главы, сцены с целями и пунктами, ветки, герои, матчасть, маячки — но пустые страницы. В каждой
+                сцене сбоку будет её прежний текст. Эта редакция останется как есть.
+              </div>
+              <button
+                className="btn"
+                style={{ marginTop: 8 }}
+                onClick={async () => {
+                  if (!confirm(`Начать новую редакцию «${p.title}»? Эта останется как есть.`)) return
+                  const { projectId, firstSceneId } = await newEdition(p.id)
+                  try {
+                    localStorage.setItem('manuscript.mode', 'rewrite')
+                  } catch {
+                    /* ignore */
+                  }
+                  window.dispatchEvent(new CustomEvent('manuscript:open', { detail: { id: projectId, sceneId: firstSceneId } }))
+                  toast('Новая редакция готова. Прежний текст сцены — сбоку, в колонке «Было»')
+                }}
+              >
+                Новая редакция
+              </button>
+            </div>
+            <button
+              className="btn ghost"
+              style={{ color: 'var(--danger-ink)', alignSelf: 'flex-start' }}
+              onClick={async () => {
+                if (!confirm(`Удалить историю «${p.title}» со всеми главами и заметками?`)) return
+                await remove('projects', p.id)
+                toast('История удалена', () => patch('projects', p.id, { deleted: false }))
+                go({ view: 'library' })
+              }}
+            >
+              Удалить эту историю
+            </button>
+          </div>
+        </details>
+      </section>
 
       {/* Publishing and pace mean something from the first thousand words; on an empty book they only reproach. */}
       {!early && <PublishSection data={data} onCopy={(id) => void copyChapter(id)} />}
 
       {!early && <PaceSection data={data} />}
-
-      <details className="card settings-section book-fold">
-        <summary>
-          <span>Описание</span>
-          <span className="muted small book-fold-peek">{(p.description ?? '').split('\n').find((l) => l.trim()) ?? 'фандом, пэйринг, аннотация'}</span>
-        </summary>
-        <InlineEdit className="input book-desc" multiline placeholder="Фандом, пэйринг, аннотация — что угодно" value={p.description ?? ''} onSave={(description) => set({ description })} />
-      </details>
-
-      <details className="card settings-section book-fold">
-        <summary>
-          <span>Файлы и прочее</span>
-          <span className="muted small">Word, добавить текст, удалить</span>
-        </summary>
-        <div className="stack" style={{ marginTop: 14 }}>
-          <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void exportWord()}>
-            Вся история в Word (.docx)
-          </button>
-          <div>
-            <span className="field-label">Добавить текст</span>
-            <div className="small muted">Главы из файла встанут в конец истории.</div>
-            <ImportPanel projectId={p.id} onDone={() => go({ view: 'board' })} />
-          </div>
-          <div>
-            <span className="field-label">Переписать книгу заново</span>
-            <div className="small muted">
-              Новая история с тем же скелетом: главы, сцены с целями и пунктами, ветки, герои, матчасть, маячки — но пустые страницы. В каждой
-              сцене сбоку будет её прежний текст. Эта редакция останется как есть.
-            </div>
-            <button
-              className="btn"
-              style={{ marginTop: 8 }}
-              onClick={async () => {
-                if (!confirm(`Начать новую редакцию «${p.title}»? Эта останется как есть.`)) return
-                const { projectId, firstSceneId } = await newEdition(p.id)
-                try {
-                  localStorage.setItem('manuscript.mode', 'rewrite')
-                } catch {
-                  /* ignore */
-                }
-                window.dispatchEvent(new CustomEvent('manuscript:open', { detail: { id: projectId, sceneId: firstSceneId } }))
-                toast('Новая редакция готова. Прежний текст сцены — сбоку, в колонке «Было»')
-              }}
-            >
-              Новая редакция
-            </button>
-          </div>
-          <button
-            className="btn ghost"
-            style={{ color: 'var(--danger-ink)', alignSelf: 'flex-start' }}
-            onClick={async () => {
-              if (!confirm(`Удалить историю «${p.title}» со всеми главами и заметками?`)) return
-              await remove('projects', p.id)
-              toast('История удалена', () => patch('projects', p.id, { deleted: false }))
-              go({ view: 'library' })
-            }}
-          >
-            Удалить эту историю
-          </button>
-        </div>
-      </details>
     </div>
   )
 }

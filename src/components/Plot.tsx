@@ -55,12 +55,14 @@ const ESSENCE_KEY = 'manuscript.essence'
 export function Essence({ project, embedded }: { project: Project; embedded?: boolean }) {
   const filled = !!(project.premise || project.ending || project.drive)
   const [open, setOpenState] = useState(() => {
+    if (embedded && !filled) return true
     try {
       return localStorage.getItem(ESSENCE_KEY) === '1'
     } catch {
       return false
     }
   })
+  const [secondaryOpen, setSecondaryOpen] = useState(() => Boolean(project.ending || project.drive))
   const setOpen = (v: boolean) => {
     setOpenState(v)
     try {
@@ -102,6 +104,34 @@ export function Essence({ project, embedded }: { project: Project; embedded?: bo
           embedded ? <span>Добавить главное об истории</span> : '+ О чём история — можно одной строкой, можно позже'
         )}
       </button>
+    )
+  }
+  if (embedded) {
+    return (
+      <section className="essence card essence-book-editor">
+        <div className="essence-head">
+          <span className="essence-title">Замысел</span>
+          <span className="spacer" />
+          <button className="link small" onClick={() => setOpen(false)}>готово</button>
+        </div>
+        <label className="essence-primary">
+          <span className="essence-k">О чём история</span>
+          <InlineEdit multiline value={project.premise ?? ''} placeholder="Суть истории в одной-двух фразах" onSave={(premise) => set({ premise })} />
+        </label>
+        <details className="essence-secondary" open={secondaryOpen} onToggle={(event) => setSecondaryOpen(event.currentTarget.open)}>
+          <summary>Финал и движущая сила</summary>
+          <div className="essence-secondary-fields">
+            <label>
+              <span className="essence-k">Чем закончится</span>
+              <InlineEdit multiline value={project.ending ?? ''} placeholder="Если уже знаешь" onSave={(ending) => set({ ending })} />
+            </label>
+            <label>
+              <span className="essence-k">Что движет героями</span>
+              <InlineEdit multiline value={project.drive ?? ''} placeholder="Мотивы, страхи, цели" onSave={(drive) => set({ drive })} />
+            </label>
+          </div>
+        </details>
+      </section>
     )
   }
   return (

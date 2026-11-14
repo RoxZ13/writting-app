@@ -167,10 +167,10 @@ const SCREENS: Screen[] = [
     },
   },
   {
-    name: 'Параметры книги — «Файлы и прочее» открыто',
+    name: 'Параметры книги — «Файлы и версии» открыто',
     open: async (page) => {
       await page.goto('/#/book')
-      await page.locator('summary', { hasText: 'Файлы и прочее' }).click()
+      await page.locator('summary', { hasText: 'Файлы и версии' }).click()
       await expect(page.getByRole('button', { name: 'Вся история в Word (.docx)' })).toBeVisible()
     },
   },
