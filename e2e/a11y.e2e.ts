@@ -37,7 +37,7 @@ async function seedStory(page: Page, { extras }: { extras?: boolean } = {}) {
     await page.goto('/#/characters')
     await page.getByPlaceholder('+ Новый герой').fill('Ирина')
     await page.keyboard.press('Enter')
-    await expect(seen(page, 'Ирина')).toBeVisible()
+    await expect(page.getByRole('textbox', { name: 'Имя героя' })).toHaveValue('Ирина')
     await page.goto('/#/lore')
     await page.getByPlaceholder(/^\+ запись/).fill('Невский дом')
     await page.keyboard.press('Enter')

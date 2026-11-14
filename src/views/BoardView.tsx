@@ -34,6 +34,7 @@ import {
 import { MarkerCard } from '../components/MarkerCard'
 import { Essence } from '../components/Plot'
 import { SceneSheet } from '../components/SceneSheet'
+import { GestureActionButton, SceneActions, SceneGestureButton } from '../components/SceneActions'
 import { StoryLine } from '../components/StoryLine'
 import { HeroBranches } from '../components/HeroBranches'
 import { isLocked, isPlaceholder, markerPayoffChapter, markerQuiet, markerSetupChapter, markerStatus, sceneName, type ProjectData } from '../lib/hooks'
@@ -491,7 +492,6 @@ function Column({
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && void addScene()}
-          onBlur={() => void addScene()}
         />
       )}
 
@@ -696,7 +696,6 @@ function PoolColumn({ data, lens, onOpenScene }: { data: ProjectData; lens: Lens
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => e.key === 'Enter' && void add()}
-        onBlur={() => void add()}
       />
     </section>
   )
@@ -854,6 +853,7 @@ function Timeline({
     () => new Set([...(here ? [here] : data.chapters.slice(0, 1).map((c) => c.id)), ...(storyEmpty(data) ? ['pool'] : [])]),
   )
   const [chapterActions, setChapterActions] = useState<string | null>(null)
+  const [sceneActions, setSceneActions] = useState<string | null>(null)
   const toggle = (id: string) =>
     setOpen((prev) => {
       const next = new Set(prev)
@@ -874,7 +874,7 @@ function Timeline({
         {poolOpen && (
           <div className="tl-body">
             {data.pool.scenes.map((s) => (
-              <TimelineScene key={s.id} data={data} scene={s} lens={lens} onOpen={() => onOpenScene(s.id)} />
+              <TimelineScene key={s.id} data={data} scene={s} lens={lens} onOpen={() => onOpenScene(s.id)} onActions={() => setSceneActions(s.id)} />
             ))}
             <TimelineAdd data={data} lens={lens} />
             <ThreeParts data={data} />
@@ -889,7 +889,13 @@ function Timeline({
         return (
           <section key={chapter.id} className={`tl-chapter ${isOpen ? 'open' : ''} ${lineMissing ? 'missing' : ''} ${chapter.locked ? 'locked' : ''}`}>
             <div className="tl-head-row">
-              <button className="tl-head" aria-expanded={isOpen} onClick={() => toggle(chapter.id)}>
+              <GestureActionButton
+                className="tl-head"
+                onOpen={() => toggle(chapter.id)}
+                onActions={() => setChapterActions(chapter.id)}
+                ariaDescription="Нажми, чтобы раскрыть главу. Зажми или смахни влево для действий"
+                ariaExpanded={isOpen}
+              >
                 <span className="tl-caret">{isOpen ? '▾' : '▸'}</span>
                 <span className="tl-title">{chapter.title}</span>
                 {chapter.locked && (
@@ -905,10 +911,7 @@ function Timeline({
                   {formatScenes(scenes.filter((s) => !isPlaceholder(s, data)).length)}
                   <LenTag data={data} chars={sumChars(scenes)} />
                 </span>
-              </button>
-              <button className="icon-btn tl-actions" aria-label={`Действия с главой «${chapter.title}»`} onClick={() => setChapterActions(chapter.id)}>
-                <Icon name="more" size={18} />
-              </button>
+              </GestureActionButton>
             </div>
             {lineMissing && <div className="tl-gap">нет сцен этой линии</div>}
             {isOpen && (
@@ -918,7 +921,14 @@ function Timeline({
                 {scenes
                   .filter((s) => !isPlaceholder(s, data))
                   .map((s) => (
-                    <TimelineScene key={s.id} data={data} scene={s} lens={lens} onOpen={() => onOpenScene(s.id)} />
+                    <TimelineScene
+                      key={s.id}
+                      data={data}
+                      scene={s}
+                      lens={lens}
+                      onOpen={() => onOpenScene(s.id)}
+                      onActions={() => setSceneActions(s.id)}
+                    />
                   ))}
                 {!chapter.locked && <TimelineAdd data={data} chapter={chapter} lens={lens} />}
                 {(pay.length > 0 || plant.length > 0) && (
@@ -946,6 +956,9 @@ function Timeline({
           scenes={data.scenes.filter((s) => s.chapterId === chapterActions)}
           onClose={() => setChapterActions(null)}
         />
+      )}
+      {sceneActions && data.sceneById.get(sceneActions) && (
+        <SceneActions data={data} scene={data.sceneById.get(sceneActions)!} onClose={() => setSceneActions(null)} />
       )}
     </div>
   )
@@ -1009,13 +1022,25 @@ function TimelineChapterActions({ data, chapter, scenes, onClose }: { data: Proj
   )
 }
 
-function TimelineScene({ data, scene, lens, onOpen }: { data: ProjectData; scene: Scene; lens: Lens; onOpen: () => void }) {
+function TimelineScene({
+  data,
+  scene,
+  lens,
+  onOpen,
+  onActions,
+}: {
+  data: ProjectData
+  scene: Scene
+  lens: Lens
+  onOpen: () => void
+  onActions: () => void
+}) {
   const markers = data.markers.filter((m) => m.setupSceneId === scene.id || m.payoffSceneId === scene.id)
   const dim = dims(lens, scene, data)
   const current = data.project.lastSceneId === scene.id
   const sub = scene.goal || scene.excerpt
   return (
-    <button className={`tl-scene ${dim ? 'dim' : ''} ${current ? 'current' : ''} ${scene.node ? 'node' : ''}`} onClick={onOpen}>
+    <SceneGestureButton className={`tl-scene ${dim ? 'dim' : ''} ${current ? 'current' : ''} ${scene.node ? 'node' : ''}`} onOpen={onOpen} onActions={onActions}>
       {scene.node ? <span className="ln-key" title="Ключевая сцена" /> : <span className="status-dot" style={{ background: statusOf(scene.status).color }} />}
       <span className="tl-text">
         <span className={`tl-name ${scene.title.trim() ? '' : 'untitled'}`}>{sceneName(data, scene)}</span>
@@ -1023,7 +1048,7 @@ function TimelineScene({ data, scene, lens, onOpen }: { data: ProjectData; scene
       </span>
       {markers.length > 0 && <span className="tl-mk">✦ {markers.length}</span>}
       {current && !storyEmpty(data) && <span className="here">ты здесь</span>}
-    </button>
+    </SceneGestureButton>
   )
 }
 
@@ -1047,7 +1072,6 @@ function TimelineAdd({ data, chapter, lens }: { data: ProjectData; chapter?: Cha
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onKeyDown={(e) => e.key === 'Enter' && void add()}
-      onBlur={() => void add()}
     />
   )
 }

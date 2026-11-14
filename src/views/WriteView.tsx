@@ -30,6 +30,7 @@ import { FindBar } from '../components/FindBar'
 import { TextStats } from '../components/TextStats'
 import { typesetDoc } from '../components/Typography'
 import { Shortcuts } from '../components/Shortcuts'
+import { SceneActions, SceneGestureButton } from '../components/SceneActions'
 
 type Mode = 'write' | 'edit' | 'rewrite'
 const PANELS_KEY = 'manuscript.panels'
@@ -579,6 +580,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
 function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: string; onPick: () => void }) {
   const current = data.sceneById.get(sceneId)
   const [open, setOpen] = useState<Set<string>>(() => new Set(current ? [current.chapterId] : []))
+  const [actions, setActions] = useState<string | null>(null)
   const toggle = (id: string) =>
     setOpen((prev) => {
       const next = new Set(prev)
@@ -625,16 +627,17 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
             {isOpen && (
               <div className="navi-scenes">
                 {scenes.map((s) => (
-                  <button
+                  <SceneGestureButton
                     key={s.id}
                     className={`navi-scene ${s.id === sceneId ? 'active' : ''}`}
-                    onClick={() => {
+                    onOpen={() => {
                       go({ view: 'text', sceneId: s.id })
                       onPick()
                     }}
+                    onActions={() => setActions(s.id)}
                   >
                     {sceneShort(data, s)}
-                  </button>
+                  </SceneGestureButton>
                 ))}
                 {!chapter.pool && !chapter.locked && (
                   <button className="navi-scene add" onClick={() => void addScene(chapter.id)}>
@@ -646,6 +649,7 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
           </div>
         )
       })}
+      {actions && data.sceneById.get(actions) && <SceneActions data={data} scene={data.sceneById.get(actions)!} onClose={() => setActions(null)} />}
     </nav>
   )
 }

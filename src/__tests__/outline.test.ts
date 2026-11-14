@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { ManuscriptDB, useDatabase, db } from '../db/db'
-import { alive, createChapter, createScene, mergeIntoPrevious, mergeSceneIntoPrevious, moveScene, splitChapterAt, applyOutline } from '../db/repo'
+import { alive, createChapter, createScene, duplicateScene, mergeIntoPrevious, mergeSceneIntoPrevious, moveScene, splitChapterAt, applyOutline } from '../db/repo'
 
 let n = 0
 async function outline() {
@@ -59,6 +59,16 @@ describe('outline restructuring', () => {
     const c2 = (await db.chapters.toArray()).find((c) => c.title === 'Глава 2')!
     await moveScene(all.find((s) => s.title === 'b')!.id, c2.id, 0)
     expect(await outline()).toEqual([['Глава 1', 'a', 'c', 'd'], ['Глава 2', 'b', 'e']])
+  })
+
+  it('duplicates a scene next to the original with an independent text record', async () => {
+    const original = (await db.scenes.toArray()).find((scene) => scene.title === 'b')!
+    const content = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Текст копии' }] }] }
+    await db.texts.update(original.id, { content, wordCount: 2 })
+    const copy = await duplicateScene(original.id)
+    expect((await outline())[0]).toEqual(['Глава 1', 'a', 'b', 'b — копия', 'c', 'd'])
+    expect(copy?.id).not.toBe(original.id)
+    expect((await db.texts.get(copy!.id))?.content).toEqual(content)
   })
 
   it('merges a scene into the previous one, keeping both texts', async () => {

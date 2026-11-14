@@ -10,9 +10,43 @@ test.describe('mobile actions stay reachable', () => {
     await startStory(page)
     await openTab(page, 'Герои')
     await page.getByPlaceholder('+ Новый герой').fill('Арина')
-    await page.getByRole('button', { name: 'Добавить героя' }).click()
+    await page.getByRole('button', { name: 'Добавить', exact: true }).click()
     await expect(page.getByRole('textbox', { name: 'Имя героя' })).toHaveValue('Арина')
     await expect.poll(async () => (await aliveRows<any>(page, 'characters')).map((c) => c.name)).toContain('Арина')
+  })
+
+  test('holding a scene opens actions without a visible ellipsis, and duplication is undoable', async ({ page }) => {
+    await startStory(page)
+    await openTab(page, 'Доска')
+    const add = page.getByPlaceholder('+ сцена: кратко, что происходит').first()
+    await add.fill('Поворот сюжета')
+    await add.press('Enter')
+    const row = page.locator('.tl-scene').filter({ hasText: 'Поворот сюжета' })
+    await expect(row).not.toContainText('⋯')
+    await row.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 180, clientY: 300 })
+    await page.waitForTimeout(480)
+    await row.dispatchEvent('pointerup', { pointerType: 'touch', clientX: 180, clientY: 300 })
+    const actions = page.getByRole('dialog', { name: 'Действия со сценой «Поворот сюжета»' })
+    await expect(actions).toBeVisible()
+    await actions.getByRole('button', { name: /Дублировать/ }).click()
+    await expect.poll(async () => (await aliveRows<any>(page, 'scenes')).filter((scene) => scene.title.startsWith('Поворот сюжета')).length).toBe(2)
+    await page.getByRole('button', { name: 'Отменить' }).click()
+    await expect.poll(async () => (await aliveRows<any>(page, 'scenes')).filter((scene) => scene.title.startsWith('Поворот сюжета')).length).toBe(1)
+  })
+
+  test('heroes are a compact list and only the selected hero exposes editable details', async ({ page }) => {
+    await startStory(page)
+    await openTab(page, 'Герои')
+    for (const name of ['Арина', 'Макс', 'Наставник']) {
+      await page.getByPlaceholder('+ Новый герой').fill(name)
+      await page.getByRole('button', { name: 'Добавить', exact: true }).click()
+      await page.getByRole('button', { name: '← Все герои' }).click()
+    }
+    await expect(page.locator('.hero-row')).toHaveCount(3)
+    await expect(page.getByRole('textbox', { name: 'Имя героя' })).toHaveCount(0)
+    await page.locator('.hero-row').filter({ hasText: 'Арина' }).click()
+    await expect(page.getByRole('textbox', { name: 'Имя героя' })).toHaveValue('Арина')
+    await expect(page.getByRole('textbox', { name: 'Имя героя' })).toHaveCount(1)
   })
 
   test('a scene can be deleted directly from its phone sheet', async ({ page }) => {
@@ -34,11 +68,25 @@ test.describe('mobile actions stay reachable', () => {
     await startStory(page)
     await openTab(page, 'Доска')
     await page.getByRole('button', { name: '+ Глава', exact: true }).click()
-    await page.getByRole('button', { name: 'Действия с главой «Глава 2»' }).click()
+    const chapter = page.locator('.tl-chapter').filter({ hasText: 'Глава 2' }).locator('.tl-head')
+    await expect(chapter).not.toContainText('⋯')
+    await chapter.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 180, clientY: 300 })
+    await page.waitForTimeout(480)
+    await chapter.dispatchEvent('pointerup', { pointerType: 'touch', clientX: 180, clientY: 300 })
     const dialog = page.getByRole('dialog', { name: 'Действия с главой «Глава 2»' })
     await dialog.getByRole('button', { name: 'Удалить главу' }).click()
     await expect(dialog).toBeHidden()
     await expect.poll(async () => (await aliveRows<any>(page, 'chapters')).filter((c) => !c.pool).length).toBe(1)
+  })
+
+  test('leaving a half-written scene does not create an accidental duplicate', async ({ page }) => {
+    await startStory(page)
+    await openTab(page, 'Доска')
+    const before = (await aliveRows<any>(page, 'scenes')).length
+    const add = page.getByPlaceholder('+ сцена: кратко, что происходит').first()
+    await add.fill('Черновик, который пока не добавляем')
+    await page.getByRole('button', { name: 'Герои', exact: true }).click()
+    await expect.poll(async () => (await aliveRows<any>(page, 'scenes')).length).toBe(before)
   })
 
   test('the scene list opens only on request as a bottom sheet and controls do not overlap', async ({ page }) => {

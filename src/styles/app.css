@@ -5943,6 +5943,233 @@ button.avatar {
 }
 
 /* =====================================================================
+   Gesture-first scene actions and a cast with one clear active character.
+   ===================================================================== */
+.gesture-scene {
+  touch-action: pan-y;
+  -webkit-touch-callout: none;
+  user-select: none;
+}
+.scene-action-sheet {
+  width: min(460px, 100%);
+  padding: 14px;
+}
+.scene-action-head {
+  padding: 0 8px 12px;
+}
+.scene-action-head h2 {
+  margin: 2px 0 3px;
+  font-size: var(--fs-xl);
+}
+.sheet-grab {
+  display: none;
+  width: 40px;
+  height: 4px;
+  margin: 0 auto 14px;
+  border-radius: 99px;
+  background: var(--line-2);
+}
+.scene-action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.scene-action-list > button,
+.scene-move-list button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  font-size: var(--fs-md);
+}
+.scene-action-list > button:hover,
+.scene-move-list button:hover {
+  background: var(--fill);
+}
+.scene-action-list > button.danger {
+  color: var(--danger-ink);
+  margin-top: 6px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 var(--r-md) var(--r-md);
+}
+.action-hint {
+  color: var(--ink-3);
+  font-size: var(--fs-sm);
+}
+.scene-move-list {
+  padding: 4px 8px 8px 20px;
+  border-left: 2px solid var(--line);
+  margin-left: 12px;
+}
+.scene-move-list button {
+  min-height: 40px;
+  color: var(--ink-2);
+}
+.scene-action-note {
+  margin: 8px;
+  padding: 14px;
+  border-radius: var(--r-md);
+  background: var(--fill);
+  color: var(--ink-2);
+}
+
+.characters-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.character-master {
+  padding: 12px;
+  position: sticky;
+  top: calc(var(--header-h) + 18px);
+}
+.character-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px 12px;
+}
+.character-list-head h2 {
+  margin: 0;
+  font-size: var(--fs-xl);
+}
+.character-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.hero-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  min-height: 64px;
+  border: 0;
+  border-radius: var(--r-md);
+  padding: 8px;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+}
+.hero-row:hover,
+.hero-row.active {
+  background: var(--fill);
+}
+.hero-row-avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 50%;
+  color: #fff;
+  font-weight: 650;
+}
+.hero-row-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+.hero-row-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.hero-row-title > span {
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+  white-space: nowrap;
+}
+.hero-row-about {
+  overflow: hidden;
+  color: var(--ink-3);
+  font-size: var(--fs-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hero-row-count {
+  flex: none;
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+}
+.character-master .person-add {
+  margin-top: 10px;
+}
+.character-detail .person {
+  min-height: 360px;
+}
+.hero-back {
+  display: none;
+  margin-bottom: 8px;
+}
+.hero-role {
+  align-self: flex-start;
+}
+.branches-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  font-weight: 650;
+  list-style: none;
+}
+.branches-summary::-webkit-details-marker {
+  display: none;
+}
+.branches-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 14px;
+}
+
+@media (max-width: 760px) {
+  .modal-back:has(.scene-action-sheet) {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .scene-action-sheet {
+    width: 100%;
+    max-height: min(82dvh, 680px);
+    border-radius: var(--r-lg) var(--r-lg) 0 0;
+    padding: 10px 14px calc(env(safe-area-inset-bottom) + 14px);
+  }
+  .sheet-grab {
+    display: block;
+  }
+  .characters-layout {
+    display: block;
+  }
+  .character-master {
+    position: static;
+  }
+  .characters-layout.has-active .character-master {
+    display: none;
+  }
+  .hero-back {
+    display: inline-flex;
+  }
+  .character-detail .person {
+    min-height: 0;
+  }
+  .branches {
+    max-width: none;
+  }
+}
+
+/* =====================================================================
    Mobile reliability: actions stay reachable and the scene navigator is
    a temporary bottom sheet instead of a permanent side column.
    ===================================================================== */

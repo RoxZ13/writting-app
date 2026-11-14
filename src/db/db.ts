@@ -132,6 +132,8 @@ export interface Character extends Base {
   projectId: string
   name: string
   color: string
+  /** Narrative weight, chosen by the author so a long cast keeps a visible hierarchy. */
+  role?: 'main' | 'supporting' | 'episodic'
   /** Free-form notes: who they are, what they want, what they hide. */
   about: string
   order: number

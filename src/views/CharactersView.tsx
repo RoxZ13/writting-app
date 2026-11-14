@@ -19,16 +19,23 @@ import { Icon } from '../components/Icon'
 /** People of the story: a few free lines about each, their own story line, their quotes. */
 export function CharactersView({ data }: { data: ProjectData }) {
   const [name, setName] = useState('')
+  const [activeId, setActiveId] = useState<string | null>(() =>
+    typeof matchMedia !== 'undefined' && matchMedia('(max-width: 760px)').matches ? null : (data.characters[0]?.id ?? null),
+  )
   const add = async () => {
     if (!name.trim()) return
-    await findOrCreateCharacter(data.project.id, name.trim())
+    const character = await findOrCreateCharacter(data.project.id, name.trim())
     setName('')
+    setActiveId(character.id)
   }
   const norm = (x: string) => x.trim().toLowerCase().replace(/ё/g, 'е')
   const known = new Set(data.characters.map((c) => norm(c.name)))
   const suggested = heroesFromDescription(data.project.description).filter((n) => !known.has(norm(n)))
   const [tagging, setTagging] = useState(false)
   const found = useWhereFound(data)
+  const active = activeId ? data.characterById.get(activeId) : undefined
+  const roleOrder = { main: 0, supporting: 1, episodic: 2 } as const
+  const characters = [...data.characters].sort((a, b) => ((a.role ? roleOrder[a.role] : 3) - (b.role ? roleOrder[b.role] : 3)) || a.order - b.order)
 
   return (
     <div>
@@ -58,30 +65,67 @@ export function CharactersView({ data }: { data: ProjectData }) {
         </div>
       )}
       {tagging && <TagScenes data={data} onClose={() => setTagging(false)} />}
-      <div className="people">
-        {data.characters.map((c) => (
-          <Person key={c.id} data={data} c={c} found={found?.get(c.id) ?? (found ? [] : undefined)} />
-        ))}
-        <form
-          className="person add person-add"
-          onSubmit={(e) => {
-            e.preventDefault()
-            void add()
-          }}
-        >
-          <input
-            className="quick-add"
-            placeholder="+ Новый герой"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <button className="btn primary sm" type="submit" disabled={!name.trim()}>
-            Добавить героя
-          </button>
-        </form>
+      <div className={`characters-layout ${active ? 'has-active' : ''}`}>
+        <section className="character-master card">
+          <div className="character-list-head">
+            <div>
+              <h2>Герои</h2>
+              <div className="small muted">{characters.length || 'Пока никого'}</div>
+            </div>
+          </div>
+          <div className="character-list">
+            {characters.map((character) => (
+              <HeroRow
+                key={character.id}
+                data={data}
+                character={character}
+                active={character.id === activeId}
+                onOpen={() => setActiveId(character.id)}
+              />
+            ))}
+          </div>
+          <form
+            className="person add person-add"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void add()
+            }}
+          >
+            <input className="quick-add" placeholder="+ Новый герой" value={name} onChange={(e) => setName(e.target.value)} />
+            <button className="btn primary sm" type="submit" disabled={!name.trim()}>
+              Добавить
+            </button>
+          </form>
+        </section>
+        {active && (
+          <section className="character-detail">
+            <button className="hero-back btn ghost" onClick={() => setActiveId(null)}>← Все герои</button>
+            <Person data={data} c={active} found={found?.get(active.id) ?? (found ? [] : undefined)} onDeleted={() => setActiveId(null)} />
+          </section>
+        )}
       </div>
       <Branches data={data} />
     </div>
+  )
+}
+
+const ROLE_LABELS: Record<NonNullable<Character['role']>, string> = {
+  main: 'Главный',
+  supporting: 'Второстепенный',
+  episodic: 'Эпизодический',
+}
+
+function HeroRow({ data, character, active, onOpen }: { data: ProjectData; character: Character; active: boolean; onOpen: () => void }) {
+  const scenes = [...data.scenes, ...data.pool.scenes].filter((scene) => scene.characterIds?.includes(character.id)).length
+  return (
+    <button className={`hero-row ${active ? 'active' : ''}`} aria-pressed={active} onClick={onOpen}>
+      <span className="hero-row-avatar" style={{ background: character.color }}>{character.name.trim()[0]?.toUpperCase()}</span>
+      <span className="hero-row-main">
+        <span className="hero-row-title"><strong>{character.name}</strong><span>{character.role ? ROLE_LABELS[character.role] : 'Роль не выбрана'}</span></span>
+        <span className="hero-row-about">{character.about.trim() || 'Добавь цель, конфликт или тайну'}</span>
+      </span>
+      <span className="hero-row-count">{scenes} сц.</span>
+    </button>
   )
 }
 
@@ -97,9 +141,11 @@ function Branches({ data }: { data: ProjectData }) {
     await remove('lines', id)
   }
   return (
-    <section className="branches card">
+    <details className="branches card">
+      <summary className="branches-summary"><span>Сюжетные линии</span><span className="small muted">{data.lines.length}</span></summary>
+      <div className="branches-body">
       <div className="row" style={{ flexWrap: 'nowrap' }}>
-        <h3 style={{ marginRight: 'auto' }}>Сюжетные линии</h3>
+        <span className="small muted" style={{ marginRight: 'auto' }}>Ветки, проходящие через несколько сцен</span>
         {data.characters.length > 0 && (
           <button className="link small" onClick={() => setFromHeroes(true)}>
             Линии из героев
@@ -128,11 +174,12 @@ function Branches({ data }: { data: ProjectData }) {
           setName('')
         }}
       />
-    </section>
+      </div>
+    </details>
   )
 }
 
-function Person({ data, c, found }: { data: ProjectData; c: Character; found?: Found[] }) {
+function Person({ data, c, found, onDeleted }: { data: ProjectData; c: Character; found?: Found[]; onDeleted?: () => void }) {
   const [quote, setQuote] = useState('')
   const line = data.lines.find((l) => l.name === c.name)
   const lines = data.notes.filter((n) => (n.kind === 'quote' || n.kind === 'dialogue') && n.characterIds?.includes(c.id) && !n.archived)
@@ -143,6 +190,7 @@ function Person({ data, c, found }: { data: ProjectData; c: Character; found?: F
     for (const s of [...data.scenes, ...data.pool.scenes])
       if (s.characterIds?.includes(c.id)) await patch<Scene>('scenes', s.id, { characterIds: s.characterIds.filter((x) => x !== c.id) })
     await remove('characters', c.id)
+    onDeleted?.()
   }
 
   return (
@@ -196,6 +244,11 @@ function Person({ data, c, found }: { data: ProjectData; c: Character; found?: F
             </button>
           </div>
         </details>
+      </div>
+      <div className="hero-role seg" role="group" aria-label="Роль героя">
+        {(Object.entries(ROLE_LABELS) as [NonNullable<Character['role']>, string][]).map(([role, label]) => (
+          <button key={role} aria-pressed={c.role === role} onClick={() => set({ role })}>{label}</button>
+        ))}
       </div>
       <InlineEdit
         className="person-about"

@@ -99,7 +99,7 @@ export function useModal(ref: RefObject<HTMLElement | null>) {
 }
 
 /** A dialog over the page: Escape or a click outside closes it. */
-export function Modal({ onClose, children, label }: { onClose: () => void; children: ReactNode; label: string }) {
+export function Modal({ onClose, children, label, className }: { onClose: () => void; children: ReactNode; label: string; className?: string }) {
   const ref = useRef<HTMLDivElement>(null)
   useModal(ref)
   useEffect(() => {
@@ -109,7 +109,7 @@ export function Modal({ onClose, children, label }: { onClose: () => void; child
   }, [onClose])
   return createPortal(
     <div className="modal-back" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="modal card" role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} ref={ref}>
+      <div className={`modal card ${className ?? ''}`} role="dialog" aria-modal="true" aria-label={label} tabIndex={-1} ref={ref}>
         {children}
       </div>
     </div>,

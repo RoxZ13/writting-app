@@ -161,6 +161,35 @@ export async function createScene(
   })
 }
 
+/** Make an independent copy next to the source, including its text but not its sync identity or markers. */
+export async function duplicateScene(sceneId: string): Promise<Scene | undefined> {
+  const scene = await db.scenes.get(sceneId)
+  if (!scene || scene.deleted) return
+  const text = await db.texts.get(sceneId)
+  const siblings = alive(await db.scenes.where('chapterId').equals(scene.chapterId).toArray()).sort((a, b) => a.order - b.order)
+  const copy = await createScene(
+    scene.projectId,
+    scene.chapterId,
+    scene.title.trim() ? `${scene.title} — копия` : '',
+    {
+      status: scene.status,
+      goal: scene.goal,
+      beats: scene.beats.map((beat) => ({ ...beat, id: uid() })),
+      excerpt: scene.excerpt,
+      epigraph: scene.epigraph,
+      lineIds: scene.lineIds ? [...scene.lineIds] : undefined,
+      characterIds: scene.characterIds ? [...scene.characterIds] : undefined,
+      node: scene.node,
+      tempo: scene.tempo,
+      heat: scene.heat,
+    },
+    text?.content ?? emptyDoc(),
+    text?.wordCount ?? 0,
+  )
+  await moveScene(copy.id, scene.chapterId, siblings.findIndex((item) => item.id === scene.id) + 1)
+  return copy
+}
+
 /** Persist a new order (and possibly new chapter) for a list of scenes. */
 export async function reorderScenes(chapterId: string, sceneIds: string[]) {
   return atomic(['scenes'], async () => {
