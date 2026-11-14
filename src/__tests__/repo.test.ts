@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { ManuscriptDB, useDatabase, db, type Project } from '../db/db'
-import { createProject, createScene, deleteChapter, deleteScene, patch } from '../db/repo'
+import { createProject, createScene, deleteChapter, deleteScene, findOrCreateCharacter, findOrCreateLine, patch, setSceneRef, toggleSceneRef } from '../db/repo'
 
 let n = 0
 
@@ -73,5 +73,26 @@ describe('repository writes', () => {
     expect((await db.scenes.get(first!.id))?.deleted).toBe(true)
     expect((await db.texts.get(first!.id))?.deleted).toBe(true)
     expect((await db.projects.get(project.id))?.lastSceneId).toBe(second.id)
+  })
+
+  it('attaches a newly typed hero and line idempotently', async () => {
+    const project = await createProject('Книга')
+    const scene = await db.scenes.where('projectId').equals(project.id).first()
+    const hero = await findOrCreateCharacter(project.id, 'Арина')
+    const line = await findOrCreateLine(project.id, 'Расследование')
+
+    await Promise.all([
+      setSceneRef(scene!.id, 'characterIds', hero.id, true),
+      setSceneRef(scene!.id, 'characterIds', hero.id, true),
+      setSceneRef(scene!.id, 'lineIds', line.id, true),
+      setSceneRef(scene!.id, 'lineIds', line.id, true),
+    ])
+
+    const attached = await db.scenes.get(scene!.id)
+    expect(attached?.characterIds).toEqual([hero.id])
+    expect(attached?.lineIds).toEqual([line.id])
+
+    await toggleSceneRef(scene!.id, 'lineIds', line.id)
+    expect((await db.scenes.get(scene!.id))?.lineIds).toEqual([])
   })
 })

@@ -2418,6 +2418,37 @@ main.page.wide {
   font-size: var(--fs-ui);
   font-weight: 500;
 }
+.sheet-ref-fold {
+  border-top: 1px solid var(--line);
+}
+.sheet-ref-fold > summary {
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  list-style: none;
+}
+.sheet-ref-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.sheet-ref-fold > summary > .muted {
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sheet-ref-fold > summary::after {
+  content: '›';
+  color: var(--ink-3);
+}
+.sheet-ref-fold[open] > summary::after {
+  transform: rotate(90deg);
+}
+.sheet-fold-body {
+  padding: 4px 0 12px;
+}
 .mk-check {
   margin-top: 3px;
   width: 16px;

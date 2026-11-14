@@ -16,6 +16,44 @@ test.describe('mobile actions stay reachable', () => {
     await expect.poll(async () => (await aliveRows<any>(page, 'characters')).map((c) => c.name)).toContain('Арина')
   })
 
+  test('a hero and a line typed inside a scene stay attached after Enter and reload', async ({ page }) => {
+    await startStory(page)
+    await openTab(page, 'Доска')
+    const addScene = page.getByPlaceholder('Новая сцена').first()
+    await addScene.fill('Сцена со связями')
+    await addScene.press('Enter')
+    await page.locator('.tl-scene').filter({ hasText: 'Сцена со связями' }).click()
+    const sheet = page.getByRole('dialog', { name: 'Сцена' })
+
+    const lines = sheet.locator('details.sheet-ref-fold').filter({ hasText: 'Линии' })
+    await lines.locator('summary').click()
+    await lines.getByRole('button', { name: '+ линия' }).click()
+    await lines.getByPlaceholder('Название линии').fill('Расследование')
+    await lines.getByPlaceholder('Название линии').press('Enter')
+    await expect(lines.locator('.ref-chip.on').filter({ hasText: 'Расследование' })).toBeVisible()
+
+    const people = sheet.locator('details.sheet-ref-fold').filter({ hasText: 'Герои' })
+    await people.locator('summary').click()
+    await people.getByRole('button', { name: '+ герой' }).click()
+    await people.getByPlaceholder('Имя героя').fill('Арина')
+    await people.getByPlaceholder('Имя героя').press('Enter')
+    await expect(people.locator('.ref-chip.on').filter({ hasText: 'Арина' })).toBeVisible()
+
+    await sheet.getByRole('button', { name: 'Закрыть' }).click()
+    await page.reload()
+    await page.locator('.tl-scene').filter({ hasText: 'Сцена со связями' }).click()
+    const reopened = page.getByRole('dialog', { name: 'Сцена' })
+    await expect(reopened.locator('summary').filter({ hasText: 'Линии' })).toContainText('Расследование')
+    await expect(reopened.locator('summary').filter({ hasText: 'Герои' })).toContainText('Арина')
+
+    const scenes = await aliveRows<any>(page, 'scenes')
+    const characters = await aliveRows<any>(page, 'characters')
+    const storyLines = await aliveRows<any>(page, 'lines')
+    const scene = scenes.find((item) => item.title === 'Сцена со связями')
+    expect(scene.characterIds).toEqual([characters.find((item) => item.name === 'Арина').id])
+    expect(scene.lineIds).toEqual([storyLines.find((item) => item.name === 'Расследование').id])
+  })
+
   test('holding a scene opens actions without a visible ellipsis, and duplication is undoable', async ({ page }) => {
     await startStory(page)
     await openTab(page, 'Доска')
@@ -62,6 +100,7 @@ test.describe('mobile actions stay reachable', () => {
     await add.press('Enter')
     await page.locator('.tl-scene').filter({ hasText: 'Лишняя сцена' }).click()
     const sheet = page.getByRole('dialog', { name: 'Сцена' })
+    await sheet.locator('details.sheet-more > summary').click()
     await sheet.getByRole('button', { name: 'Удалить сцену', exact: true }).click()
     await expect(sheet).toBeHidden()
     await expect.poll(async () => (await aliveRows<any>(page, 'scenes')).some((s) => s.title === 'Лишняя сцена')).toBe(false)

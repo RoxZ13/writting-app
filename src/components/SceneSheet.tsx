@@ -35,8 +35,8 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
   const canMerge = !inPool && !locked && siblings.indexOf(scene) > 0
   // No dragging on a phone: there the way to move a scene is right in sight, not under «Ещё».
   const phone = typeof matchMedia !== 'undefined' && matchMedia('(max-width: 760px)').matches
-  const [opened, setOpened] = useState<Set<'lines' | 'people'>>(new Set())
-  const show = (k: 'lines' | 'people') => opened.has(k) || (k === 'lines' ? (scene.lineIds ?? []).length > 0 : (scene.characterIds ?? []).length > 0)
+  const selectedLines = (scene.lineIds ?? []).map((id) => data.lineById.get(id)?.name).filter(Boolean)
+  const selectedPeople = (scene.characterIds ?? []).map((id) => data.characterById.get(id)?.name).filter(Boolean)
   const where = (
     <label className="sheet-where">
       <span className="field-label">{phone ? 'Где стоит' : 'Перенести в'}</span>
@@ -49,8 +49,27 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
           </option>
         ))}
       </select>
-      {locked && <span className="small muted">Глава зафиксирована — сцена стоит на месте. Открепить можно на доске, в ⋯ у главы.</span>}
+      {locked && <span className="small muted">Глава зафиксирована</span>}
     </label>
+  )
+  const plotControls = (
+    <div className="sheet-plot">
+      <div className="seg" role="group" aria-label="Темп сцены">
+        {(
+          [
+            ['calm', 'Спокойная'],
+            ['tense', 'Напряжённая'],
+          ] as const
+        ).map(([v, label]) => (
+          <button key={v} aria-pressed={scene.tempo === v} onClick={() => set({ tempo: scene.tempo === v ? undefined : v }, 'темп сцены')}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <button className={`chip-toggle sm ${scene.node ? 'on' : ''}`} onClick={() => set({ node: scene.node ? undefined : true }, 'отметка «Ключевая»')}>
+        Ключевая
+      </button>
+    </div>
   )
   const place = async (to: string) => {
     if (to === 'pool') {
@@ -100,78 +119,44 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
           Писать эту сцену →
         </button>
         {phone && where}
-        {phone && (
-          <button className="btn ghost scene-delete-mobile" onClick={() => void deleteScene()}>
-            Удалить сцену
-          </button>
-        )}
-        {/* Only what stands out: pace when the scene is quiet or tense, and whether it is a key one. */}
-        <div className="sheet-plot">
-          <div className="seg" role="group" aria-label="Темп сцены">
-            {(
-              [
-                ['calm', 'Спокойная'],
-                ['tense', 'Напряжённая'],
-              ] as const
-            ).map(([v, label]) => (
-              <button key={v} aria-pressed={scene.tempo === v} onClick={() => set({ tempo: scene.tempo === v ? undefined : v }, 'темп сцены')}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <button className={`chip-toggle sm ${scene.node ? 'on' : ''}`} onClick={() => set({ node: scene.node ? undefined : true }, 'отметка «Ключевая»')}>
-            Ключевая
-          </button>
-        </div>
+        {!phone && plotControls}
 
-        {show('lines') && (
-          <section className="sheet-section">
-            <h3>Линии</h3>
+        <details className="sheet-section sheet-ref-fold">
+          <summary><span>Линии</span><span className="small muted">{selectedLines.join(', ') || 'Не выбраны'}</span></summary>
+          <div className="sheet-fold-body">
             <RefChips data={data} sceneId={scene.id} field="lineIds" selected={scene.lineIds ?? []} />
-          </section>
-        )}
-        {show('people') && (
-          <section className="sheet-section">
-            <h3>Герои в сцене</h3>
+          </div>
+        </details>
+        <details className="sheet-section sheet-ref-fold">
+          <summary><span>Герои</span><span className="small muted">{selectedPeople.join(', ') || 'Не выбраны'}</span></summary>
+          <div className="sheet-fold-body">
             <RefChips data={data} sceneId={scene.id} field="characterIds" selected={scene.characterIds ?? []} />
-          </section>
-        )}
+          </div>
+        </details>
         {markers.length > 0 && (
-          <section className="sheet-section">
-            <h3>Маячки</h3>
-            <div className="stack" style={{ gap: 8 }}>
+          <details className="sheet-section sheet-ref-fold">
+            <summary><span>Маячки</span><span className="small muted">{markers.length}</span></summary>
+            <div className="stack sheet-fold-body" style={{ gap: 8 }}>
               {markers.map((m) => (
                 <MarkerCard key={m.id} data={data} marker={m} />
               ))}
             </div>
-          </section>
+          </details>
         )}
-        <div className="pp-add">
-          <span className="muted small">+ добавить:</span>
-          {!show('people') && (
-            <button className="pp-add-btn" onClick={() => setOpened((o) => new Set(o).add('people'))}>
-              кто в сцене
-            </button>
-          )}
-          {!show('lines') && (
-            <button className="pp-add-btn" onClick={() => setOpened((o) => new Set(o).add('lines'))}>
-              линию
-            </button>
-          )}
-          <button
-            className="pp-add-btn"
-            onClick={() =>
-              void undoable('новый маячок', () => createMarker(data.project.id, { title: 'Новый маячок', setupSceneId: scene.id, setupChapterId: scene.chapterId }))
-            }
-          >
-            маячок
-          </button>
-        </div>
 
         <details className="sheet-more">
           <summary>Ещё</summary>
           <div className="stack" style={{ gap: 12, marginTop: 12 }}>
             {!phone && where}
+            {phone && plotControls}
+            <button
+              className="btn"
+              onClick={() =>
+                void undoable('новый маячок', () => createMarker(data.project.id, { title: 'Новый маячок', setupSceneId: scene.id, setupChapterId: scene.chapterId }))
+              }
+            >
+              Добавить маячок
+            </button>
             {canMerge && (
               <button
                 className="btn"

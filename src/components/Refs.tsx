@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Character, Line, Marker } from '../db/db'
-import { createLine, findOrCreateCharacter, patch, toggleSceneRef } from '../db/repo'
+import { findOrCreateCharacter, findOrCreateLine, patch, setSceneRef, toggleSceneRef } from '../db/repo'
 import { ColorDot } from './ColorDot'
 import { sceneName, type ProjectData } from '../lib/hooks'
 import { undoable } from '../lib/undo'
@@ -19,19 +19,28 @@ export function RefChips({
 }) {
   const [adding, setAdding] = useState(false)
   const [name, setName] = useState('')
+  const committing = useRef(false)
+  const cancelBlur = useRef(false)
   const label = field === 'lineIds' ? 'линия сцены' : 'герой в сцене'
   const items = field === 'lineIds' ? data.lines.map((l) => ({ id: l.id, name: l.name, color: l.color })) : data.characters
   const add = async () => {
+    if (committing.current) return
     const n = name.trim()
-    setAdding(false)
-    setName('')
-    if (!n) return
-    const existingLine = field === 'lineIds' ? data.lines.find((l) => l.name.trim().toLowerCase() === n.toLowerCase()) : undefined
-    await undoable(label, async () => {
-      const created =
-        field === 'lineIds' ? (existingLine ?? (await createLine(data.project.id, n))) : await findOrCreateCharacter(data.project.id, n)
-      if (!selected.includes(created.id)) await toggleSceneRef(sceneId, field, created.id)
-    })
+    if (!n) {
+      setAdding(false)
+      return
+    }
+    committing.current = true
+    try {
+      await undoable(label, async () => {
+        const created = field === 'lineIds' ? await findOrCreateLine(data.project.id, n) : await findOrCreateCharacter(data.project.id, n)
+        await setSceneRef(sceneId, field, created.id, true)
+      })
+      setName('')
+      setAdding(false)
+    } finally {
+      committing.current = false
+    }
   }
   return (
     <div className="chips">
@@ -61,14 +70,31 @@ export function RefChips({
           placeholder={field === 'lineIds' ? 'Название линии' : 'Имя героя'}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onBlur={() => void add()}
+          onBlur={() => {
+            if (cancelBlur.current) {
+              cancelBlur.current = false
+              return
+            }
+            void add()
+          }}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') void add()
-            if (e.key === 'Escape') setAdding(false)
+            if (e.key === 'Enter') {
+              e.preventDefault()
+              e.currentTarget.blur()
+            }
+            if (e.key === 'Escape') {
+              e.preventDefault()
+              cancelBlur.current = true
+              setName('')
+              setAdding(false)
+            }
           }}
         />
       ) : (
-        <button className="ref-chip add" onClick={() => setAdding(true)}>
+        <button className="ref-chip add" onClick={() => {
+          cancelBlur.current = false
+          setAdding(true)
+        }}>
           + {field === 'lineIds' ? 'линия' : 'герой'}
         </button>
       )}

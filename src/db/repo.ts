@@ -392,6 +392,13 @@ export async function createLine(projectId: string, name: string): Promise<Line>
   })
 }
 
+/** Find a line by name or create one, so submitting the same mobile field twice stays harmless. */
+export async function findOrCreateLine(projectId: string, name: string): Promise<Line> {
+  const norm = (value: string) => value.trim().toLowerCase().replace(/ё/g, 'е')
+  const existing = alive(await db.lines.where('projectId').equals(projectId).toArray())
+  return existing.find((line) => norm(line.name) === norm(name)) ?? createLine(projectId, name)
+}
+
 /** Find a character by name (case- and ё-insensitive) or create one — so typing a name twice never makes a twin. */
 export async function findOrCreateCharacter(projectId: string, name: string): Promise<Character> {
   const norm = (s: string) => s.trim().toLowerCase().replace(/ё/g, 'е')
@@ -412,12 +419,23 @@ export async function createCharacter(projectId: string, name: string): Promise<
   })
 }
 
-/** Toggle an id in a scene's list field (lines or characters) using the freshest stored copy. */
+/** Explicitly attach or detach a reference. Repeating the same mobile action is idempotent. */
+export async function setSceneRef(sceneId: string, field: 'lineIds' | 'characterIds', id: string, selected: boolean) {
+  return write<Scene>('scenes', sceneId, (scene) => {
+    if (!scene) return
+    const list = scene[field] ?? []
+    const next = selected ? [...new Set([...list, id])] : list.filter((item) => item !== id)
+    return { ...scene, [field]: next }
+  })
+}
+
+/** Toggle an existing chip using the freshest copy inside the write transaction. */
 export async function toggleSceneRef(sceneId: string, field: 'lineIds' | 'characterIds', id: string) {
-  const s = await db.scenes.get(sceneId)
-  if (!s) return
-  const list = s[field] ?? []
-  await save<Scene>('scenes', { ...s, [field]: list.includes(id) ? list.filter((x) => x !== id) : [...list, id] })
+  return write<Scene>('scenes', sceneId, (scene) => {
+    if (!scene) return
+    const list = scene[field] ?? []
+    return { ...scene, [field]: list.includes(id) ? list.filter((item) => item !== id) : [...list, id] }
+  })
 }
 
 /** Move a scene to a chapter at a position (board drag and drop). */
