@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { Note } from '../db/db'
 import { createNote, patch, remove } from '../db/repo'
 import type { ProjectData } from '../lib/hooks'
@@ -30,6 +30,8 @@ export function LoreView({ data }: { data: ProjectData }) {
   const [q, setQ] = useState('')
   const [topic, setTopic] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
+  const [activeId, setActiveId] = useState<string | null>(null)
+  const addInput = useRef<HTMLInputElement>(null)
   const found = useWhereFound(data)
   const topics = [...new Set(data.lore.map((n) => n.topic?.trim()).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, 'ru'))
   const shown = data.lore.filter(
@@ -42,45 +44,61 @@ export function LoreView({ data }: { data: ProjectData }) {
     setDraft('')
     const n = await createNote('', 'lore', data.project.id)
     await patch<Note>('notes', n.id, { title, topic: topic ?? undefined })
+    requestAnimationFrame(() => addInput.current?.focus())
   }
+
+  const active = activeId ? data.lore.find((note) => note.id === activeId) : undefined
 
   return (
     <div>
       <div className="toolbar">
         <WorldNav current="lore" />
-        <span className="spacer" />
-        <input className="input lore-search" placeholder="Найти в мире" value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
-      {topics.length > 0 && (
-        <div className="row lore-topics">
-          <button className={`chip-toggle ${topic === null ? 'on' : ''}`} onClick={() => setTopic(null)}>
-            Всё
-          </button>
-          {topics.map((t) => (
-            <button key={t} className={`chip-toggle ${topic === t ? 'on' : ''}`} onClick={() => setTopic(topic === t ? null : t)}>
-              {t}
-            </button>
-          ))}
-        </div>
-      )}
-      <input
-        className="quick-add lore-add"
-        placeholder={topic ? `+ запись в «${topic}»: название` : '+ запись: название — место, заклинание, событие…'}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && void add()}
-      />
-      <div className="lore-grid">
-        {shown.map((n) => (
-          <LoreCard key={n.id} n={n} data={data} found={found?.get(n.id) ?? (found ? [] : undefined)} />
-        ))}
+      <div className={`lore-layout ${active ? 'has-active' : ''}`}>
+        <section className="lore-master card">
+          <div className="lore-master-head">
+            <div><h2>Мир истории</h2><div className="small muted">Места, правила, события и важные детали</div></div>
+          </div>
+          <input className="input lore-search" placeholder="Найти запись" value={q} onChange={(e) => setQ(e.target.value)} />
+          {topics.length > 0 && (
+            <div className="lore-topics">
+              <button className={`chip-toggle ${topic === null ? 'on' : ''}`} onClick={() => setTopic(null)}>Всё</button>
+              {topics.map((t) => (
+                <button key={t} className={`chip-toggle ${topic === t ? 'on' : ''}`} onClick={() => setTopic(topic === t ? null : t)}>{t}</button>
+              ))}
+            </div>
+          )}
+          <div className="lore-list">
+            {shown.map((n) => (
+              <button key={n.id} className={`lore-row ${activeId === n.id ? 'active' : ''}`} onClick={() => setActiveId(n.id)}>
+                <span><strong>{n.title || 'Без названия'}</strong>{n.topic && <small>{n.topic}</small>}</span><span aria-hidden="true">›</span>
+              </button>
+            ))}
+          </div>
+          <form className="lore-add" onSubmit={(e) => { e.preventDefault(); void add() }}>
+            <input
+              ref={addInput}
+              className="quick-add"
+              placeholder={topic ? `Новая запись в «${topic}»` : 'Новая запись: место, правило, событие…'}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            <button className="btn primary sm" type="submit" disabled={!draft.trim()}>Добавить</button>
+          </form>
+          {!data.lore.length && <div className="empty lore-empty">Сначала можно просто собрать названия. Подробности добавишь позже.</div>}
+        </section>
+        {active && (
+          <section className="lore-detail">
+            <button className="lore-back btn ghost" onClick={() => setActiveId(null)}>← Все записи</button>
+            <LoreCard n={active} data={data} found={found?.get(active.id) ?? (found ? [] : undefined)} onDeleted={() => setActiveId(null)} />
+          </section>
+        )}
       </div>
-      {!data.lore.length && <div className="empty">Места, магия, даты, кто что знает. Запись можно прикрепить к герою, главе или сцене — она появится в плане сцены.</div>}
     </div>
   )
 }
 
-function LoreCard({ n, data, found }: { n: Note; data: ProjectData; found?: Found[] }) {
+function LoreCard({ n, data, found, onDeleted }: { n: Note; data: ProjectData; found?: Found[]; onDeleted?: () => void }) {
   const set = (changes: Partial<Note>) => void patch<Note>('notes', n.id, changes)
   return (
     <article className="card lore-card">
@@ -92,6 +110,7 @@ function LoreCard({ n, data, found }: { n: Note; data: ProjectData; found?: Foun
           onClick={() => {
             if (!confirm(`Удалить «${n.title}» из мира?`)) return
             void remove('notes', n.id)
+            onDeleted?.()
             toast('Запись удалена')
           }}
         >

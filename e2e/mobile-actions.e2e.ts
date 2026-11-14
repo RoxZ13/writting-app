@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import { aliveRows, startStory } from './helpers'
 
-const openTab = (page: Page, name: 'Доска' | 'Герои') => page.locator('.tabs > button', { hasText: name }).first().click()
+const openTab = (page: Page, name: 'Доска' | 'Герои') => page.locator('.tabs-mobile > button', { hasText: name }).click()
 
 test.describe('mobile actions stay reachable', () => {
   test.beforeEach(async ({ isMobile }) => test.skip(!isMobile, 'phone layout'))
@@ -9,9 +9,10 @@ test.describe('mobile actions stay reachable', () => {
   test('a hero is added with a visible button, not only the keyboard Enter key', async ({ page }) => {
     await startStory(page)
     await openTab(page, 'Герои')
-    await page.getByPlaceholder('+ Новый герой').fill('Арина')
+    await page.getByPlaceholder('Имя нового героя').fill('Арина')
     await page.getByRole('button', { name: 'Добавить', exact: true }).click()
-    await expect(page.getByRole('textbox', { name: 'Имя героя' })).toHaveValue('Арина')
+    await expect(page.locator('.hero-row').filter({ hasText: 'Арина' })).toBeVisible()
+    await expect(page.getByPlaceholder('Имя нового героя')).toBeFocused()
     await expect.poll(async () => (await aliveRows<any>(page, 'characters')).map((c) => c.name)).toContain('Арина')
   })
 
@@ -28,6 +29,10 @@ test.describe('mobile actions stay reachable', () => {
     await row.dispatchEvent('pointerup', { pointerType: 'touch', clientX: 180, clientY: 300 })
     const actions = page.getByRole('dialog', { name: 'Действия со сценой «Поворот сюжета»' })
     await expect(actions).toBeVisible()
+    await expect(page.locator('.modal-back')).toHaveCount(0)
+    const rowBox = await row.boundingBox()
+    const actionBox = await actions.boundingBox()
+    expect(actionBox!.y).toBeGreaterThanOrEqual(rowBox!.y)
     await actions.getByRole('button', { name: /Дублировать/ }).click()
     await expect.poll(async () => (await aliveRows<any>(page, 'scenes')).filter((scene) => scene.title.startsWith('Поворот сюжета')).length).toBe(2)
     await page.getByRole('button', { name: 'Отменить' }).click()
@@ -38,9 +43,8 @@ test.describe('mobile actions stay reachable', () => {
     await startStory(page)
     await openTab(page, 'Герои')
     for (const name of ['Арина', 'Макс', 'Наставник']) {
-      await page.getByPlaceholder('+ Новый герой').fill(name)
+      await page.getByPlaceholder('Имя нового героя').fill(name)
       await page.getByRole('button', { name: 'Добавить', exact: true }).click()
-      await page.getByRole('button', { name: '← Все герои' }).click()
     }
     await expect(page.locator('.hero-row')).toHaveCount(3)
     await expect(page.getByRole('textbox', { name: 'Имя героя' })).toHaveCount(0)
@@ -74,7 +78,9 @@ test.describe('mobile actions stay reachable', () => {
     await page.waitForTimeout(480)
     await chapter.dispatchEvent('pointerup', { pointerType: 'touch', clientX: 180, clientY: 300 })
     const dialog = page.getByRole('dialog', { name: 'Действия с главой «Глава 2»' })
+    await expect(page.locator('.modal-back')).toHaveCount(0)
     await dialog.getByRole('button', { name: 'Удалить главу' }).click()
+    await dialog.getByRole('button', { name: 'Удалить', exact: true }).click()
     await expect(dialog).toBeHidden()
     await expect.poll(async () => (await aliveRows<any>(page, 'chapters')).filter((c) => !c.pool).length).toBe(1)
   })
@@ -87,6 +93,15 @@ test.describe('mobile actions stay reachable', () => {
     await add.fill('Черновик, который пока не добавляем')
     await page.getByRole('button', { name: 'Герои', exact: true }).click()
     await expect.poll(async () => (await aliveRows<any>(page, 'scenes')).length).toBe(before)
+  })
+
+  test('book parameters no longer occupy a bottom navigation slot', async ({ page }) => {
+    await startStory(page)
+    await expect(page.locator('.tabs').getByText('История', { exact: true })).toHaveCount(0)
+    await page.locator('.project-name').click()
+    await expect(page.getByText('Параметры книги', { exact: true })).toBeVisible()
+    await page.locator('.tabs-mobile > button').filter({ hasText: 'Входящие' }).click()
+    await expect(page.getByRole('heading', { name: 'Входящие' })).toBeVisible()
   })
 
   test('the scene list opens only on request as a bottom sheet and controls do not overlap', async ({ page }) => {

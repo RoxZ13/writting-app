@@ -1,8 +1,7 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import type { Scene } from '../db/db'
 import { duplicateScene, ensurePool, moveScene, remove } from '../db/repo'
 import { isLocked, sceneName, type ProjectData } from '../lib/hooks'
-import { Modal } from '../lib/ui'
 import { toastUndo, undoable } from '../lib/undo'
 
 /** A scene row stays visually quiet: familiar gestures reveal the actions when they are wanted. */
@@ -24,11 +23,14 @@ export function GestureActionButton({
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const start = useRef<{ x: number; y: number } | null>(null)
   const suppressClick = useRef(false)
+  const [pressing, setPressing] = useState(false)
   const clear = () => {
     clearTimeout(timer.current)
     timer.current = undefined
   }
   const actions = () => {
+    clear()
+    setPressing(false)
     suppressClick.current = true
     navigator.vibrate?.(12)
     onActions()
@@ -36,15 +38,20 @@ export function GestureActionButton({
   const down = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (event.pointerType === 'mouse') return
     start.current = { x: event.clientX, y: event.clientY }
+    setPressing(true)
     clear()
-    timer.current = setTimeout(actions, 430)
+    timer.current = setTimeout(actions, 380)
   }
   const move = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (!start.current) return
-    if (Math.hypot(event.clientX - start.current.x, event.clientY - start.current.y) > 10) clear()
+    if (Math.hypot(event.clientX - start.current.x, event.clientY - start.current.y) > 18) {
+      clear()
+      setPressing(false)
+    }
   }
   const up = (event: ReactPointerEvent<HTMLButtonElement>) => {
     clear()
+    setPressing(false)
     if (start.current) {
       const dx = event.clientX - start.current.x
       const dy = event.clientY - start.current.y
@@ -55,7 +62,7 @@ export function GestureActionButton({
   return (
     <button
       type="button"
-      className={`${className ?? ''} gesture-scene`}
+      className={`${className ?? ''} gesture-scene ${pressing ? 'gesture-pressing' : ''}`}
       aria-description={ariaDescription}
       aria-expanded={ariaExpanded}
       onPointerDown={down}
@@ -63,6 +70,7 @@ export function GestureActionButton({
       onPointerUp={up}
       onPointerCancel={() => {
         clear()
+        setPressing(false)
         start.current = null
       }}
       onContextMenu={(event) => {
@@ -93,9 +101,13 @@ export function SceneGestureButton(props: Omit<Parameters<typeof GestureActionBu
   return <GestureActionButton {...props} ariaDescription="Нажми, чтобы открыть. Зажми или смахни влево для действий" />
 }
 
-/** Telegram-like action sheet opened by hold, swipe, or right click — never by a permanent ellipsis. */
+/** Contextual actions stay next to their scene, so the author never loses what is being changed. */
 export function SceneActions({ data, scene, onClose }: { data: ProjectData; scene: Scene; onClose: () => void }) {
   const [moving, setMoving] = useState(false)
+  const panel = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    requestAnimationFrame(() => panel.current?.scrollIntoView({ block: 'center', behavior: 'auto' }))
+  }, [])
   const locked = isLocked(data, scene.chapterId)
   const inPool = scene.chapterId === data.pool.chapter?.id
   const place = async (target: string) => {
@@ -108,11 +120,13 @@ export function SceneActions({ data, scene, onClose }: { data: ProjectData; scen
     toastUndo(target === 'pool' ? 'Сцена убрана в «Пока без места»' : 'Сцена перенесена')
   }
   return (
-    <Modal onClose={onClose} label={`Действия со сценой «${sceneName(data, scene)}»`} className="scene-action-sheet">
-      <div className="scene-action-head">
-        <div className="sheet-grab" />
-        <h2>{sceneName(data, scene)}</h2>
-        <div className="small muted">{data.chapterById.get(scene.chapterId)?.title ?? 'Пока без места'}</div>
+    <div ref={panel} className="scene-action-panel" role="dialog" aria-label={`Действия со сценой «${sceneName(data, scene)}»`}>
+      <div className="scene-action-context">
+        <div>
+          <strong>{sceneName(data, scene)}</strong>
+          <span>{data.chapterById.get(scene.chapterId)?.title ?? 'Пока без места'}</span>
+        </div>
+        <button type="button" className="icon-btn" aria-label="Закрыть действия" onClick={onClose}>×</button>
       </div>
       {locked ? (
         <div className="scene-action-note">Глава зафиксирована. Сначала открепи её на доске.</div>
@@ -156,6 +170,6 @@ export function SceneActions({ data, scene, onClose }: { data: ProjectData; scen
           </button>
         </div>
       )}
-    </Modal>
+    </div>
   )
 }

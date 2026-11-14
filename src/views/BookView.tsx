@@ -67,12 +67,12 @@ export function BookView({ data }: { data: ProjectData }) {
       <div className="book-hero">
         <BookCover project={p} words={words} />
         <div className="stack" style={{ flex: 1, minWidth: 0 }}>
-          <span className="eyebrow">Об истории</span>
+          <span className="eyebrow">Параметры книги</span>
           <InlineEdit className="book-title" label="Название истории" value={p.title} onSave={(title) => title.trim() && set({ title })} />
           <InlineEdit className="book-genre" value={p.genre ?? ''} placeholder="Жанр — например, фэнтези, гет, макси" onSave={(genre) => set({ genre })} />
           <div>
             <span className="field-label">Стадия</span>
-            <div className="seg">
+            <div className="seg book-stage">
               {STAGES.map((s) => (
                 <button key={s.id} aria-pressed={(p.stage ?? 'writing') === s.id} onClick={() => set({ stage: s.id })}>
                   {s.label}

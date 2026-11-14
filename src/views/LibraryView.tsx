@@ -94,8 +94,8 @@ function StoryCard({
             {p.title}
           </strong>
           <details className="menu">
-            <summary className="icon-btn" aria-label="Действия">
-              <Icon name="more" size={18} />
+            <summary className="btn sm ghost" aria-label={`Настроить «${p.title}»`}>
+              Настроить
             </summary>
             <div className="menu-list card story-menu">
               <label className="menu-field">

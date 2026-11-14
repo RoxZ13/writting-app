@@ -627,17 +627,19 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
             {isOpen && (
               <div className="navi-scenes">
                 {scenes.map((s) => (
-                  <SceneGestureButton
-                    key={s.id}
-                    className={`navi-scene ${s.id === sceneId ? 'active' : ''}`}
-                    onOpen={() => {
-                      go({ view: 'text', sceneId: s.id })
-                      onPick()
-                    }}
-                    onActions={() => setActions(s.id)}
-                  >
-                    {sceneShort(data, s)}
-                  </SceneGestureButton>
+                  <div key={s.id} className={`navi-scene-wrap ${actions === s.id ? 'actions-open' : ''}`}>
+                    <SceneGestureButton
+                      className={`navi-scene ${s.id === sceneId ? 'active' : ''}`}
+                      onOpen={() => {
+                        go({ view: 'text', sceneId: s.id })
+                        onPick()
+                      }}
+                      onActions={() => setActions((id) => id === s.id ? null : s.id)}
+                    >
+                      {sceneShort(data, s)}
+                    </SceneGestureButton>
+                    {actions === s.id && <SceneActions data={data} scene={s} onClose={() => setActions(null)} />}
+                  </div>
                 ))}
                 {!chapter.pool && !chapter.locked && (
                   <button className="navi-scene add" onClick={() => void addScene(chapter.id)}>
@@ -649,7 +651,6 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
           </div>
         )
       })}
-      {actions && data.sceneById.get(actions) && <SceneActions data={data} scene={data.sceneById.get(actions)!} onClose={() => setActions(null)} />}
     </nav>
   )
 }

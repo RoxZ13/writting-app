@@ -44,6 +44,26 @@ export function App() {
   // A brand-new, still empty story keeps its header in view until the first key: the author sees once where things are.
   const [fresh, setFresh] = useState(false)
   useEffect(() => {
+    const viewport = window.visualViewport
+    const syncVisibleViewport = () => {
+      const visibleBottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight)
+      const hiddenBottom = Math.max(0, window.innerHeight - visibleBottom)
+      document.documentElement.style.setProperty('--visual-bottom-offset', `${hiddenBottom}px`)
+    }
+    syncVisibleViewport()
+    const settleTimer = window.setTimeout(syncVisibleViewport, 250)
+    viewport?.addEventListener('resize', syncVisibleViewport)
+    viewport?.addEventListener('scroll', syncVisibleViewport)
+    window.addEventListener('resize', syncVisibleViewport)
+    return () => {
+      window.clearTimeout(settleTimer)
+      viewport?.removeEventListener('resize', syncVisibleViewport)
+      viewport?.removeEventListener('scroll', syncVisibleViewport)
+      window.removeEventListener('resize', syncVisibleViewport)
+      document.documentElement.style.removeProperty('--visual-bottom-offset')
+    }
+  }, [route.view])
+  useEffect(() => {
     const on = (e: Event) => setFresh((e as CustomEvent<boolean>).detail)
     window.addEventListener('manuscript:fresh', on)
     return () => window.removeEventListener('manuscript:fresh', on)
@@ -234,27 +254,37 @@ export function App() {
 function AppHeader({ data, route, safety, onSearch }: { data: ProjectData; route: Route; safety: DataSafetyStatus; onSearch: () => void }) {
   const inbox = data.notes.filter((n) => !n.archived && !n.sceneId && !n.used && !(n.characterIds ?? []).length).length
   return (
-    <header className="app-header">
-      <div className="crumb">
-        <button className="logo" title="Все истории" onClick={() => go({ view: 'library' })}>
-          Manuscript.
-        </button>
-        <span className="slash">/</span>
-        <button className="project-name" title="Все истории" onClick={() => go({ view: 'library' })}>
-          {data.project.title} <span className="caret"><Icon name="down" size={13} /></span>
-        </button>
-        <button
-          className="data-safety"
-          data-state={safety.state}
-          title={safety.title}
-          aria-label={`${safety.label}. ${safety.title}`}
-          onClick={() => go({ view: 'settings' })}
-        >
-          <span className="sync-dot" data-state={safety.state} />
-          <span className="data-safety-label">{safety.label}</span>
-        </button>
-      </div>
-      <nav className="tabs">
+    <>
+      <header className="app-header">
+        <div className="crumb">
+          <button className="logo" title="Все истории" onClick={() => go({ view: 'library' })}>Manuscript.</button>
+          <span className="slash">/</span>
+          <button className="project-name" title="Параметры книги" onClick={() => go({ view: 'book' })}>
+            {data.project.title}
+            <span className="project-settings-label">Параметры</span>
+            <span className="project-settings-icon"><Icon name="settings" size={13} /></span>
+          </button>
+          <button
+            className="data-safety"
+            data-state={safety.state}
+            title={safety.title}
+            aria-label={`${safety.label}. ${safety.title}`}
+            onClick={() => go({ view: 'settings' })}
+          >
+            <span className="sync-dot" data-state={safety.state} />
+            <span className="data-safety-label">{safety.label}</span>
+          </button>
+        </div>
+        <WorkspaceTabs className="tabs tabs-desktop" route={route} inbox={inbox} onSearch={onSearch} />
+      </header>
+      <WorkspaceTabs className="tabs tabs-mobile" route={route} inbox={inbox} onSearch={onSearch} />
+    </>
+  )
+}
+
+function WorkspaceTabs({ className, route, inbox, onSearch }: { className: string; route: Route; inbox: number; onSearch: () => void }) {
+  return (
+    <nav className={className} aria-label="Разделы книги">
         {TABS.map((t) => (
           <button
             key={t.view}
@@ -280,14 +310,7 @@ function AppHeader({ data, route, safety, onSearch }: { data: ProjectData; route
           <span className="tab-label">Входящие</span>
           {inbox > 0 && <span className="badge">{inbox}</span>}
         </button>
-        <button className="tab-aux" aria-current={route.view === 'book' ? 'page' : undefined} title="Об истории: обложка, дедлайн, экспорт" onClick={() => go({ view: 'book' })}>
-          <span className="tab-ico">
-            <Icon name="book" />
-          </span>
-          <span className="tab-label">История</span>
-        </button>
-      </nav>
-    </header>
+    </nav>
   )
 }
 

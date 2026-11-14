@@ -5943,6 +5943,352 @@ button.avatar {
 }
 
 /* =====================================================================
+   Coherent mobile information architecture: contextual actions remain
+   beside their object; master lists stay quiet until an item is opened.
+   ===================================================================== */
+.project-settings-label {
+  margin-left: 6px;
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+}
+.project-settings-icon {
+  display: none;
+  color: var(--ink-3);
+}
+.gesture-item,
+.navi-scene-wrap {
+  min-width: 0;
+}
+.gesture-pressing {
+  transform: scale(0.985);
+  background: var(--fill) !important;
+  box-shadow: inset 3px 0 0 var(--accent-2);
+}
+.gesture-item.actions-open > .gesture-scene,
+.navi-scene-wrap.actions-open > .gesture-scene {
+  background: var(--fill);
+  box-shadow: inset 3px 0 0 var(--accent-2);
+}
+.scene-action-panel,
+.chapter-action-panel {
+  margin: 4px 6px 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(20, 18, 16, 0.08);
+  animation: action-reveal 0.14s ease-out;
+}
+@keyframes action-reveal {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+.scene-action-context {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 2px 8px;
+}
+.scene-action-context > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.scene-action-context span {
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+}
+.scene-action-list,
+.chapter-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.scene-action-list > button,
+.chapter-action-grid > button {
+  justify-content: flex-start;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  font-size: var(--fs-sm);
+}
+.scene-action-list > button {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+.scene-action-list > button.danger {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--danger-ink) 25%, var(--line));
+  border-radius: var(--r-sm);
+}
+.scene-move-list,
+.inline-confirm {
+  grid-column: 1 / -1;
+}
+.scene-move-list {
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--fill);
+}
+.scene-move-list button {
+  min-height: 38px;
+}
+.inline-confirm {
+  padding: 10px;
+  border-radius: var(--r-sm);
+  background: color-mix(in srgb, var(--danger-ink) 7%, var(--surface));
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+.inline-confirm .row {
+  margin-top: 8px;
+}
+.navi-scene-wrap > .navi-scene {
+  width: 100%;
+}
+.navi-scene-wrap .scene-action-panel {
+  margin: 4px 0 8px;
+  box-shadow: none;
+}
+
+.character-master .person-add {
+  margin: 0 0 10px;
+}
+.hero-row {
+  min-height: 48px;
+  gap: 10px;
+  padding: 8px 10px;
+}
+.hero-row-color {
+  width: 4px;
+  height: 28px;
+  flex: none;
+  border-radius: 99px;
+}
+.hero-row-title {
+  justify-content: flex-start;
+}
+.hero-row-arrow {
+  color: var(--ink-3);
+  font-size: var(--fs-xl);
+  line-height: 1;
+}
+.branches {
+  max-width: 720px;
+}
+.branches-intro {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+}
+.branch-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.branch-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.branch-usage {
+  grid-column: 1;
+  padding-left: 34px;
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+}
+.branch-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  padding-top: 8px;
+}
+
+.lore-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.lore-layout > .card {
+  padding: 12px;
+}
+.lore-search {
+  width: 100%;
+  margin-bottom: 8px;
+}
+.lore-topics {
+  display: flex;
+  gap: 5px;
+  overflow-x: auto;
+  margin: 0 0 8px;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.lore-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.lore-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--ink);
+  text-align: left;
+}
+.lore-row:hover,
+.lore-row.active {
+  background: var(--fill);
+}
+.lore-row > span:first-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.lore-row strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.lore-row small {
+  color: var(--ink-3);
+}
+.lore-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin: 10px 0 0;
+}
+.lore-back {
+  display: none;
+  margin-bottom: 8px;
+}
+.lore-empty {
+  padding: 18px 8px 8px;
+  font-size: var(--fs-sm);
+}
+
+.inbox-capture {
+  margin-bottom: 18px;
+}
+.inbox-capture-actions,
+.note-detail-actions,
+.note-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.inbox-capture-actions .spacer {
+  flex: 1;
+}
+.inbox-filters {
+  margin-bottom: 14px;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  scrollbar-width: none;
+}
+.inbox-filters > button {
+  white-space: nowrap;
+}
+.note-main {
+  flex: 1;
+  min-width: 0;
+}
+.note-row-actions {
+  justify-content: flex-end;
+}
+
+@media (max-width: 760px) {
+  .project-settings-label {
+    display: none;
+  }
+  .project-settings-icon {
+    display: inline-grid;
+  }
+  .book-stage {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .book-stage > button {
+    flex: none;
+  }
+  .scene-action-panel,
+  .chapter-action-panel {
+    margin: 4px 0 10px;
+  }
+  .action-hint {
+    font-size: 11px;
+  }
+  .characters-layout.has-active + .branches {
+    display: none;
+  }
+  .hero-row-title > span {
+    margin-left: auto;
+  }
+  .branches-intro {
+    align-items: flex-start;
+  }
+  .lore-layout {
+    display: block;
+  }
+  .lore-layout:has(.lore-detail) > .card {
+    display: none;
+  }
+  .lore-back {
+    display: inline-flex;
+  }
+  .note-item {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px 10px;
+    padding: 14px 12px;
+  }
+  .note-row-actions {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+  .note-row-actions .btn {
+    min-height: 36px;
+  }
+  .note-kind-picker {
+    max-width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    scrollbar-width: none;
+  }
+  .inbox-capture-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .inbox-capture-actions > .btn {
+    align-self: flex-end;
+  }
+}
+
+/* =====================================================================
    Gesture-first scene actions and a cast with one clear active character.
    ===================================================================== */
 .gesture-scene {
@@ -7322,5 +7668,116 @@ button.avatar {
     min-height: 44px;
     min-width: 44px;
     padding: 0 10px;
+  }
+}
+
+/* Final precedence for the mobile UX layer above. */
+.scene-action-list,
+.chapter-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+.scene-action-list > button,
+.chapter-action-grid > button {
+  display: flex;
+  min-height: 42px;
+  margin: 0;
+  padding: 8px 10px;
+  justify-content: flex-start;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--paper);
+  font-size: var(--fs-sm);
+}
+.scene-action-list > button {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+}
+.scene-action-list > button.danger {
+  margin: 0;
+  border: 1px solid color-mix(in srgb, var(--danger-ink) 25%, var(--line));
+  border-radius: var(--r-sm);
+}
+.scene-action-panel,
+.chapter-action-panel {
+  margin: 4px 6px 10px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(20, 18, 16, 0.08);
+}
+.scene-move-list {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+.hero-row {
+  min-height: 48px;
+  padding: 8px 10px;
+}
+.character-master .person-add {
+  margin: 0 0 10px;
+}
+.branch-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2px 10px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+.branches {
+  max-width: 720px;
+}
+.branch-usage {
+  grid-column: 1;
+}
+.app:has(.scene-action-panel, .chapter-action-panel) .fab {
+  opacity: 0;
+  pointer-events: none;
+}
+@media (max-width: 760px) {
+  .scene-action-panel,
+  .chapter-action-panel {
+    margin: 4px 0 10px;
+  }
+  .characters-layout.has-active + .branches {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .tabs-mobile {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100vw;
+    box-sizing: border-box;
+    /* Android Chrome keeps part of 100vh behind its browser controls. Keep the
+       navigation inside the actually visible dynamic viewport. */
+    bottom: var(--visual-bottom-offset, 0px);
+    z-index: 1000;
+    pointer-events: auto;
+    isolation: isolate;
+  }
+  .tabs-mobile > button {
+    width: 100%;
+    min-width: 0;
+    justify-content: center;
+    padding-inline: 2px;
+    pointer-events: auto;
+  }
+  .tabs-desktop {
+    display: none;
+  }
+}
+
+@media (min-width: 901px) {
+  .tabs-mobile {
+    display: none;
   }
 }

@@ -874,7 +874,16 @@ function Timeline({
         {poolOpen && (
           <div className="tl-body">
             {data.pool.scenes.map((s) => (
-              <TimelineScene key={s.id} data={data} scene={s} lens={lens} onOpen={() => onOpenScene(s.id)} onActions={() => setSceneActions(s.id)} />
+              <TimelineScene
+                key={s.id}
+                data={data}
+                scene={s}
+                lens={lens}
+                onOpen={() => onOpenScene(s.id)}
+                actionsOpen={sceneActions === s.id}
+                onActions={() => setSceneActions((id) => id === s.id ? null : s.id)}
+                onCloseActions={() => setSceneActions(null)}
+              />
             ))}
             <TimelineAdd data={data} lens={lens} />
             <ThreeParts data={data} />
@@ -892,7 +901,7 @@ function Timeline({
               <GestureActionButton
                 className="tl-head"
                 onOpen={() => toggle(chapter.id)}
-                onActions={() => setChapterActions(chapter.id)}
+                onActions={() => setChapterActions((id) => id === chapter.id ? null : chapter.id)}
                 ariaDescription="Нажми, чтобы раскрыть главу. Зажми или смахни влево для действий"
                 ariaExpanded={isOpen}
               >
@@ -913,6 +922,9 @@ function Timeline({
                 </span>
               </GestureActionButton>
             </div>
+            {chapterActions === chapter.id && (
+              <TimelineChapterActions data={data} chapter={chapter} scenes={scenes} onClose={() => setChapterActions(null)} />
+            )}
             {lineMissing && <div className="tl-gap">нет сцен этой линии</div>}
             {isOpen && (
               <div className="tl-body">
@@ -927,7 +939,9 @@ function Timeline({
                       scene={s}
                       lens={lens}
                       onOpen={() => onOpenScene(s.id)}
-                      onActions={() => setSceneActions(s.id)}
+                      actionsOpen={sceneActions === s.id}
+                      onActions={() => setSceneActions((id) => id === s.id ? null : s.id)}
+                      onCloseActions={() => setSceneActions(null)}
                     />
                   ))}
                 {!chapter.locked && <TimelineAdd data={data} chapter={chapter} lens={lens} />}
@@ -949,23 +963,13 @@ function Timeline({
       <button className="btn ghost" onClick={() => void newChapter(data)}>
         + Глава
       </button>
-      {chapterActions && data.chapterById.get(chapterActions) && (
-        <TimelineChapterActions
-          data={data}
-          chapter={data.chapterById.get(chapterActions)!}
-          scenes={data.scenes.filter((s) => s.chapterId === chapterActions)}
-          onClose={() => setChapterActions(null)}
-        />
-      )}
-      {sceneActions && data.sceneById.get(sceneActions) && (
-        <SceneActions data={data} scene={data.sceneById.get(sceneActions)!} onClose={() => setSceneActions(null)} />
-      )}
     </div>
   )
 }
 
 /** Chapter operations that the desktop keeps in its column menu, exposed as a touch-friendly dialog. */
 function TimelineChapterActions({ data, chapter, scenes, onClose }: { data: ProjectData; chapter: Chapter; scenes: Scene[]; onClose: () => void }) {
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const index = data.chapters.findIndex((c) => c.id === chapter.id)
   const previous = index > 0 ? data.chapters[index - 1] : undefined
   const addAfter = async () => {
@@ -979,15 +983,17 @@ function TimelineChapterActions({ data, chapter, scenes, onClose }: { data: Proj
     toastUndo('Глава добавлена')
   }
   const del = async () => {
-    if (!confirm(`Удалить «${chapter.title}» вместе со сценами (${scenes.length})?`)) return
     await undoable('удаление главы', () => deleteChapter(chapter.id))
     onClose()
     toastUndo('Глава удалена')
   }
   return (
-    <Modal onClose={onClose} label={`Действия с главой «${chapter.title}»`}>
-      <div className="stack chapter-actions-mobile">
-        <h2>{chapter.title}</h2>
+    <div className="chapter-action-panel" role="dialog" aria-label={`Действия с главой «${chapter.title}»`}>
+      <div className="scene-action-context">
+        <div><strong>{chapter.title}</strong><span>{formatScenes(scenes.length)}</span></div>
+        <button type="button" className="icon-btn" aria-label="Закрыть действия" onClick={onClose}>×</button>
+      </div>
+      <div className="chapter-action-grid">
         <button
           className="btn"
           onClick={async () => {
@@ -1012,13 +1018,21 @@ function TimelineChapterActions({ data, chapter, scenes, onClose }: { data: Proj
             Склеить с предыдущей главой
           </button>
         )}
-        {!chapter.locked && (
-          <button className="btn ghost mobile-danger" onClick={() => void del()}>
-            Удалить главу
-          </button>
+        {!chapter.locked && !confirmDelete && (
+          <button className="btn ghost mobile-danger" onClick={() => setConfirmDelete(true)}>Удалить главу</button>
+        )}
+        {confirmDelete && (
+          <div className="inline-delete-confirm">
+            <strong>Удалить «{chapter.title}» и {formatScenes(scenes.length)}?</strong>
+            <span>После удаления можно сразу нажать «Отменить».</span>
+            <div className="row">
+              <button className="btn" onClick={() => setConfirmDelete(false)}>Оставить</button>
+              <button className="btn mobile-danger" onClick={() => void del()}>Удалить</button>
+            </div>
+          </div>
         )}
       </div>
-    </Modal>
+    </div>
   )
 }
 
@@ -1027,28 +1041,35 @@ function TimelineScene({
   scene,
   lens,
   onOpen,
+  actionsOpen,
   onActions,
+  onCloseActions,
 }: {
   data: ProjectData
   scene: Scene
   lens: Lens
   onOpen: () => void
+  actionsOpen: boolean
   onActions: () => void
+  onCloseActions: () => void
 }) {
   const markers = data.markers.filter((m) => m.setupSceneId === scene.id || m.payoffSceneId === scene.id)
   const dim = dims(lens, scene, data)
   const current = data.project.lastSceneId === scene.id
   const sub = scene.goal || scene.excerpt
   return (
-    <SceneGestureButton className={`tl-scene ${dim ? 'dim' : ''} ${current ? 'current' : ''} ${scene.node ? 'node' : ''}`} onOpen={onOpen} onActions={onActions}>
-      {scene.node ? <span className="ln-key" title="Ключевая сцена" /> : <span className="status-dot" style={{ background: statusOf(scene.status).color }} />}
-      <span className="tl-text">
-        <span className={`tl-name ${scene.title.trim() ? '' : 'untitled'}`}>{sceneName(data, scene)}</span>
-        {sub && <span className="tl-sub">{sub}</span>}
-      </span>
-      {markers.length > 0 && <span className="tl-mk">✦ {markers.length}</span>}
-      {current && !storyEmpty(data) && <span className="here">ты здесь</span>}
-    </SceneGestureButton>
+    <div className={`gesture-item ${actionsOpen ? 'actions-open' : ''}`}>
+      <SceneGestureButton className={`tl-scene ${dim ? 'dim' : ''} ${current ? 'current' : ''} ${scene.node ? 'node' : ''}`} onOpen={onOpen} onActions={onActions}>
+        {scene.node ? <span className="ln-key" title="Ключевая сцена" /> : <span className="status-dot" style={{ background: statusOf(scene.status).color }} />}
+        <span className="tl-text">
+          <span className={`tl-name ${scene.title.trim() ? '' : 'untitled'}`}>{sceneName(data, scene)}</span>
+          {sub && <span className="tl-sub">{sub}</span>}
+        </span>
+        {markers.length > 0 && <span className="tl-mk">✦ {markers.length}</span>}
+        {current && !storyEmpty(data) && <span className="here">ты здесь</span>}
+      </SceneGestureButton>
+      {actionsOpen && <SceneActions data={data} scene={scene} onClose={onCloseActions} />}
+    </div>
   )
 }
 

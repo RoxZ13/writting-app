@@ -35,7 +35,7 @@ export function InboxView({ data }: { data: ProjectData }) {
         <h1 style={{ marginRight: 'auto' }}>Входящие</h1>
       </div>
 
-      <div className="card" style={{ marginBottom: 18 }}>
+      <div className="card inbox-capture">
         <textarea
           className="capture-text"
           style={{ minHeight: 50 }}
@@ -49,8 +49,8 @@ export function InboxView({ data }: { data: ProjectData }) {
             }
           }}
         />
-        <div className="row">
-          <div className="seg">
+        <div className="inbox-capture-actions">
+          <div className="seg note-kind-picker">
             {NOTE_KINDS.map((k) => (
               <button key={k.id} aria-pressed={kind === k.id} onClick={() => setKind(k.id)}>
                 {k.icon} {k.label}
@@ -64,7 +64,7 @@ export function InboxView({ data }: { data: ProjectData }) {
         </div>
       </div>
 
-      <div className="seg" style={{ marginBottom: 14 }}>
+      <div className="seg inbox-filters">
         {(
           [
             ['inbox', 'Неразобранные'],
@@ -114,7 +114,7 @@ function NoteRow({ note, data }: { note: Note; data: ProjectData }) {
       <span className="note-kind" title={k.label}>
         {k.icon}
       </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="note-main">
         <div className="note-text">{note.text}</div>
         <div className="small muted" style={{ marginTop: 4 }}>
           {timeAgo(note.createdAt)}
@@ -167,7 +167,7 @@ function NoteRow({ note, data }: { note: Note; data: ProjectData }) {
                 })}
               </div>
             )}
-            <div className="row">
+            <div className="note-detail-actions">
               {scene && (
                 <button className="btn sm" onClick={() => void toBeat()}>
                   ☑ В план сцены
@@ -190,21 +190,19 @@ function NoteRow({ note, data }: { note: Note; data: ProjectData }) {
           </div>
         )}
       </div>
-      {!!note.content && scene && !note.archived && (
-        <button className="btn sm" onClick={() => void returnToText(note)}>
-          Вернуть в текст
+      <div className="note-row-actions">
+        {!!note.content && scene && !note.archived && (
+          <button className="btn sm" onClick={() => void returnToText(note)}>Вернуть</button>
+        )}
+        <button className="btn sm ghost" onClick={() => setOpen(!open)}>{open ? 'Готово' : 'Разобрать'}</button>
+        <button
+          className="btn sm ghost"
+          title={note.archived ? 'Вернуть' : note.kind === 'question' ? 'Вопрос решён' : 'В архив'}
+          onClick={() => void patch<Note>('notes', note.id, { archived: !note.archived })}
+        >
+          {note.archived ? 'Вернуть' : 'В архив'}
         </button>
-      )}
-      <button className="btn sm ghost" onClick={() => setOpen(!open)}>
-        {open ? 'Готово' : 'Разобрать'}
-      </button>
-      <button
-        className="icon-btn"
-        title={note.archived ? 'Вернуть' : note.kind === 'question' ? 'Вопрос решён' : 'В архив'}
-        onClick={() => void patch<Note>('notes', note.id, { archived: !note.archived })}
-      >
-        {note.archived ? '↩' : '✓'}
-      </button>
+      </div>
     </div>
   )
 }

@@ -35,11 +35,11 @@ async function seedStory(page: Page, { extras }: { extras?: boolean } = {}) {
   await expect(page.locator('.board, .timeline')).toBeVisible({ timeout: 30_000 })
   if (extras) {
     await page.goto('/#/characters')
-    await page.getByPlaceholder('+ Новый герой').fill('Ирина')
+    await page.getByPlaceholder('Имя нового героя').fill('Ирина')
     await page.keyboard.press('Enter')
-    await expect(page.getByRole('textbox', { name: 'Имя героя' })).toHaveValue('Ирина')
+    await expect(seen(page, 'Ирина')).toBeVisible()
     await page.goto('/#/lore')
-    await page.getByPlaceholder(/^\+ запись/).fill('Невский дом')
+    await page.getByPlaceholder(/^Новая запись/).fill('Невский дом')
     await page.keyboard.press('Enter')
     await expect(seen(page, 'Невский дом')).toBeVisible()
     await page.goto('/#/board')
@@ -157,14 +157,14 @@ const SCREENS: Screen[] = [
     },
   },
   {
-    name: 'Об истории (книга)',
+    name: 'Параметры книги',
     open: async (page) => {
       await page.goto('/#/book')
-      await expect(page.getByText('Об истории', { exact: true })).toBeVisible()
+      await expect(page.getByText('Параметры книги', { exact: true })).toBeVisible()
     },
   },
   {
-    name: 'Об истории — «Файлы и прочее» открыто',
+    name: 'Параметры книги — «Файлы и прочее» открыто',
     open: async (page) => {
       await page.goto('/#/book')
       await page.locator('summary', { hasText: 'Файлы и прочее' }).click()
