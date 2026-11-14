@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import type { Scene } from '../db/db'
-import { duplicateScene, ensurePool, moveScene, remove } from '../db/repo'
+import { deleteScene, duplicateScene, ensurePool, moveScene } from '../db/repo'
 import { isLocked, sceneName, type ProjectData } from '../lib/hooks'
 import { toastUndo, undoable } from '../lib/undo'
 
@@ -104,6 +104,8 @@ export function SceneGestureButton(props: Omit<Parameters<typeof GestureActionBu
 /** Contextual actions stay next to their scene, so the author never loses what is being changed. */
 export function SceneActions({ data, scene, onClose }: { data: ProjectData; scene: Scene; onClose: () => void }) {
   const [moving, setMoving] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const panel = useRef<HTMLDivElement>(null)
   useEffect(() => {
     requestAnimationFrame(() => panel.current?.scrollIntoView({ block: 'center', behavior: 'auto' }))
@@ -128,10 +130,11 @@ export function SceneActions({ data, scene, onClose }: { data: ProjectData; scen
         </div>
         <button type="button" className="icon-btn" aria-label="Закрыть действия" onClick={onClose}>×</button>
       </div>
-      {locked ? (
-        <div className="scene-action-note">Глава зафиксирована. Сначала открепи её на доске.</div>
-      ) : (
-        <div className="scene-action-list">
+      <div className="scene-action-list">
+        {locked ? (
+          <div className="scene-action-note">Глава зафиксирована: перемещение отключено.</div>
+        ) : (
+          <>
           <button
             onClick={async () => {
               await undoable('дублирование сцены', () => duplicateScene(scene.id))
@@ -139,10 +142,10 @@ export function SceneActions({ data, scene, onClose }: { data: ProjectData; scen
               toastUndo('Копия сцены создана рядом')
             }}
           >
-            <span>Дублировать</span><span className="action-hint">копия рядом</span>
+            Дублировать
           </button>
           <button onClick={() => setMoving((value) => !value)} aria-expanded={moving}>
-            <span>Переместить</span><span className="action-hint">{moving ? 'свернуть' : 'в другую главу'}</span>
+            {moving ? 'Скрыть главы' : 'Переместить'}
           </button>
           {moving && (
             <div className="scene-move-list">
@@ -154,22 +157,37 @@ export function SceneActions({ data, scene, onClose }: { data: ProjectData; scen
               ))}
             </div>
           )}
-          {!inPool && <button onClick={() => void place('pool')}><span>Убрать из плана</span><span className="action-hint">в «Пока без места»</span></button>}
-          <button
-            className="danger"
-            onClick={async () => {
-              await undoable('удаление сцены', async () => {
-                await remove('scenes', scene.id)
-                await remove('texts', scene.id)
-              })
-              onClose()
-              toastUndo('Сцена удалена')
-            }}
-          >
-            Удалить
-          </button>
-        </div>
-      )}
+          {!inPool && <button onClick={() => void place('pool')}>Убрать из главы</button>}
+          </>
+        )}
+        {!confirmDelete ? (
+          <button className="danger" onClick={() => setConfirmDelete(true)}>Удалить сцену</button>
+        ) : (
+          <div className="scene-delete-confirm">
+            <span>Удалить «{sceneName(data, scene)}» вместе с текстом?</span>
+            <div>
+              <button type="button" onClick={() => setConfirmDelete(false)}>Оставить</button>
+              <button
+                type="button"
+                className="danger"
+                disabled={deleting}
+                onClick={async () => {
+                  setDeleting(true)
+                  try {
+                    await undoable('удаление сцены', () => deleteScene(scene.id))
+                    onClose()
+                    toastUndo('Сцена удалена')
+                  } finally {
+                    setDeleting(false)
+                  }
+                }}
+              >
+                {deleting ? 'Удаляю…' : 'Удалить'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

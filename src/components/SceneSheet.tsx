@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { Scene } from '../db/db'
-import { createMarker, ensurePool, mergeSceneIntoPrevious, moveScene, patch, remove, splitChapterAt } from '../db/repo'
+import { createMarker, deleteScene as deleteSceneRecord, ensurePool, mergeSceneIntoPrevious, moveScene, patch, splitChapterAt } from '../db/repo'
 import { go } from '../lib/router'
 import { modalRoot, useModal } from '../lib/ui'
 import { isLocked, sceneName, type ProjectData } from '../lib/hooks'
@@ -63,10 +63,7 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
   }
   const deleteScene = async () => {
     if (!confirm(`Удалить «${sceneName(data, scene)}» вместе с текстом?`)) return
-    await undoable('удаление сцены', async () => {
-      await remove('scenes', scene.id)
-      await remove('texts', scene.id)
-    })
+    await undoable('удаление сцены', () => deleteSceneRecord(scene.id))
     onClose()
     toastUndo('Сцена удалена')
   }
@@ -103,7 +100,7 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
           Писать эту сцену →
         </button>
         {phone && where}
-        {phone && !locked && (
+        {phone && (
           <button className="btn ghost scene-delete-mobile" onClick={() => void deleteScene()}>
             Удалить сцену
           </button>
@@ -211,15 +208,13 @@ export function SceneSheet({ data, scene, onClose }: { data: ProjectData; scene:
                 Склеить с предыдущей сценой
               </button>
             )}
-            {!locked && (
-              <button
-                className="btn ghost"
-                style={{ color: 'var(--danger-ink)' }}
-                onClick={() => void deleteScene()}
-              >
-                Удалить сцену
-              </button>
-            )}
+            <button
+              className="btn ghost"
+              style={{ color: 'var(--danger-ink)' }}
+              onClick={() => void deleteScene()}
+            >
+              Удалить сцену
+            </button>
           </div>
         </details>
       </div>

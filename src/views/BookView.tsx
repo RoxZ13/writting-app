@@ -139,6 +139,44 @@ export function BookView({ data }: { data: ProjectData }) {
         </div>
       </div>
 
+      <details className="card settings-section book-fold book-mobile-section">
+        <summary>
+          <span>План</span>
+          <span className="muted small book-fold-peek">
+            {p.deadline || 'без дедлайна'}{p.targetChapters ? ` · ${p.targetChapters} глав` : ''}
+          </span>
+        </summary>
+        <div className="book-mobile-fields">
+          <label>
+            <span className="field-label">Дедлайн</span>
+            <DateChip value={p.deadline} empty="Поставить дату" onChange={(deadline) => set({ deadline })} />
+          </label>
+          <label>
+            <span className="field-label">Количество глав</span>
+            <NumberField value={p.targetChapters || undefined} placeholder="Не задано" onSave={(targetChapters) => set({ targetChapters })} />
+          </label>
+          <LengthNorm project={p} />
+          {!early && <button className="link small" onClick={() => setLeft(true)}>Что осталось дописать</button>}
+        </div>
+      </details>
+
+      <details className="card settings-section book-fold book-mobile-section">
+        <summary><span>Вид книги</span><span className="muted small book-fold-peek">обложка и стадия</span></summary>
+        <div className="book-mobile-fields">
+          <label>
+            <span className="field-label">Стадия</span>
+            <select className="input" value={p.stage ?? 'writing'} onChange={(event) => set({ stage: event.target.value as Project['stage'] })}>
+              {STAGES.map((stage) => <option key={stage.id} value={stage.id}>{stage.label}</option>)}
+            </select>
+          </label>
+          <BookCover project={p} words={words} />
+          <CoverPicker projectId={p.id} />
+          {!cover && <div className="covers">{COVERS.map((color) => (
+            <button key={color} className={`swatch ${color === (p.color ?? COVERS[0]) ? 'on' : ''}`} style={{ background: color }} aria-label="Цвет обложки" onClick={() => set({ color })} />
+          ))}</div>}
+        </div>
+      </details>
+
       <Essence project={p} embedded />
       {left && <LeftToWrite data={data} onClose={() => setLeft(false)} />}
 

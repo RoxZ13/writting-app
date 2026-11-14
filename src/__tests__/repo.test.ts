@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { ManuscriptDB, useDatabase, db, type Project } from '../db/db'
-import { createProject, deleteChapter, patch } from '../db/repo'
+import { createProject, createScene, deleteChapter, deleteScene, patch } from '../db/repo'
 
 let n = 0
 
@@ -60,5 +60,18 @@ describe('repository writes', () => {
     expect((await db.chapters.get(chapter!.id))?.deleted).not.toBe(true)
     expect((await db.scenes.get(scene!.id))?.deleted).not.toBe(true)
     expect((await db.texts.get(scene!.id))?.deleted).not.toBe(true)
+  })
+
+  it('deletes the scene with its text and moves the current-scene pointer', async () => {
+    const project = await createProject('Книга')
+    const chapter = await db.chapters.where('projectId').equals(project.id).first()
+    const first = await db.scenes.where('projectId').equals(project.id).first()
+    const second = await createScene(project.id, chapter!.id, 'Следующая')
+
+    await deleteScene(first!.id)
+
+    expect((await db.scenes.get(first!.id))?.deleted).toBe(true)
+    expect((await db.texts.get(first!.id))?.deleted).toBe(true)
+    expect((await db.projects.get(project.id))?.lastSceneId).toBe(second.id)
   })
 })

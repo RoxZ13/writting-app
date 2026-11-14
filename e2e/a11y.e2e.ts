@@ -160,7 +160,8 @@ const SCREENS: Screen[] = [
     name: 'Параметры книги',
     open: async (page) => {
       await page.goto('/#/book')
-      await expect(page.getByText('Параметры книги', { exact: true })).toBeVisible()
+      await expect(page.locator('.book-page')).toBeVisible()
+      await expect(page.getByText('План', { exact: true })).toBeVisible()
     },
   },
   {

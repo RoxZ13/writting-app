@@ -161,6 +161,42 @@ export async function createScene(
   })
 }
 
+/** Remove a scene as one domain action: its text disappears, and no live record keeps pointing at it. */
+export async function deleteScene(sceneId: string) {
+  return atomic(['projects', 'scenes', 'texts', 'markers', 'notes'], async () => {
+    const scene = await db.scenes.get(sceneId)
+    if (!scene || scene.deleted) return false
+
+    const remaining = alive(await db.scenes.where('projectId').equals(scene.projectId).toArray())
+      .filter((item) => item.id !== sceneId)
+      .sort((a, b) => a.order - b.order)
+    const project = await db.projects.get(scene.projectId)
+    if (project?.lastSceneId === sceneId) {
+      await patch<Project>('projects', project.id, { lastSceneId: remaining[0]?.id })
+    }
+
+    for (const marker of alive(await db.markers.where('projectId').equals(scene.projectId).toArray())) {
+      const changes: Partial<Marker> = {}
+      if (marker.setupSceneId === sceneId) changes.setupSceneId = undefined
+      if (marker.payoffSceneId === sceneId) changes.payoffSceneId = undefined
+      if (marker.echoSceneIds?.includes(sceneId)) changes.echoSceneIds = marker.echoSceneIds.filter((id) => id !== sceneId)
+      if (Object.keys(changes).length) await patch<Marker>('markers', marker.id, changes)
+    }
+
+    for (const note of alive(await db.notes.where('projectId').equals(scene.projectId).toArray())) {
+      const changes: Partial<Note> = {}
+      if (note.sceneId === sceneId) changes.sceneId = undefined
+      if (note.sceneIds?.includes(sceneId)) changes.sceneIds = note.sceneIds.filter((id) => id !== sceneId)
+      if (note.ignoreSceneIds?.includes(sceneId)) changes.ignoreSceneIds = note.ignoreSceneIds.filter((id) => id !== sceneId)
+      if (Object.keys(changes).length) await patch<Note>('notes', note.id, changes)
+    }
+
+    await remove('scenes', sceneId)
+    await remove('texts', sceneId)
+    return true
+  })
+}
+
 /** Make an independent copy next to the source, including its text but not its sync identity or markers. */
 export async function duplicateScene(sceneId: string): Promise<Scene | undefined> {
   const scene = await db.scenes.get(sceneId)

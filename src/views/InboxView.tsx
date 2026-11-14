@@ -50,21 +50,19 @@ export function InboxView({ data }: { data: ProjectData }) {
           }}
         />
         <div className="inbox-capture-actions">
-          <div className="seg note-kind-picker">
+          <select className="input note-kind-select" aria-label="Тип записи" value={kind} onChange={(event) => setKind(event.target.value as NoteKind)}>
             {NOTE_KINDS.map((k) => (
-              <button key={k.id} aria-pressed={kind === k.id} onClick={() => setKind(k.id)}>
-                {k.icon} {k.label}
-              </button>
+              <option key={k.id} value={k.id}>{k.icon} {k.label}</option>
             ))}
-          </div>
+          </select>
           <span className="spacer" />
-          <button className="btn primary sm" onClick={() => void add()}>
+          <button className="btn primary sm" disabled={!text.trim()} onClick={() => void add()}>
             Сохранить
           </button>
         </div>
       </div>
 
-      <div className="seg inbox-filters">
+      {data.notes.length > 0 && <div className="seg inbox-filters">
         {(
           [
             ['inbox', 'Неразобранные'],
@@ -77,10 +75,10 @@ export function InboxView({ data }: { data: ProjectData }) {
             {label} <span className="muted">{lists[f].length}</span>
           </button>
         ))}
-      </div>
+      </div>}
 
       {shown.length === 0 ? (
-        <div className="empty card">{filter === 'inbox' ? 'Всё разобрано. Голова свободна 🌿' : 'Пусто'}</div>
+        <div className="empty inbox-empty">{filter === 'inbox' ? 'Пока пусто' : 'Пусто'}</div>
       ) : (
         <div className="card" style={{ padding: 0 }}>
           {shown.map((n) => (

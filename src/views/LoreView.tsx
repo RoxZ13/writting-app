@@ -57,9 +57,21 @@ export function LoreView({ data }: { data: ProjectData }) {
       <div className={`lore-layout ${active ? 'has-active' : ''}`}>
         <section className="lore-master card">
           <div className="lore-master-head">
-            <div><h2>Мир истории</h2><div className="small muted">Места, правила, события и важные детали</div></div>
+            <div><h1>Мир истории</h1></div>
           </div>
-          <input className="input lore-search" placeholder="Найти запись" value={q} onChange={(e) => setQ(e.target.value)} />
+          <form className="lore-add" onSubmit={(e) => { e.preventDefault(); void add() }}>
+            <input
+              ref={addInput}
+              className="quick-add"
+              placeholder={topic ? `Новая запись в «${topic}»` : 'Новая запись'}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+            />
+            <button className="btn primary sm compact-add" type="submit" disabled={!draft.trim()} aria-label="Добавить">
+              <span aria-hidden="true">+</span>
+            </button>
+          </form>
+          {data.lore.length > 4 && <input className="input lore-search" placeholder="Найти запись" value={q} onChange={(e) => setQ(e.target.value)} />}
           {topics.length > 0 && (
             <div className="lore-topics">
               <button className={`chip-toggle ${topic === null ? 'on' : ''}`} onClick={() => setTopic(null)}>Всё</button>
@@ -75,17 +87,6 @@ export function LoreView({ data }: { data: ProjectData }) {
               </button>
             ))}
           </div>
-          <form className="lore-add" onSubmit={(e) => { e.preventDefault(); void add() }}>
-            <input
-              ref={addInput}
-              className="quick-add"
-              placeholder={topic ? `Новая запись в «${topic}»` : 'Новая запись: место, правило, событие…'}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-            />
-            <button className="btn primary sm" type="submit" disabled={!draft.trim()}>Добавить</button>
-          </form>
-          {!data.lore.length && <div className="empty lore-empty">Сначала можно просто собрать названия. Подробности добавишь позже.</div>}
         </section>
         {active && (
           <section className="lore-detail">

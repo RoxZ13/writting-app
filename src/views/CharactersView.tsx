@@ -45,12 +45,6 @@ export function CharactersView({ data }: { data: ProjectData }) {
     <div>
       <div className="toolbar">
         <WorldNav current="characters" />
-        <span className="spacer" />
-        {data.characters.length > 0 && (
-          <button className="btn" onClick={() => setTagging(true)}>
-            Найти героев в сценах
-          </button>
-        )}
       </div>
       {suggested.length > 0 && (
         <div className="card suggest">
@@ -73,7 +67,7 @@ export function CharactersView({ data }: { data: ProjectData }) {
         <section className="character-master card">
           <div className="character-list-head">
             <div>
-              <h2>Герои</h2>
+              <h1>Герои</h1>
               <div className="small muted">{characters.length ? `${characters.length} ${pluralRu(characters.length, 'герой', 'героя', 'героев')}` : 'Пока никого'}</div>
             </div>
           </div>
@@ -85,8 +79,8 @@ export function CharactersView({ data }: { data: ProjectData }) {
             }}
           >
             <input ref={addInput} className="quick-add" placeholder="Имя нового героя" value={name} onChange={(e) => setName(e.target.value)} />
-            <button className="btn primary sm" type="submit" disabled={!name.trim()}>
-              Добавить
+            <button className="btn primary sm compact-add" type="submit" disabled={!name.trim()} aria-label="Добавить">
+              <span aria-hidden="true">+</span>
             </button>
           </form>
           <div className="character-list">
@@ -99,6 +93,9 @@ export function CharactersView({ data }: { data: ProjectData }) {
               />
             ))}
           </div>
+          {data.characters.length > 0 && (
+            <button className="link small character-find" onClick={() => setTagging(true)}>Найти упоминания в тексте</button>
+          )}
         </section>
         {active && (
           <section className="character-detail">

@@ -41,11 +41,8 @@ import { isLocked, isPlaceholder, markerPayoffChapter, markerQuiet, markerSetupC
 import { MARKER_STATES, statusOf } from '../lib/status'
 import { InlineEdit, Modal, toast } from '../lib/ui'
 import { deadlineText } from '../lib/stories'
-import { formatScenes, formatWords, lastSentences } from '../lib/text'
-import { chapterProgress, totalWords } from '../lib/pace'
+import { formatScenes } from '../lib/text'
 import { chapterLength, lengthText, normText, sumChars } from '../lib/length'
-import { db } from '../db/db'
-import { useLiveQuery } from 'dexie-react-hooks'
 import { go } from '../lib/router'
 import { getBoardLayout } from '../lib/session'
 import { Icon } from '../components/Icon'
@@ -155,6 +152,13 @@ export function BoardView({ data }: { data: ProjectData }) {
   const hanging = data.markers.filter((m) => ['hanging', 'late'].includes(markerStatus(m, data)))
   const quiet = data.markers.filter((m) => markerQuiet(m, data))
   const filters = data.markers.length > 0 || data.lines.length > 0 || data.characters.length > 0 || lens.kind !== 'all'
+  const lensTitle = lens.kind === 'markers'
+    ? 'Маячки'
+    : lens.kind === 'line'
+      ? (data.lineById.get(lens.id)?.name ?? 'Линия')
+      : lens.kind === 'hero'
+        ? (data.characterById.get(lens.id)?.name ?? 'Герой')
+        : 'Все сцены'
 
   const addChapterAfter = (i: number) =>
     undoable('новая глава', async () => {
@@ -179,17 +183,15 @@ export function BoardView({ data }: { data: ProjectData }) {
         {phone ? (
           <div className="story-home-head">
             <h1>{data.project.title}</h1>
-            <div className="muted small">
-              {chapterProgress(data.project, data.chapters, data.scenes).written} из {chapterProgress(data.project, data.chapters, data.scenes).of} глав ·{' '}
-              {formatWords(totalWords([...data.scenes, ...data.pool.scenes]))}
-            </div>
           </div>
         ) : (
           <h1>Доска</h1>
         )}
         {/* Filters only once there is something to filter; «+ линия» is always there. */}
         {filters && <span className="lens-label hide-sm">Показать:</span>}
-        <div className={`seg lens ${filters ? '' : 'bare'}`}>
+        <details className={`board-filter-fold ${filters ? 'has-filters' : ''}`}>
+          {filters && <summary><span>Фильтры</span><span className="muted">{lensTitle}</span></summary>}
+          <div className={`seg lens ${filters ? '' : 'bare'}`}>
           {filters && (
             <>
               <button aria-pressed={lens.kind === 'all'} onClick={() => setLens({ kind: 'all' })}>
@@ -255,7 +257,8 @@ export function BoardView({ data }: { data: ProjectData }) {
               }}
             />
           )}
-        </div>
+          </div>
+        </details>
         <PlanLock data={data} />
       </div>
 
@@ -805,9 +808,7 @@ function Card({ data, scene, lens, overlay }: { data: ProjectData; scene: Scene;
 /** On the phone this page is the story's home: one big way back into the text, then the chapters. */
 function ContinueCard({ data }: { data: ProjectData }) {
   const scene = (data.project.lastSceneId && data.sceneById.get(data.project.lastSceneId)) || data.scenes[0]
-  const text = useLiveQuery(() => (scene ? db.texts.get(scene.id) : undefined), [scene?.id])
   if (!scene) return null
-  const tail = text ? lastSentences(text.content, 2) : ''
   return (
     <a
       className="continue-card"
@@ -817,9 +818,8 @@ function ContinueCard({ data }: { data: ProjectData }) {
         go({ view: 'text', sceneId: scene.id })
       }}
     >
-      <span className="continue-k">{tail ? 'Продолжить' : 'Начать писать'}</span>
+      <span className="continue-k">Продолжить</span>
       <span className="continue-t">{sceneName(data, scene)}</span>
-      {tail && <span className="continue-x">…{tail}</span>}
     </a>
   )
 }
@@ -864,12 +864,12 @@ function Timeline({
   const poolOpen = open.has('pool')
   return (
     <div className="timeline">
-      <section className={`tl-chapter pool ${poolOpen ? 'open' : ''} ${data.pool.scenes.length ? '' : 'is-empty'}`}>
+      {data.pool.scenes.length > 0 && <section className={`tl-chapter pool ${poolOpen ? 'open' : ''}`}>
         <button className="tl-head" aria-expanded={poolOpen} onClick={() => toggle('pool')}>
           <span className="tl-caret">{poolOpen ? '▾' : '▸'}</span>
           <span className="tl-title">Пока без места</span>
           <span className="spacer" />
-          <span className="tl-meta">{data.pool.scenes.length ? formatScenes(data.pool.scenes.length) : 'сцены из головы'}</span>
+          {data.pool.scenes.length > 0 && <span className="tl-meta">{formatScenes(data.pool.scenes.length)}</span>}
         </button>
         {poolOpen && (
           <div className="tl-body">
@@ -889,7 +889,7 @@ function Timeline({
             <ThreeParts data={data} />
           </div>
         )}
-      </section>
+      </section>}
       {data.outline.map(({ chapter, scenes }) => {
         const pay = data.markers.filter((m) => !m.resolved && markerPayoffChapter(m, data) === chapter.id)
         const plant = data.markers.filter((m) => !m.resolved && markerSetupChapter(m, data) === chapter.id)
@@ -914,12 +914,9 @@ function Timeline({
                 )}
                 {chapter.id === here && !isOpen && !storyEmpty(data) && <span className="here">ты здесь</span>}
                 <span className="spacer" />
-                {pay.length > 0 && <span className="tl-mk">◎ {pay.length}</span>}
-                {plant.length > 0 && <span className="tl-mk">✦ {plant.length}</span>}
-                <span className="tl-meta">
-                  {formatScenes(scenes.filter((s) => !isPlaceholder(s, data)).length)}
-                  <LenTag data={data} chars={sumChars(scenes)} />
-                </span>
+                {scenes.some((s) => !isPlaceholder(s, data)) && (
+                  <span className="tl-meta">{formatScenes(scenes.filter((s) => !isPlaceholder(s, data)).length)}</span>
+                )}
               </GestureActionButton>
             </div>
             {chapterActions === chapter.id && (
@@ -929,7 +926,6 @@ function Timeline({
             {isOpen && (
               <div className="tl-body">
                 {chapter.goal && <div className="tl-goal">{chapter.goal}</div>}
-                {!scenes.some((s) => !isPlaceholder(s, data)) && !chapter.locked && <EmptyChapterHint />}
                 {scenes
                   .filter((s) => !isPlaceholder(s, data))
                   .map((s) => (
@@ -1089,7 +1085,7 @@ function TimelineAdd({ data, chapter, lens }: { data: ProjectData; chapter?: Cha
   return (
     <input
       className="quick-add small"
-      placeholder={chapter ? '+ сцена: кратко, что происходит' : '+ сцена из головы'}
+      placeholder={chapter ? 'Новая сцена' : 'Сцена без главы'}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onKeyDown={(e) => e.key === 'Enter' && void add()}

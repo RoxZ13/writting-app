@@ -2,7 +2,7 @@ import type { Editor } from '@tiptap/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { db, uid, type Beat, type Marker, type Note, type Scene } from '../db/db'
-import { createMarker, createNote, mergeSceneIntoPrevious, patch, remove, snapshotScene } from '../db/repo'
+import { createMarker, createNote, deleteScene, mergeSceneIntoPrevious, patch, snapshotScene } from '../db/repo'
 import { isLocked, markerPayoffChapter, markerStatus, unusedLines, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { MARKER_STATES, noteKind, STATUSES, timeAgo } from '../lib/status'
@@ -387,11 +387,11 @@ function More({ data, scene, editor }: { data: ProjectData; scene: Scene; editor
           </select>
         </label>
         <Versions scene={scene} editor={editor} />
-        {isLocked(data, scene.chapterId) ? (
-          <div className="small muted">Глава зафиксирована: сцену не склеить и не удалить. Открепить можно на доске, в ⋯ у главы.</div>
-        ) : (
+        {isLocked(data, scene.chapterId) && (
+          <div className="small muted">Глава зафиксирована: перемещение и склейка отключены.</div>
+        )}
         <div className="row">
-          {data.scenes.filter((s) => s.chapterId === scene.chapterId).indexOf(scene) > 0 && (
+          {!isLocked(data, scene.chapterId) && data.scenes.filter((s) => s.chapterId === scene.chapterId).indexOf(scene) > 0 && (
             <button
               className="btn sm"
               onClick={async () => {
@@ -411,10 +411,7 @@ function More({ data, scene, editor }: { data: ProjectData; scene: Scene; editor
             style={{ color: 'var(--danger-ink)' }}
             onClick={async () => {
               if (!confirm('Удалить эту сцену вместе с текстом?')) return
-              await undoable('удаление сцены', async () => {
-                await remove('scenes', scene.id)
-                await remove('texts', scene.id)
-              })
+              await undoable('удаление сцены', () => deleteScene(scene.id))
               go({ view: 'board' })
               toastUndo('Сцена удалена')
             }}
@@ -422,7 +419,6 @@ function More({ data, scene, editor }: { data: ProjectData; scene: Scene; editor
             Удалить сцену
           </button>
         </div>
-        )}
       </div>
     </details>
   )

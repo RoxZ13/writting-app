@@ -73,9 +73,10 @@ export function Essence({ project, embedded }: { project: Project; embedded?: bo
 
   // On the board only as a reminder once filled in; it is written on «Книга» (embedded).
   if (!embedded && !filled) return null
-  if (!open && !embedded) {
+  if (!open) {
     return (
-      <button className={`essence-bar ${filled ? '' : 'empty'}`} onClick={() => setOpen(true)}>
+      <button className={`${embedded ? 'essence-book-bar' : 'essence-bar'} ${filled ? '' : 'empty'}`} onClick={() => setOpen(true)}>
+        {embedded && <strong>Замысел</strong>}
         {filled ? (
           <>
             {project.premise && (
@@ -98,7 +99,7 @@ export function Essence({ project, embedded }: { project: Project; embedded?: bo
             )}
           </>
         ) : (
-          '+ О чём история — можно одной строкой, можно позже'
+          embedded ? <span>Добавить главное об истории</span> : '+ О чём история — можно одной строкой, можно позже'
         )}
       </button>
     )
@@ -108,11 +109,7 @@ export function Essence({ project, embedded }: { project: Project; embedded?: bo
       <div className="essence-head">
         <span className={embedded ? 'essence-title' : 'eyebrow'}>Замысел</span>
         <span className="spacer" />
-        {!embedded && (
-          <button className="link small" onClick={() => setOpen(false)}>
-            свернуть
-          </button>
-        )}
+        <button className="link small" onClick={() => setOpen(false)}>готово</button>
       </div>
       <div className="essence-grid">
         <label>
