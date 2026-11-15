@@ -131,12 +131,13 @@ function StoryCard({
       <BookCover project={p} onClick={() => onOpen()} />
       <div className="story-body">
         <div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}>
-          <strong className="story-title" onClick={() => onOpen()}>
+          <button className="story-title" onClick={() => onOpen()}>
             {p.title}
-          </strong>
+          </button>
           <details className="menu">
             <summary className="btn sm ghost" aria-label={`Настроить «${p.title}»`}>
-              Настроить
+              <span className="story-settings-label">Настроить</span>
+              <span className="story-settings-icon" aria-hidden="true"><Icon name="settings" size={18} /></span>
             </summary>
             <div className="menu-list card story-menu">
               <label className="menu-field">
@@ -188,7 +189,7 @@ function StoryCard({
           {timeAgo(p.updatedAt)}
         </div>
         {dl && <div className={`deadline ${dl.late ? 'late' : ''}`}><Icon name="clock" size={13} /> {dl.text}</div>}
-        <button className="btn sm" style={{ alignSelf: 'flex-start', marginTop: 6 }} onClick={() => onOpen('text')}>
+        <button className="btn sm story-continue" onClick={() => onOpen('text')}>
           Продолжить
         </button>
       </div>

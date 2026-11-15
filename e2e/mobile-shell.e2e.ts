@@ -72,3 +72,24 @@ test('a chapter with one text opens the editor in one tap', async ({ page }, inf
   await expect(page.locator('.ProseMirror')).toBeVisible()
   await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/#\/text\//)
 })
+
+test('the phone library is a compact picker and opens a story from its title', async ({ page }, info) => {
+  test.skip(info.project.name === 'desktop', 'phone library only')
+  await startStory(page)
+  await page.goto('/#/library')
+  await expect(page.getByRole('heading', { name: 'Истории' })).toBeVisible()
+
+  const story = page.locator('.story').first()
+  const book = story.locator('.book')
+  const storyBox = await story.boundingBox()
+  const bookBox = await book.boundingBox()
+  expect(storyBox).not.toBeNull()
+  expect(bookBox).not.toBeNull()
+  expect(storyBox!.width).toBeGreaterThan(storyBox!.height * 2)
+  expect(bookBox!.width).toBeLessThan(100)
+  await expect(story.getByRole('button', { name: 'Продолжить' })).toBeHidden()
+
+  await story.locator('.story-title').click()
+  await expect(page.locator('.ProseMirror')).toBeVisible()
+  await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/#\/text/)
+})

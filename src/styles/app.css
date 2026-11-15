@@ -3337,9 +3337,25 @@ main.page {
   gap: 4px;
 }
 .story-title {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--ink);
+  font-family: var(--sans);
   font-size: var(--fs-md);
+  font-weight: 650;
+  line-height: 1.25;
+  text-align: left;
   cursor: pointer;
   flex: 1;
+}
+.story-settings-icon {
+  display: none;
+}
+.story-continue {
+  align-self: flex-start;
+  margin-top: 6px;
 }
 .story-meta {
   font-size: var(--fs-sm);
@@ -3937,6 +3953,150 @@ main.page {
 }
 .story.add {
   aspect-ratio: 3 / 4.1;
+}
+
+/* On a phone the library is a picker, not a shop window: one book per quiet, tappable row. */
+@media (max-width: 600px) {
+  .lib-side {
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding: calc(env(safe-area-inset-top) + 8px) 16px 8px;
+  }
+  .lib-side .brand {
+    display: none;
+  }
+  .lib-back {
+    order: -1;
+    flex: 1;
+    width: auto;
+    min-width: 0;
+    padding: 10px 0;
+    color: var(--ink-2);
+  }
+  .lib-nav {
+    flex: none;
+    width: auto;
+    gap: 4px;
+  }
+  .lib-nav button {
+    width: 42px;
+    height: 42px;
+    justify-content: center;
+    padding: 0;
+    border-radius: 50%;
+    font-size: 0;
+  }
+  .lib-nav button svg {
+    width: 18px;
+    height: 18px;
+  }
+  .lib-main {
+    padding-top: 22px;
+  }
+  .lib-head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    padding-bottom: 18px;
+    margin-bottom: 6px;
+  }
+  .lib-head > div:first-child {
+    grid-column: 1;
+  }
+  .lib-head > .big-pill {
+    grid-column: 2;
+    grid-row: 1;
+    min-height: 42px;
+    padding: 0 14px;
+    font-size: var(--fs-ui);
+    box-shadow: none;
+  }
+  .lib-head > label {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+  .library,
+  .story-group-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+  .story-group-head {
+    margin: 20px 0 0;
+  }
+  .story {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    align-items: center;
+    gap: 14px;
+    min-height: 104px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .story .book {
+    grid-column: 1;
+    width: 64px;
+    height: 86px;
+    margin: 0;
+    aspect-ratio: auto;
+    border-radius: 3px 8px 8px 3px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08), 0 7px 16px rgba(0, 0, 0, 0.12);
+  }
+  .story .book:hover {
+    transform: none;
+  }
+  .story.current .book {
+    outline-width: 2px;
+    outline-offset: 2px;
+  }
+  .story .book-spine {
+    width: 7px;
+  }
+  .story .book-face {
+    padding: 7px;
+  }
+  .story .book-stage,
+  .story .book-name,
+  .story .book-genre-tag,
+  .story .book-words {
+    display: none;
+  }
+  .story-body {
+    grid-column: 2;
+    min-width: 0;
+    gap: 5px;
+  }
+  .story-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--fs-lg);
+  }
+  .story-meta {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .story-body .menu > summary {
+    width: 42px;
+    min-width: 42px;
+    height: 42px;
+    padding: 0;
+    justify-content: center;
+  }
+  .story-settings-label,
+  .story-continue {
+    display: none;
+  }
+  .story-settings-icon {
+    display: inline-grid;
+    place-items: center;
+  }
+  .story-menu {
+    left: auto;
+    right: 0;
+    width: min(320px, calc(100vw - 32px));
+  }
 }
 
 .book-page {

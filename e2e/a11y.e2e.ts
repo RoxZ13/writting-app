@@ -71,6 +71,13 @@ async function ensureBoard(page: Page) {
   await expect(page.locator('.board:visible, .timeline:visible')).toBeVisible()
 }
 
+async function openLibrary(page: Page) {
+  // Import finishes with a last-scene navigation; let it settle before choosing another screen.
+  await page.waitForTimeout(1_000)
+  await page.goto('/#/library')
+  await expect(page.getByRole('heading', { name: 'Истории' })).toBeVisible()
+}
+
 async function openSceneCard(page: Page) {
   await ensureBoard(page)
   if (await page.locator('.board:visible').count()) {
@@ -216,8 +223,7 @@ const SCREENS: Screen[] = [
   {
     name: 'Все истории (библиотека)',
     open: async (page) => {
-      await page.goto('/#/library')
-      await expect(page.getByRole('heading', { name: 'Истории' })).toBeVisible()
+      await openLibrary(page)
     },
   },
   {
@@ -312,8 +318,7 @@ test.describe('keyboard only', () => {
 
   test('library: «Импорт .docx / .txt» can be reached with Tab and opened with Enter', async ({ page }) => {
     await seedStory(page)
-    await page.goto('/#/library')
-    await expect(page.getByRole('heading', { name: 'Истории' })).toBeVisible()
+    await openLibrary(page)
     const order = await tabOrder(page, 25)
     expect(order.some((o) => o.includes('Импорт .docx'))).toBe(true)
     await page.getByRole('button', { name: 'Импорт .docx' }).focus()
