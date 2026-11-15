@@ -172,6 +172,8 @@ test.describe('mobile actions stay reachable', () => {
     await title.fill('Новая книга')
     await title.blur()
     await expect.poll(async () => (await aliveRows<any>(page, 'projects')).some((project) => project.title === 'Новая книга')).toBe(true)
+    await page.mouse.click(12, 12)
+    await expect(page.getByRole('button', { name: 'Закрыть настройки книги' })).toBeHidden()
     await page.locator('.tabs-mobile > button').filter({ hasText: 'Заметки' }).click()
     await expect(page.getByRole('heading', { name: 'Заметки' })).toBeVisible()
   })

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type SyntheticEvent } from 'react'
 import { db, type Project } from '../db/db'
 import { patch, remove } from '../db/repo'
 import { ImportPanel } from '../components/ImportPanel'
@@ -39,6 +39,15 @@ export function BookView({ data }: { data: ProjectData }) {
   const descriptionPeek = (p.description ?? '').split('\n').find((line) => line.trim())?.trim()
   const [left, setLeft] = useState(false)
   const [paceSetup, setPaceSetup] = useState(false)
+  const phone = typeof matchMedia !== 'undefined' && matchMedia('(max-width: 760px)').matches
+  const [openSection, setOpenSection] = useState<'plan' | 'description' | 'publishing' | 'identity' | 'files' | null>(null)
+  const fold = (id: NonNullable<typeof openSection>) => phone ? {
+    open: openSection === id,
+    onToggle: (event: SyntheticEvent<HTMLDetailsElement>) => {
+      const isOpen = event.currentTarget.open
+      setOpenSection((current) => isOpen ? id : current === id ? null : current)
+    },
+  } : {}
 
   const exportWord = async () => download(await exportDocx(p.title, await loadChapters(data)), `${p.title}.docx`)
   const platform = platformOf(p)
@@ -81,8 +90,9 @@ export function BookView({ data }: { data: ProjectData }) {
       <Essence project={p} embedded autoOpen={words === 0} />
       {left && <LeftToWrite data={data} onClose={() => setLeft(false)} />}
 
+      {phone && openSection && <button className="book-section-backdrop" aria-label="Закрыть настройки книги" onClick={() => setOpenSection(null)} />}
       <section className="book-section-list card" aria-label="Настройки книги">
-        <details className="settings-section book-fold book-mobile-section">
+        <details className="settings-section book-fold book-mobile-section" {...fold('plan')}>
           <summary>
             <span>План</span>
             {planPeek && <span className="muted small book-fold-peek">{planPeek}</span>}
@@ -120,7 +130,7 @@ export function BookView({ data }: { data: ProjectData }) {
           </div>
         </details>
 
-        <details className="settings-section book-fold">
+        <details className="settings-section book-fold" {...fold('description')}>
           <summary>
             <span>Описание</span>
             {descriptionPeek && <span className="muted small book-fold-peek">{descriptionPeek}</span>}
@@ -128,7 +138,7 @@ export function BookView({ data }: { data: ProjectData }) {
           <InlineEdit className="input book-desc" multiline placeholder="Фандом, пэйринг, аннотация — что угодно" value={p.description ?? ''} onSave={(description) => set({ description })} />
         </details>
 
-        <details className="settings-section book-fold">
+        <details className="settings-section book-fold" {...fold('publishing')}>
           <summary>
             <span>Публикация</span>
             <span className="muted small book-fold-peek">{platform.selected ? platform.name : 'не настроена'}</span>
@@ -138,7 +148,7 @@ export function BookView({ data }: { data: ProjectData }) {
           </div>
         </details>
 
-        <details className="settings-section book-fold book-mobile-section">
+        <details className="settings-section book-fold book-mobile-section" {...fold('identity')}>
           <summary><span>О книге</span></summary>
           <div className="book-mobile-fields">
             <div className="book-mobile-identity-fields">
@@ -165,7 +175,7 @@ export function BookView({ data }: { data: ProjectData }) {
           </div>
         </details>
 
-        <details className="settings-section book-fold">
+        <details className="settings-section book-fold" {...fold('files')}>
           <summary><span>Файлы и версии</span></summary>
           <div className="stack book-file-actions">
             <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void exportWord()}>

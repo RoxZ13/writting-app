@@ -9370,16 +9370,54 @@ button.avatar {
     margin: 0 20px;
     border-radius: var(--r-lg);
   }
+  .book-section-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal-back);
+    border: 0;
+    background: rgba(20, 20, 20, 0.2);
+    backdrop-filter: blur(2px);
+  }
+  .book-section-list:has(.book-fold[open]) {
+    overflow: visible;
+  }
   .book-section-list > .book-fold,
   .book-section-list > .book-mobile-section {
     border: 0;
     border-bottom: 1px solid var(--line);
     border-radius: 0;
   }
+  .book-section-list > .book-fold[open] {
+    position: fixed;
+    z-index: var(--z-modal);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    max-height: min(84dvh, 760px);
+    overflow-y: auto;
+    padding-bottom: calc(env(safe-area-inset-bottom) + 8px);
+    border: 0;
+    border-radius: 22px 22px 0 0;
+    background: var(--surface);
+    box-shadow: 0 -16px 55px rgba(0, 0, 0, 0.18);
+  }
   .book-section-list .book-fold > summary {
     min-height: 56px;
     padding: 0 16px;
     font-size: var(--fs-md);
+    touch-action: manipulation;
+  }
+  .book-section-list .book-fold:not([open]) > summary:active {
+    background: var(--fill);
+  }
+  .book-section-list .book-fold[open] > summary {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    min-height: 62px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--line);
   }
   .book-section-list .book-mobile-fields,
   .book-section-list .book-desc,
