@@ -45,10 +45,25 @@ export function App() {
   const [fresh, setFresh] = useState(false)
   useEffect(() => {
     const viewport = window.visualViewport
+    let viewportWidth = window.innerWidth
+    let fullHeight = viewport?.height ?? window.innerHeight
     const syncVisibleViewport = () => {
-      const visibleBottom = (viewport?.offsetTop ?? 0) + (viewport?.height ?? window.innerHeight)
+      const visibleHeight = viewport?.height ?? window.innerHeight
+      if (window.innerWidth !== viewportWidth) {
+        // Orientation changed: the old portrait height is not a keyboard baseline.
+        viewportWidth = window.innerWidth
+        fullHeight = visibleHeight
+      } else {
+        fullHeight = Math.max(fullHeight, visibleHeight)
+      }
+      const visibleBottom = (viewport?.offsetTop ?? 0) + visibleHeight
       const hiddenBottom = Math.max(0, window.innerHeight - visibleBottom)
-      document.documentElement.style.setProperty('--visual-bottom-offset', `${hiddenBottom}px`)
+      // A browser toolbar can cover a few pixels at the bottom; the software
+      // keyboard covers hundreds. Moving fixed navigation above the latter made
+      // it jump into the editor, so keyboard-open is a separate state instead.
+      const keyboardOpen = !!viewport && window.innerWidth <= 900 && (hiddenBottom > 120 || fullHeight - visibleHeight > 120)
+      document.documentElement.dataset.keyboard = keyboardOpen ? 'open' : 'closed'
+      document.documentElement.style.setProperty('--visual-bottom-offset', `${keyboardOpen ? 0 : hiddenBottom}px`)
     }
     syncVisibleViewport()
     const settleTimer = window.setTimeout(syncVisibleViewport, 250)
@@ -61,8 +76,22 @@ export function App() {
       viewport?.removeEventListener('scroll', syncVisibleViewport)
       window.removeEventListener('resize', syncVisibleViewport)
       document.documentElement.style.removeProperty('--visual-bottom-offset')
+      delete document.documentElement.dataset.keyboard
     }
   }, [route.view])
+
+  useEffect(() => {
+    // iOS Safari may still emit proprietary pinch gestures even with a locked
+    // viewport. Manuscript is an app surface, so keep zooming inside text and
+    // typography controls rather than scaling the whole interface.
+    const stopPageZoom = (event: Event) => event.preventDefault()
+    document.addEventListener('gesturestart', stopPageZoom, { passive: false })
+    document.addEventListener('gesturechange', stopPageZoom, { passive: false })
+    return () => {
+      document.removeEventListener('gesturestart', stopPageZoom)
+      document.removeEventListener('gesturechange', stopPageZoom)
+    }
+  }, [])
   useEffect(() => {
     const on = (e: Event) => setFresh((e as CustomEvent<boolean>).detail)
     window.addEventListener('manuscript:fresh', on)

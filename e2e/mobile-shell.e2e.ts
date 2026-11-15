@@ -1,0 +1,41 @@
+import { expect, test } from '@playwright/test'
+import { startStory } from './helpers'
+
+test('the mobile shell behaves like an app surface', async ({ page }, info) => {
+  test.skip(info.project.name === 'desktop', 'phone shell only')
+  await page.goto('/')
+
+  const viewport = await page.locator('meta[name="viewport"]').getAttribute('content')
+  expect(viewport).toContain('maximum-scale=1')
+  expect(viewport).toContain('user-scalable=no')
+
+  await startStory(page)
+  const tabs = page.locator('.tabs-mobile')
+  await expect(tabs).toBeVisible()
+  await expect(tabs.getByText('Текст', { exact: true })).toBeVisible()
+  await expect(tabs.getByText('Доска', { exact: true })).toBeVisible()
+  await expect(tabs.getByText('Герои', { exact: true })).toBeVisible()
+  await expect(tabs.getByText('Заметки', { exact: true })).toBeVisible()
+
+  await page.evaluate(() => { document.documentElement.dataset.keyboard = 'open' })
+  await expect(tabs).toBeHidden()
+  await page.evaluate(() => { document.documentElement.dataset.keyboard = 'closed' })
+  await expect(tabs).toBeVisible()
+})
+
+test('chapter progress keeps plan controls in a separate sheet on phones', async ({ page }, info) => {
+  test.skip(info.project.name === 'desktop', 'phone hierarchy only')
+  await startStory(page)
+  await page.locator('.chapter-progress-trigger').click()
+
+  const progress = page.getByRole('dialog', { name: /Прогресс главы/ })
+  await expect(progress).toBeVisible()
+  await expect(progress.locator('.chapter-goal-settings')).toHaveCount(0)
+  await expect(progress.locator('.chapter-progress-book')).not.toHaveAttribute('open', '')
+
+  await progress.getByRole('button', { name: 'Цели' }).click()
+  const goals = page.getByRole('dialog', { name: 'Цели книги и главы' })
+  await expect(goals).toBeVisible()
+  await expect(goals.getByText('Книга', { exact: true })).toBeVisible()
+  await expect(goals.getByText('Общий диапазон главы', { exact: true })).toBeVisible()
+})

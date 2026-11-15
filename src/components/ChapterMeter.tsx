@@ -87,6 +87,8 @@ export function ChapterMeter({
   chapters: Chapter[]
 }) {
   const [open, setOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [bookOpen, setBookOpen] = useState(() => typeof matchMedia !== 'undefined' && matchMedia('(min-width: 761px)').matches)
   useEffect(() => {
     if (!open) return
     const close = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false)
@@ -116,13 +118,20 @@ export function ChapterMeter({
       : progress.max && progress.chars > progress.max
         ? `Глава длиннее диапазона на ${number(progress.chars - progress.max)} знаков. Это ориентир, не ошибка.`
         : 'Объём находится в целевом диапазоне.'
+  const close = () => {
+    setSettingsOpen(false)
+    setOpen(false)
+  }
 
   return (
     <div className={`chapter-meter ${tone}`}>
       <button className="chapter-progress-trigger" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}>
         <span className="chapter-progress-label">{chapter.title}</span>
-        <span className="chapter-progress-summary">
+        <span className="chapter-progress-summary chapter-progress-summary-desktop">
           {number(progress.chars)} зн.{range ? ` · цель ${range}` : ' · задать диапазон'}
+        </span>
+        <span className="chapter-progress-summary chapter-progress-summary-mobile">
+          {number(progress.chars)}{range ? ` из ${range}` : ' · без цели'}
         </span>
         <span className="chapter-progress-percent">
           {progress.ready}/{progress.total} сцен
@@ -139,14 +148,17 @@ export function ChapterMeter({
 
       {open && (
         <>
-          <button className="chapter-progress-backdrop" aria-label="Закрыть прогресс главы" onClick={() => setOpen(false)} />
+          <button className="chapter-progress-backdrop" aria-label="Закрыть прогресс главы" onClick={close} />
           <section className="chapter-progress-panel card" role="dialog" aria-modal="true" aria-label={`Прогресс главы «${chapter.title}»`}>
             <header className="chapter-progress-head">
               <div>
                 <span className="eyebrow">Прогресс главы</span>
                 <h2>{chapter.title}</h2>
               </div>
-              <button className="icon-btn" aria-label="Закрыть" onClick={() => setOpen(false)}>×</button>
+              <div className="chapter-progress-head-actions">
+                <button className="btn sm ghost" onClick={() => setSettingsOpen(true)}>Цели</button>
+                <button className="icon-btn" aria-label="Закрыть" onClick={close}>×</button>
+              </div>
             </header>
 
             <div className={`chapter-progress-hero ${tone}`}>
@@ -197,21 +209,36 @@ export function ChapterMeter({
               </button>
             </div>
 
-            <section className="chapter-progress-book">
-              <div className="chapter-progress-section-title"><strong>Книга</strong><span>{readyBook.ready} из {readyBook.total} глав готовы</span></div>
-              <div className="book-progress-primary">
-                {book.target ? <><strong>{number(book.chars)} / {number(book.target)} знаков</strong><span>{Math.round(book.ratio * 100)}%</span></> : <><strong>{number(book.chars)} знаков</strong><span>план не задан</span></>}
+            <details className="chapter-progress-book" open={bookOpen} onToggle={(event) => setBookOpen(event.currentTarget.open)}>
+              <summary className="chapter-progress-section-title">
+                <strong>Вся книга</strong>
+                <span>{book.target ? `${Math.round(book.ratio * 100)}% · ` : ''}{readyBook.ready} из {readyBook.total} глав готовы</span>
+              </summary>
+              <div className="book-progress-details">
+                <div className="book-progress-primary">
+                  {book.target ? <><strong>{number(book.chars)} / {number(book.target)} знаков</strong><span>{Math.round(book.ratio * 100)}%</span></> : <><strong>{number(book.chars)} знаков</strong><span>план не задан</span></>}
+                </div>
+                <div className="book-progress-sheets">{sheets(book.sheets)}{book.targetSheets !== undefined ? ` / ${sheets(book.targetSheets)}` : ''} авторских листов</div>
+                {book.forecast && <div className={`book-progress-forecast ${book.target && book.forecast > book.target ? 'growing' : ''}`}>
+                  При нынешнем среднем объёме получится около <strong>{number(book.forecast)} знаков</strong>{book.target ? ` вместо ${number(book.target)}` : ''}.
+                  <span>Расчёт по {book.forecastSample} готовым главам.</span>
+                </div>}
+                {!book.forecast && project.targetChapters && <div className="chapter-goal-hint">Прогноз появится после трёх готовых глав.</div>}
               </div>
-              <div className="book-progress-sheets">{sheets(book.sheets)}{book.targetSheets !== undefined ? ` / ${sheets(book.targetSheets)}` : ''} авторских листов</div>
-              {book.forecast && <div className={`book-progress-forecast ${book.target && book.forecast > book.target ? 'growing' : ''}`}>
-                При нынешнем среднем объёме получится около <strong>{number(book.forecast)} знаков</strong>{book.target ? ` вместо ${number(book.target)}` : ''}.
-                <span>Расчёт по {book.forecastSample} готовым главам.</span>
-              </div>}
-              {!book.forecast && project.targetChapters && <div className="chapter-goal-hint">Прогноз появится после трёх готовых глав.</div>}
-            </section>
-
-            <GoalSettings project={project} chapter={chapter} />
+            </details>
           </section>
+          {settingsOpen && (
+            <>
+              <button className="chapter-goal-backdrop" aria-label="Закрыть цели" onClick={() => setSettingsOpen(false)} />
+              <section className="chapter-goal-dialog card" role="dialog" aria-modal="true" aria-label="Цели книги и главы">
+                <header className="chapter-progress-head">
+                  <div><span className="eyebrow">Ориентиры</span><h2>Цели</h2></div>
+                  <button className="icon-btn" aria-label="Закрыть цели" onClick={() => setSettingsOpen(false)}>×</button>
+                </header>
+                <GoalSettings project={project} chapter={chapter} />
+              </section>
+            </>
+          )}
         </>
       )}
     </div>
@@ -241,8 +268,7 @@ function GoalSettings({ project, chapter }: { project: Project; chapter: Chapter
   const setProject = (changes: Partial<Project>) => void patch<Project>('projects', project.id, { ...changes, lengthUnit: 'chars' })
   const setChapter = (changes: Partial<Chapter>) => void patch<Chapter>('chapters', chapter.id, changes)
   return (
-    <details className="chapter-goal-settings">
-      <summary>Изменить план</summary>
+    <div className="chapter-goal-settings">
       <div className="chapter-goal-settings-body">
         <div className="goal-settings-group">
           <strong>Книга</strong>
@@ -264,6 +290,6 @@ function GoalSettings({ project, chapter }: { project: Project; chapter: Chapter
           {custom && <div className="goal-settings-grid"><GoalNumber label="От" value={chapter.targetMin} placeholder="8 000" onSave={(targetMin) => setChapter({ targetMin })} /><GoalNumber label="До" value={chapter.targetMax} placeholder="12 000" onSave={(targetMax) => setChapter({ targetMax })} /></div>}
         </div>
       </div>
-    </details>
+    </div>
   )
 }

@@ -8,13 +8,15 @@ async function setChapterRangeHere(page: Page, min: number, max: number) {
   await expect(trigger).toContainText('задать диапазон')
   await trigger.click()
   const panel = page.getByRole('dialog', { name: /Прогресс главы/ })
-  await panel.locator('.chapter-goal-settings > summary').click()
-  const common = panel.locator('.goal-settings-group').filter({ hasText: 'Общий диапазон главы' })
+  await panel.getByRole('button', { name: 'Цели' }).click()
+  const goals = page.getByRole('dialog', { name: 'Цели книги и главы' })
+  const common = goals.locator('.goal-settings-group').filter({ hasText: 'Общий диапазон главы' })
   await common.getByLabel('От').fill(String(min))
   await common.getByLabel('От').blur()
   await common.getByLabel('До').fill(String(max))
   await common.getByLabel('До').blur()
   await expect(panel).toContainText(`До целевого диапазона осталось`)
+  await goals.getByRole('button', { name: 'Закрыть цели' }).click()
   await panel.getByRole('button', { name: 'Закрыть' }).click()
 }
 
@@ -26,8 +28,12 @@ test('chapter goal stays visible and opens scene progress', async ({ page }, inf
 
   const trigger = page.locator('.chapter-progress-trigger')
   await expect(trigger).toBeVisible()
-  await expect(trigger).toContainText(/\d+ зн\./)
-  await expect(trigger).toContainText(/цель 600–1[\s ]?000/)
+  if (info.project.name === 'desktop') {
+    await expect(trigger).toContainText(/\d+ зн\./)
+    await expect(trigger).toContainText(/цель 600–1[\s ]?000/)
+  } else {
+    await expect(trigger).toContainText(/\d+ из 600–1[\s ]?000/)
+  }
   await expect(trigger).toContainText('0/1 сцен')
   await trigger.click()
 
