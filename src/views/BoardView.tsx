@@ -42,11 +42,11 @@ import { MARKER_STATES, statusOf } from '../lib/status'
 import { InlineEdit, Modal, toast } from '../lib/ui'
 import { deadlineText } from '../lib/stories'
 import { formatScenes } from '../lib/text'
-import { chapterLength, lengthText, normText, sumChars } from '../lib/length'
 import { go } from '../lib/router'
 import { getBoardLayout } from '../lib/session'
 import { Icon } from '../components/Icon'
 import { offerUndo, once, redo, toastUndo, undo, undoable, undoKey } from '../lib/undo'
+import { chapterWritingProgress, sceneProgressState } from '../lib/writing-progress'
 
 type Lens = { kind: 'all' } | { kind: 'line'; id: string } | { kind: 'markers' } | { kind: 'hero'; id: string }
 
@@ -409,7 +409,6 @@ function Column({
           )}
           <span className="column-count">
             {formatScenes(shown.length)}
-            <LenTag data={data} chars={sumChars(scenes)} />
             {chapter.publishedAt && (
               <span className="published" title="Выложена">
                 ✓ {new Date(chapter.publishedAt + 'T12:00:00').toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
@@ -470,6 +469,7 @@ function Column({
           value={chapter.goal}
           onSave={(goal) => edit('цель главы', { goal })}
         />
+        <BoardChapterProgress data={data} scenes={scenes} />
         {deadlineText(chapter.deadline) && (
           <div className={`deadline column-deadline ${deadlineText(chapter.deadline)!.late ? 'late' : ''}`}>
             <Icon name="clock" size={13} /> {deadlineText(chapter.deadline)!.text}
@@ -637,16 +637,22 @@ function AskLock({ data }: { data: ProjectData }) {
   )
 }
 
-/** The chapter's length on the board; with a norm, coloured: close to the bound, over it. */
-function LenTag({ data, chars }: { data: ProjectData; chars: number }) {
-  const L = chapterLength(data.project, chars)
-  if (!chars) return null
-  const say = { none: 'длина главы', short: 'короче нормы', ok: 'в норме', near: 'почти у верхней границы', over: 'длиннее нормы' }[L.state]
+function BoardChapterProgress({ data, scenes }: { data: ProjectData; scenes: Scene[] }) {
+  const progress = chapterWritingProgress(data.project, scenes)
+  if (!scenes.length && !progress.target) return null
+  const number = (value: number) => Math.round(value).toLocaleString('ru-RU')
+  const ratio = progress.target ? progress.ratio : progress.total ? progress.ready / progress.total : 0
   return (
-    <span className={`len-tag ${L.state}`} title={L.state === 'none' ? say : `${say}: ${normText(data.project)}`}>
-      {' · '}
-      {lengthText(data.project, chars)}
-    </span>
+    <div className="board-chapter-progress" title={progress.target ? `Лимит главы: ${number(progress.target)} знаков` : 'Готовность сцен главы'}>
+      <div className="board-chapter-track">
+        <span style={{ width: `${Math.min(100, ratio * 100)}%` }} />
+        {scenes.map((scene, index) => <i key={scene.id} className={sceneProgressState(scene)} style={{ left: `${((index + 1) / scenes.length) * 100}%` }} />)}
+      </div>
+      <div className="board-chapter-progress-copy">
+        <span>{progress.target ? `${number(progress.chars)} / ${number(progress.target)} зн.` : `${progress.written} из ${progress.total} написано`}</span>
+        <strong>{progress.ready} {progress.ready === 1 ? 'сцена готова' : 'сцен готово'}</strong>
+      </div>
+    </div>
   )
 }
 
@@ -926,6 +932,7 @@ function Timeline({
             {isOpen && (
               <div className="tl-body">
                 {chapter.goal && <div className="tl-goal">{chapter.goal}</div>}
+                <BoardChapterProgress data={data} scenes={scenes} />
                 {scenes
                   .filter((s) => !isPlaceholder(s, data))
                   .map((s) => (

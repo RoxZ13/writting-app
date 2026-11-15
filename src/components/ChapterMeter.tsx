@@ -1,11 +1,12 @@
 import type { Editor, JSONContent } from '@tiptap/react'
+import { useEffect, useState } from 'react'
 import { db, type Project, type Scene, type SceneText } from '../db/db'
 import { alive, createScene, moveScene, patch, save, splitChapterAt } from '../db/repo'
 import { makeExcerpt } from '../lib/importer'
 import { docCharCount, docParagraphs, docWordCount } from '../lib/text'
-import { chapterLength, lengthText, normText } from '../lib/length'
 import { go } from '../lib/router'
 import { toast } from '../lib/ui'
+import { bookReadyProgress, chapterWritingProgress, sceneProgressState } from '../lib/writing-progress'
 
 /** Step 1 of a split: the tail becomes a new scene right after `scene`, opening a new chapter. Does not touch `scene`. */
 export async function createTailChapter(project: Project, scene: Scene, tail: JSONContent): Promise<Scene> {
@@ -68,25 +69,142 @@ export async function splitChapterHere(project: Project, scene: Scene, editor: E
  * neutral, shown only on a wide screen and only while the author is not typing. Nothing at all when
  * the author has set no norm. Starting the next chapter from the cursor is in the «⋯» menu.
  */
-export function ChapterMeter({ project, chars }: { project: Project; chars: number }) {
-  const L = chapterLength(project, chars)
-  if (L.state === 'none') return null
-  const len = (n: number) => lengthText(project, n)
-  const minMark = project.chapterMin && project.chapterMax ? project.chapterMin / project.chapterMax : undefined
+export function ChapterMeter({
+  project,
+  chars,
+  chapterTitle,
+  scene,
+  scenes,
+  bookScenes,
+  chapterIds,
+  bookWords,
+}: {
+  project: Project
+  chars: number
+  chapterTitle: string
+  scene: Scene
+  scenes: Scene[]
+  bookScenes: Scene[]
+  chapterIds: string[]
+  bookWords: number
+}) {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const close = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false)
+    addEventListener('keydown', close)
+    return () => removeEventListener('keydown', close)
+  }, [open])
+
+  const liveMine = Math.max(0, chars - scenes.filter((item) => item.id !== scene.id).reduce((sum, item) => sum + (item.charCount ?? 0), 0))
+  const progress = chapterWritingProgress(project, scenes, { sceneId: scene.id, chars: liveMine })
+  const readyBook = bookReadyProgress(bookScenes, chapterIds)
+  const sceneRatio = progress.total ? progress.ready / progress.total : 0
+  const ratio = progress.target ? progress.ratio : sceneRatio
+  const percent = Math.round(ratio * 100)
+  const complete = progress.total > 0 && progress.ready === progress.total && (!progress.target || progress.chars >= progress.target)
+  const number = (value: number) => Math.round(value).toLocaleString('ru-RU')
+  const remaining = progress.target
+    ? progress.over
+      ? `сверх лимита ${number(progress.over)}`
+      : progress.left === 0
+        ? 'лимит набран'
+        : `осталось ${number(progress.left ?? 0)}`
+    : `${progress.ready} из ${progress.total} сцен готовы`
+  const tone = complete ? 'done' : progress.over ? 'over' : ratio >= 0.9 ? 'near' : 'calm'
 
   return (
-    <div className={`chapter-meter ${L.state}`}>
-      <div className="cm-track" title={`Глава: ${len(chars)} · норма ${normText(project)}`}>
-        <div className="cm-fill" style={{ width: `${L.fill * 100}%` }} />
-        {minMark !== undefined && <div className="cm-min" style={{ left: `${minMark * 100}%` }} />}
-      </div>
-      <div className="cm-text">
-        <span className="cm-k">
-          глава · {len(chars)} · норма {normText(project)}
+    <div className={`chapter-meter ${tone}${complete ? ' complete' : ''}`}>
+      <button className="chapter-progress-trigger" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}>
+        <span className="chapter-progress-label">Глава</span>
+        <span
+          className="chapter-progress-track"
+          role="progressbar"
+          aria-label={`Прогресс главы «${chapterTitle}»`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.min(100, percent)}
+        >
+          <span className="chapter-progress-fill" style={{ width: `${Math.min(100, percent)}%` }} />
+          {scenes.map((item, index) => (
+            <span
+              key={item.id}
+              className={`chapter-progress-tick ${sceneProgressState(item)}`}
+              style={{ left: `${((index + 1) / scenes.length) * 100}%` }}
+            />
+          ))}
         </span>
-        {L.state === 'near' && <span className="cm-say">до конца нормы ≈ {len(L.left ?? 0)}</span>}
-        {L.state === 'over' && <span className="cm-say">длиннее нормы на {len(L.over)}</span>}
-      </div>
+        <span className="chapter-progress-value">
+          {progress.target ? `${number(progress.chars)} / ${number(progress.target)} зн.` : `${progress.ready}/${progress.total}`}
+        </span>
+        <span className="chapter-progress-left">{remaining}</span>
+      </button>
+
+      {open && (
+        <>
+          <button className="chapter-progress-backdrop" aria-label="Закрыть прогресс главы" onClick={() => setOpen(false)} />
+          <section className="chapter-progress-panel card" role="dialog" aria-modal="true" aria-label={`Прогресс главы «${chapterTitle}»`}>
+            <header className="chapter-progress-head">
+              <div>
+                <span className="eyebrow">Прогресс главы</span>
+                <h2>{chapterTitle}</h2>
+              </div>
+              <button className="icon-btn" aria-label="Закрыть" onClick={() => setOpen(false)}>×</button>
+            </header>
+
+            <div className={`chapter-progress-hero ${tone}`}>
+              <div className="chapter-progress-number">
+                {progress.target ? <><strong>{number(progress.chars)}</strong><span>из {number(progress.target)} знаков</span></> : <><strong>{progress.ready}/{progress.total}</strong><span>сцен готовы</span></>}
+              </div>
+              <div className="chapter-progress-bigtrack"><span style={{ width: `${Math.min(100, percent)}%` }} /></div>
+              <div className="chapter-progress-message">
+                {complete ? 'Глава собрана. Можно двигаться дальше ✦' : progress.over ? `Лимит превышен на ${number(progress.over)} знаков` : progress.target ? `Ещё ${number(progress.left ?? 0)} знаков — ${Math.max(0, 100 - percent)}% пути` : 'Задай лимит, чтобы видеть путь по знакам'}
+              </div>
+            </div>
+
+            <div className="chapter-progress-scenes">
+              <div className="chapter-progress-section-title">
+                <strong>Сцены</strong>
+                <span>{progress.written} написано · {progress.ready} готово</span>
+              </div>
+              {scenes.map((item) => {
+                const state = sceneProgressState(item)
+                const itemChars = item.id === scene.id ? liveMine : (item.charCount ?? 0)
+                return (
+                  <button
+                    key={item.id}
+                    className={`chapter-progress-scene ${state}${item.id === scene.id ? ' current' : ''}`}
+                    onClick={() => {
+                      setOpen(false)
+                      go({ view: 'text', sceneId: item.id })
+                    }}
+                  >
+                    <span className="chapter-progress-scene-dot" />
+                    <span className="chapter-progress-scene-name">{item.title || item.excerpt || 'Сцена'}</span>
+                    <span className="chapter-progress-scene-length">{number(itemChars)} зн.</span>
+                    <span className="chapter-progress-scene-state">{state === 'ready' ? 'готова' : state === 'written' ? 'написана' : state === 'writing' ? 'в работе' : 'в плане'}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div className="chapter-progress-actions">
+              <button
+                className={`btn sm ${scene.status === 'done' ? 'ghost' : 'primary'}`}
+                onClick={() => void patch<Scene>('scenes', scene.id, { status: scene.status === 'done' ? (liveMine > 0 ? 'written' : 'draft') : 'done' })}
+              >
+                {scene.status === 'done' ? 'Вернуть сцену в работу' : 'Отметить эту сцену готовой'}
+              </button>
+              {!progress.target && <button className="link small" onClick={() => go({ view: 'book' })}>Задать лимит главы</button>}
+            </div>
+
+            <footer className="chapter-progress-book">
+              <span>Вся книга</span>
+              {project.targetWords ? <strong>{Math.min(100, Math.round((bookWords / project.targetWords) * 100))}% · {number(bookWords)} из {number(project.targetWords)} слов</strong> : <strong>{readyBook.ready} из {readyBook.total} глав готовы</strong>}
+            </footer>
+          </section>
+        </>
+      )}
     </div>
   )
 }

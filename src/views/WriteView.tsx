@@ -298,6 +298,8 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   const chapterChars =
     sumChars(data.scenes.filter((s) => s.chapterId === scene.chapterId && s.id !== scene.id)) +
     (live?.id === scene.id ? live.chars : (scene.charCount ?? 0))
+  const chapterScenes = chapter && !chapter.pool ? data.scenes.filter((s) => s.chapterId === scene.chapterId) : []
+  const bookWords = totalWords([...data.scenes, ...data.pool.scenes]) - scene.wordCount + (words ?? scene.wordCount)
 
   return (
     <div className={cls}>
@@ -464,7 +466,16 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
           <SceneNow data={data} scene={scene} onOpenPlan={openPlan} />
         </div>
         {chapter && !chapter.pool && (
-          <ChapterMeter project={data.project} chars={chapterChars} />
+          <ChapterMeter
+            project={data.project}
+            chars={chapterChars}
+            chapterTitle={chapter.title}
+            scene={scene}
+            scenes={chapterScenes}
+            bookScenes={data.scenes}
+            chapterIds={data.chapters.filter((item) => !item.pool).map((item) => item.id)}
+            bookWords={bookWords}
+          />
         )}
 
         <div className="editor-area">
@@ -516,11 +527,11 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
         chapterWords={data.scenes
           .filter((s) => s.chapterId === scene.chapterId)
           .reduce((n, s) => n + (s.id === scene.id ? (words ?? s.wordCount) : s.wordCount), 0)}
-        bookWords={totalWords([...data.scenes, ...data.pool.scenes]) - scene.wordCount + (words ?? scene.wordCount)}
+        bookWords={bookWords}
         today={wordsOn(data.project, dayKey())}
         project={data.project}
         scene={scene}
-        chapterScenes={chapter && !chapter.pool ? data.scenes.filter((s) => s.chapterId === scene.chapterId) : null}
+        chapterScenes={chapter && !chapter.pool ? chapterScenes : null}
         bookScenes={[...data.scenes, ...data.pool.scenes]}
       />
       {keysOpen && <Shortcuts onClose={() => setKeysOpen(false)} />}
