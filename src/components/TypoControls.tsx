@@ -155,7 +155,7 @@ export function TypoControls() {
             t={t}
             set={set}
             options={[
-              ['edit', 'Только при правке'],
+              ['edit', 'Только при самопроверке'],
               ['always', 'Всегда'],
               ['never', 'Выкл'],
             ]}

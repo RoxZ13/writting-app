@@ -2808,22 +2808,11 @@ main.page {
   min-width: 0;
 }
 
-/* Писать: only the text. Marker underlines stay hidden until you switch to «Править». */
+/* Писать: only the text. Marker underlines stay hidden until «Самопроверка». */
 .write.mode-write .mk {
   text-decoration-color: transparent;
 }
-/* Править: the text sits on a page, materials alongside. */
-.write.mode-edit .write-center {
-  background: var(--bg);
-}
-.write.mode-edit .editor-wrap {
-  background: var(--surface);
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow);
-  margin: 18px auto 60px;
-  padding: 48px 56px 40vh;
-  width: min(780px, calc(100% - 32px));
-}
+/* Самопроверка keeps the writing geometry: switching it on must not move text. */
 /* Переписывать: the old text is a quiet column to the side. */
 .old-text {
   position: sticky;
@@ -2903,9 +2892,6 @@ main.page {
     margin: 8px 16px 0;
     position: static;
     padding: 6px 12px;
-  }
-  .write.mode-edit .editor-wrap {
-    padding: 28px 22px 40vh;
   }
   .modes {
     margin-left: 4px;
@@ -3087,9 +3073,6 @@ main.page {
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-.write.mode-edit .write-top {
-  background: var(--bg);
-}
 .old-text {
   max-height: calc(100dvh - var(--header-h) - 110px);
 }
@@ -3147,9 +3130,6 @@ main.page {
   flex: 0 1 auto;
   width: min(calc(var(--measure) + 64px), 100%);
   margin: 0 auto;
-}
-.write.mode-edit .editor-wrap {
-  width: min(calc(var(--measure) + 112px), calc(100% - 32px));
 }
 .compass,
 .old-body {
@@ -3535,10 +3515,6 @@ main.page {
   .passport-wrap {
     padding: 0 18px;
   }
-}
-.write.mode-edit .passport-wrap {
-  width: min(calc(var(--measure) + 112px), calc(100% - 32px));
-  padding: 0;
 }
 .passport {
   border-radius: var(--r-lg);
@@ -4399,13 +4375,6 @@ main.page {
   opacity: 0;
   transition: opacity 0.4s;
 }
-.write.mode-edit .passport-wrap {
-  background: var(--bg);
-}
-.write.mode-edit .passport-wrap::after {
-  background: linear-gradient(var(--bg), transparent);
-}
-
 /* =====================================================================
    Planning on the board: essence, "Пока без места", key points, arc.
    ===================================================================== */
@@ -4871,7 +4840,7 @@ main.page {
   white-space: pre-wrap;
 }
 
-/* «Править»: hints. */
+/* «Самопроверка»: hints. */
 .hints-bar {
   display: inline-flex;
   align-items: center;
@@ -8082,9 +8051,6 @@ button.avatar {
     border-radius: 6px 6px 0 0;
     box-shadow: 0 0 0 1px var(--line), 0 1px 3px rgba(0, 0, 0, 0.04), 0 12px 40px rgba(0, 0, 0, 0.04);
     min-height: calc(100dvh - 120px);
-  }
-  .write.mode-edit .editor-wrap {
-    width: min(calc(var(--measure) + 200px), 100%);
   }
 }
 

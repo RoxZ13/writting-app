@@ -12,7 +12,7 @@ export interface Typo {
   calm: 'off' | 'on'
   /** The paragraph being written stays bright, the rest fades. */
   focusPara: 'off' | 'on'
-  /** The browser's spelling underlines: always, only while editing («Править»), or never. */
+  /** The browser's spelling underlines: always, only in «Самопроверка», or never. */
   spell: 'always' | 'edit' | 'never'
   /** On opening a scene: a quiet plate with the last note and the last two sentences. */
   resume: 'on' | 'off'

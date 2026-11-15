@@ -82,7 +82,7 @@ function typesetFragment(fragment: Fragment): Fragment {
 }
 
 /**
- * «Причесать текст»: the whole scene typeset in one step (one undo brings it back).
+ * «Исправить типографику»: the whole scene is typeset in one step (one undo brings it back).
  * Returns how many paragraphs changed; 0 means nothing was dispatched.
  */
 export function typesetDoc(state: EditorState, dispatch: (tr: Transaction) => void): number {

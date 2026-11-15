@@ -28,7 +28,7 @@ function compute(doc: PMNode) {
   return { hints, set }
 }
 
-/** «Править» mode helper: underlines repeats, fillers and long sentences. Off unless switched on. */
+/** «Самопроверка»: underlines repeats, fillers and long sentences. */
 export const EditHints = Extension.create({
   name: 'editHints',
   addProseMirrorPlugins() {

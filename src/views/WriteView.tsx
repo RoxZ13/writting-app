@@ -22,7 +22,7 @@ import { sumChars } from '../lib/length'
 import { ChapterMeter, splitChapterHere } from '../components/ChapterMeter'
 import { chapterProgress, dayKey, totalWords, wordsOn } from '../lib/pace'
 import { MARKER_STATES } from '../lib/status'
-import { docParagraphs, emptyDoc, formatWords, formatWordsOf, lastSentences, wordNoun } from '../lib/text'
+import { docParagraphs, emptyDoc, formatWords, formatWordsOf, lastSentences, pluralRu, wordNoun } from '../lib/text'
 import { loadTypo } from '../lib/typography'
 import { diffParagraphs } from '../lib/diff'
 import { InlineEdit, Modal, toast } from '../lib/ui'
@@ -134,7 +134,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
     return () => window.removeEventListener('manuscript:typo', refresh)
   }, [editor, mode])
 
-  // «Править»: repeats, long sentences and filler words are underlined while the hints are on.
+  // «Самопроверка»: repeats, long sentences and filler words are underlined while the hints are on.
   useEffect(() => {
     if (!editor) return
     editor.view.dispatch(editor.state.tr.setMeta(editHintsKey, mode === 'edit' && hintsOn))
@@ -223,8 +223,8 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   const typeset = () => {
     if (!editor) return
     const n = typesetDoc(editor.state, (tr) => editor.view.dispatch(tr))
-    if (n) toast(`Причёсано абзацев: ${n}`, () => editor.commands.undo())
-    else toast('Здесь уже всё аккуратно')
+    if (n) toast(`Типографика исправлена: ${n} ${pluralRu(n, 'абзац', 'абзаца', 'абзацев')}`, () => editor.commands.undo())
+    else toast('Кавычки, тире и пробелы уже оформлены')
   }
 
   // Remember where the author is — this powers "continue where I stopped" on every device.
@@ -259,6 +259,16 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
       return
     }
     setModeState(m)
+    // Entering self-check is an explicit request to see the checks. Do not make
+    // the author discover a second switch before the mode does anything.
+    if (m === 'edit' && !hintsOn) {
+      setHintsOn(true)
+      try {
+        localStorage.setItem(HINTS_KEY, '1')
+      } catch {
+        /* ignore */
+      }
+    }
     try {
       localStorage.setItem(MODE_KEY, m)
     } catch {
@@ -325,7 +335,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
               {chapter?.title} ›
             </span>
             <span className="crumb-scene">{sceneName(data, scene)}</span>
-            {mode !== 'write' && <span className="mode-chip">{mode === 'edit' ? 'правка' : 'переписываю'}</span>}
+            {mode !== 'write' && <span className="mode-chip">{mode === 'edit' ? 'самопроверка' : 'переписываю'}</span>}
           </div>
           {mode === 'edit' && (
             <span className="hints-bar">
@@ -390,7 +400,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                     {(
                       [
                         ['write', 'Писать', 'Только текст'],
-                        ['edit', 'Править', 'Маячки и подсказки на странице'],
+                        ['edit', 'Самопроверка', 'Повторы, длинные предложения, лишние слова и орфография'],
                         ['rewrite', 'Переписать', 'Прежний текст сбоку, новый рядом'],
                       ] as [Mode, string, string][]
                     ).map(([m, label, hint]) => (
@@ -415,7 +425,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                         ? [['cut', 'Новая глава с этого абзаца', '', () => void splitChapterHere(data.project, scene, editor)] as [string, string, string, () => void]]
                         : []),
                       ['search', 'Найти и заменить', isMac ? '⌘⇧H' : 'Ctrl+H', () => setFind({ replace: true })],
-                      ['type', 'Причесать текст', '', typeset],
+                      ['type', 'Исправить типографику', '', typeset],
                       ['focus', 'Фокус с таймером', '', () => setFocusOpen(true)],
                       ['check', 'Закончить на сегодня', '', () => setFinishing(true)],
                       ['help', 'Справка', '', () => go({ view: 'help' })],

@@ -1,5 +1,5 @@
 /**
- * Hints for the «Править» mode, no AI: the same word again too soon, sentences that run too long,
+ * Hints for «Самопроверка», no AI: the same word again too soon, sentences that run too long,
  * and words that usually weaken Russian prose. They only point; the author decides.
  */
 export type HintKind = 'repeat' | 'long' | 'filler'
