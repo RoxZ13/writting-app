@@ -39,3 +39,20 @@ test('chapter progress keeps plan controls in a separate sheet on phones', async
   await expect(goals.getByText('Книга', { exact: true })).toBeVisible()
   await expect(goals.getByText('Общий диапазон главы', { exact: true })).toBeVisible()
 })
+
+test('the phone board starts with the next writing action, not repeated headings', async ({ page }, info) => {
+  test.skip(info.project.name === 'desktop', 'phone hierarchy only')
+  await startStory(page)
+  await page.locator('.tabs-mobile > button').filter({ hasText: 'Доска' }).click()
+
+  const resume = page.locator('.continue-card')
+  const structure = page.locator('.timeline')
+  await expect(resume).toBeVisible()
+  await expect(structure).toBeVisible()
+  const resumeBox = await resume.boundingBox()
+  const structureBox = await structure.boundingBox()
+  expect(resumeBox).not.toBeNull()
+  expect(structureBox).not.toBeNull()
+  expect(resumeBox!.y).toBeLessThan(structureBox!.y)
+  await expect(page.getByRole('heading', { name: 'Доска' })).toHaveClass(/sr-only/)
+})

@@ -8572,9 +8572,8 @@ button.avatar {
     padding: 16px;
   }
 
-  .story-home-head h1 {
-    font-size: 24px;
-    margin: 0;
+  .board-bar.phone-empty {
+    display: none;
   }
   .board-bar .lens.bare,
   .board-bar .plan-lock {
@@ -8638,6 +8637,12 @@ button.avatar {
   }
   .tl-body {
     padding: 0 0 10px 18px;
+  }
+  .tl-body .board-chapter-progress-copy > span {
+    display: none;
+  }
+  .tl-body .board-chapter-progress-copy {
+    justify-content: flex-end;
   }
   .tl-goal {
     margin: 0 4px 6px;
@@ -8882,7 +8887,7 @@ button.avatar {
     font-size: var(--fs-lg);
     font-weight: 600;
   }
-  .tabs > button:not([aria-current='page']) .tab-label {
+  .tabs-desktop > button:not([aria-current='page']) .tab-label {
     position: absolute;
     width: 1px;
     height: 1px;

@@ -179,14 +179,10 @@ export function BoardView({ data }: { data: ProjectData }) {
 
   return (
     <div className="board-page">
-      <div className="board-bar">
-        {phone ? (
-          <div className="story-home-head">
-            <h1>{data.project.title}</h1>
-          </div>
-        ) : (
-          <h1>Доска</h1>
-        )}
+      {phone && <h1 className="sr-only">Доска</h1>}
+      {phone && <ContinueCard data={data} />}
+      <div className={`board-bar ${phone && !filters ? 'phone-empty' : ''}`}>
+        {!phone && <h1>Доска</h1>}
         {/* Filters only once there is something to filter; «+ линия» is always there. */}
         {filters && <span className="lens-label hide-sm">Показать:</span>}
         <details className={`board-filter-fold ${filters ? 'has-filters' : ''}`}>
@@ -284,7 +280,6 @@ export function BoardView({ data }: { data: ProjectData }) {
       )}
       {lens.kind === 'line' && data.lineById.get(lens.id) && <LineNote data={data} lineId={lens.id} onGone={() => setLens({ kind: 'all' })} />}
 
-      {phone && <ContinueCard data={data} />}
       {phone ? (
         <Timeline data={data} lens={lens} onOpenScene={setOpenScene} onOpenMarker={setOpenMarker} />
       ) : view === 'line' ? (
