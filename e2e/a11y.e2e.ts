@@ -63,6 +63,28 @@ async function seedStory(page: Page, { extras }: { extras?: boolean } = {}) {
   return book
 }
 
+async function ensureBoard(page: Page) {
+  await page.waitForTimeout(300)
+  if (!(await page.locator('.board:visible, .timeline:visible').count())) {
+    await page.locator('.tabs-mobile:visible > button, .tabs-desktop:visible > button').filter({ hasText: 'Доска' }).click()
+  }
+  await expect(page.locator('.board:visible, .timeline:visible')).toBeVisible()
+}
+
+async function openSceneCard(page: Page) {
+  await ensureBoard(page)
+  if (await page.locator('.board:visible').count()) {
+    await page.locator('article.card-scene').first().click()
+  } else {
+    const scene = page.locator('.tl-scene').first()
+    await scene.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 180, clientY: 300 })
+    await page.waitForTimeout(480)
+    await scene.dispatchEvent('pointerup', { pointerType: 'touch', clientX: 180, clientY: 300 })
+    await page.getByRole('dialog', { name: /Действия со сценой/ }).getByRole('button', { name: 'Карточка сцены' }).click()
+  }
+  await expect(page.getByRole('dialog', { name: 'Сцена' })).toBeVisible()
+}
+
 interface Found {
   id: string
   impact: string | null | undefined
@@ -231,8 +253,7 @@ const SCREENS: Screen[] = [
     name: 'карточка сцены на доске',
     open: async (page) => {
       await page.goto('/#/board')
-      await page.locator('article.card-scene, .tl-scene').first().click()
-      await expect(page.getByRole('dialog', { name: 'Сцена' })).toBeVisible()
+      await openSceneCard(page)
     },
   },
 ]
@@ -306,7 +327,7 @@ test.describe('keyboard only', () => {
     // B-017 (fixed): on the desktop board a card is a dnd-kit draggable; Enter opens the scene, Space starts a keyboard drag.
     await seedStory(page)
     await page.goto('/#/board')
-    await expect(page.locator('.board, .timeline')).toBeVisible()
+    await ensureBoard(page)
     await page.locator('body').click({ position: { x: 5, y: 5 } })
 
     const cardSel = project === 'desktop' ? 'article.card-scene' : '.tl-scene'
@@ -327,11 +348,13 @@ test.describe('keyboard only', () => {
     expect(reached, 'a scene card never received focus').not.toBe('')
 
     await page.keyboard.press('Enter')
-    const openedByEnter = await page.getByRole('dialog', { name: 'Сцена' }).isVisible().catch(() => false)
+    const openedByEnter = project === 'desktop'
+      ? await page.getByRole('dialog', { name: 'Сцена' }).isVisible().catch(() => false)
+      : /#\/text\/.+/.test(page.url())
     const dragAnnounce = await page.locator('[aria-live]').allTextContents()
     console.log(`KEYS [${project}] board: Enter opened the scene sheet: ${openedByEnter}; live region: ${JSON.stringify(dragAnnounce.map((t) => t.trim()).filter(Boolean))}`)
     appendFileSync(AXE_OUT, JSON.stringify({ project, screen: 'KEYBOARD board card', tabsToCard: presses + 1, focused: reached, enterOpensScene: openedByEnter }) + '\n')
-    expect(openedByEnter, 'Enter on a focused scene card should open the scene').toBe(true)
+    expect(openedByEnter, 'Enter on a focused scene should open its card on desktop or its text on a phone').toBe(true)
   })
 })
 

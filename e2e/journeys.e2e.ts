@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Locator, type Page } from '@playwright/test'
 import fs from 'node:fs'
 import { aliveRows, allTexts, dbAll, docText, firstSceneId, startStory, typeInEditor, waitSaveTick, waitTextInDb, wordsIn } from './helpers'
 
@@ -21,7 +21,21 @@ async function addSceneOnBoard(page: Page, title: string, nth = 0) {
   await input.click()
   await page.keyboard.type(title)
   await page.keyboard.press('Enter')
-  await expect(page.locator('.card-scene, .tl-scene').filter({ hasText: title })).toBeVisible()
+  await expect.poll(async () => (await aliveRows<any>(page, 'scenes')).some((scene) => scene.title === title)).toBe(true)
+}
+
+async function hold(locator: Locator) {
+  await locator.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 180, clientY: 300 })
+  await locator.page().waitForTimeout(480)
+  await locator.dispatchEvent('pointerup', { pointerType: 'touch', clientX: 180, clientY: 300 })
+}
+
+async function openOnlySceneCard(page: Page, chapterName = 'Глава 1') {
+  const chapter = page.locator('.tl-chapter').filter({ hasText: chapterName }).locator('.tl-head')
+  await hold(chapter)
+  const actions = page.getByRole('dialog', { name: `Действия с главой «${chapterName}»` })
+  await actions.getByRole('button', { name: 'Карточка текста' }).click()
+  return page.getByRole('dialog', { name: 'Сцена' })
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -60,16 +74,20 @@ test.describe('2. close-tab guard', () => {
 
 // ---------------------------------------------------------------------------------------------
 test.describe('3. board basics', () => {
-  test('add a scene, open its card, go to writing it', async ({ page }) => {
+  test('add a scene and go to writing it without an extra step on a phone', async ({ page, isMobile }) => {
     await startStory(page)
     await board(page)
     await addSceneOnBoard(page, 'Погоня в тумане')
-    const card = page.locator('.card-scene, .tl-scene').filter({ hasText: 'Погоня в тумане' })
-    await card.click()
-    const sheet = page.getByRole('dialog', { name: 'Сцена' })
-    await expect(sheet).toBeVisible()
-    await expect(sheet.locator('.sheet-title')).toBeVisible()
-    await sheet.getByRole('button', { name: /Писать эту сцену/ }).click()
+    if (isMobile) {
+      await page.locator('.tl-chapter').filter({ hasText: 'Глава 1' }).locator('.tl-head').click()
+    } else {
+      const card = page.locator('.card-scene').filter({ hasText: 'Погоня в тумане' })
+      await card.click()
+      const sheet = page.getByRole('dialog', { name: 'Сцена' })
+      await expect(sheet).toBeVisible()
+      await expect(sheet.locator('.sheet-title')).toBeVisible()
+      await sheet.getByRole('button', { name: /Писать эту сцену/ }).click()
+    }
     await expect(page).toHaveURL(/#\/text\/.+/)
     const editor = page.locator('.ProseMirror')
     await expect(editor).toBeVisible()
@@ -144,8 +162,7 @@ test.describe('4. drag a scene to another chapter', () => {
     await board(page)
     await addSceneOnBoard(page, 'Сцена А')
     await page.getByRole('button', { name: '+ Глава' }).click()
-    await page.locator('.tl-chapter.open .tl-scene').filter({ hasText: 'Сцена А' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Сцена' })
+    const sheet = await openOnlySceneCard(page)
     const chapters = (await aliveRows<any>(page, 'chapters')).filter((c) => !c.pool).sort((a, b) => a.order - b.order)
     await sheet.getByLabel('Где стоит').selectOption(chapters[1].id)
     await expect
@@ -209,8 +226,7 @@ test.describe('5. board undo', () => {
     await board(page)
     await addSceneOnBoard(page, 'Сцена А')
     await page.getByRole('button', { name: '+ Глава' }).click()
-    await page.locator('.tl-chapter.open .tl-scene').filter({ hasText: 'Сцена А' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Сцена' })
+    const sheet = await openOnlySceneCard(page)
     const chapters = (await aliveRows<any>(page, 'chapters')).filter((c) => !c.pool).sort((a, b) => a.order - b.order)
     await sheet.getByLabel('Где стоит').selectOption(chapters[1].id)
     await expect

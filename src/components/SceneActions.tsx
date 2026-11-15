@@ -102,7 +102,7 @@ export function SceneGestureButton(props: Omit<Parameters<typeof GestureActionBu
 }
 
 /** Contextual actions stay next to their scene, so the author never loses what is being changed. */
-export function SceneActions({ data, scene, onClose }: { data: ProjectData; scene: Scene; onClose: () => void }) {
+export function SceneActions({ data, scene, onClose, onEdit }: { data: ProjectData; scene: Scene; onClose: () => void; onEdit?: () => void }) {
   const [moving, setMoving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -131,6 +131,7 @@ export function SceneActions({ data, scene, onClose }: { data: ProjectData; scen
         <button type="button" className="icon-btn" aria-label="Закрыть действия" onClick={onClose}>×</button>
       </div>
       <div className="scene-action-list">
+        {onEdit && <button onClick={() => { onClose(); onEdit() }}>Карточка сцены</button>}
         {locked ? (
           <div className="scene-action-note">Глава зафиксирована: перемещение отключено.</div>
         ) : (

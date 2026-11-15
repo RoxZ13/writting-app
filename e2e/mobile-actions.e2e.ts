@@ -3,6 +3,26 @@ import { aliveRows, startStory, waitSaveTick } from './helpers'
 
 const openTab = (page: Page, name: 'Доска' | 'Герои') => page.locator('.tabs-mobile > button', { hasText: name }).click()
 
+async function hold(locator: Locator) {
+  await locator.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 180, clientY: 300 })
+  await locator.page().waitForTimeout(480)
+  await locator.dispatchEvent('pointerup', { pointerType: 'touch', clientX: 180, clientY: 300 })
+}
+
+async function openOnlySceneCard(page: Page, chapterName = 'Глава 1') {
+  const chapter = page.locator('.tl-chapter').filter({ hasText: chapterName }).locator('.tl-head')
+  await hold(chapter)
+  const actions = page.getByRole('dialog', { name: `Действия с главой «${chapterName}»` })
+  await actions.getByRole('button', { name: 'Карточка текста' }).click()
+  return page.getByRole('dialog', { name: 'Сцена' })
+}
+
+async function exposeSceneRows(page: Page, chapterName = 'Глава 1') {
+  const chapter = page.locator('.tl-chapter').filter({ hasText: chapterName }).locator('.tl-head')
+  await hold(chapter)
+  await page.getByRole('dialog', { name: `Действия с главой «${chapterName}»` }).getByRole('button', { name: '+ Сцена в этой главе' }).click()
+}
+
 test.describe('mobile actions stay reachable', () => {
   test.beforeEach(async ({ isMobile }) => test.skip(!isMobile, 'phone layout'))
 
@@ -23,8 +43,7 @@ test.describe('mobile actions stay reachable', () => {
     const addScene = page.getByPlaceholder('Новая сцена').first()
     await addScene.fill('Сцена со связями')
     await addScene.press('Enter')
-    await page.locator('.tl-scene').filter({ hasText: 'Сцена со связями' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Сцена' })
+    const sheet = await openOnlySceneCard(page)
 
     const lines = sheet.locator('details.sheet-ref-fold').filter({ hasText: 'Линии' })
     await lines.locator('summary').click()
@@ -42,8 +61,7 @@ test.describe('mobile actions stay reachable', () => {
 
     await sheet.getByRole('button', { name: 'Закрыть' }).click()
     await page.reload()
-    await page.locator('.tl-scene').filter({ hasText: 'Сцена со связями' }).click()
-    const reopened = page.getByRole('dialog', { name: 'Сцена' })
+    const reopened = await openOnlySceneCard(page)
     await expect(reopened.locator('summary').filter({ hasText: 'Линии' })).toContainText('Расследование')
     await expect(reopened.locator('summary').filter({ hasText: 'Герои' })).toContainText('Арина')
 
@@ -61,11 +79,10 @@ test.describe('mobile actions stay reachable', () => {
     const add = page.getByPlaceholder('Новая сцена').first()
     await add.fill('Поворот сюжета')
     await add.press('Enter')
+    await exposeSceneRows(page)
     const row = page.locator('.tl-scene').filter({ hasText: 'Поворот сюжета' })
     await expect(row).not.toContainText('⋯')
-    await row.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 180, clientY: 300 })
-    await page.waitForTimeout(480)
-    await row.dispatchEvent('pointerup', { pointerType: 'touch', clientX: 180, clientY: 300 })
+    await hold(row)
     const actions = page.getByRole('dialog', { name: 'Действия со сценой «Поворот сюжета»' })
     await expect(actions).toBeVisible()
     await expect(page.locator('.modal-back')).toHaveCount(0)
@@ -100,8 +117,7 @@ test.describe('mobile actions stay reachable', () => {
     const add = page.getByPlaceholder('Новая сцена').first()
     await add.fill('Лишняя сцена')
     await add.press('Enter')
-    await page.locator('.tl-scene').filter({ hasText: 'Лишняя сцена' }).click()
-    const sheet = page.getByRole('dialog', { name: 'Сцена' })
+    const sheet = await openOnlySceneCard(page)
     await sheet.locator('details.sheet-more > summary').click()
     await sheet.getByRole('button', { name: 'Удалить сцену', exact: true }).click()
     await expect(sheet).toBeHidden()
@@ -114,10 +130,9 @@ test.describe('mobile actions stay reachable', () => {
     const add = page.getByPlaceholder('Новая сцена').first()
     await add.fill('Удалить удержанием')
     await add.press('Enter')
+    await exposeSceneRows(page)
     const row = page.locator('.tl-scene').filter({ hasText: 'Удалить удержанием' })
-    await row.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 180, clientY: 300 })
-    await page.waitForTimeout(480)
-    await row.dispatchEvent('pointerup', { pointerType: 'touch', clientX: 180, clientY: 300 })
+    await hold(row)
     const actions = page.getByRole('dialog', { name: 'Действия со сценой «Удалить удержанием»' })
     await actions.getByRole('button', { name: 'Удалить сцену' }).click()
     await actions.getByRole('button', { name: 'Удалить', exact: true }).click()

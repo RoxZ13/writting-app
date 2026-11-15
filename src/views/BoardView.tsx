@@ -880,7 +880,8 @@ function Timeline({
                 data={data}
                 scene={s}
                 lens={lens}
-                onOpen={() => onOpenScene(s.id)}
+                onOpen={() => go({ view: 'text', sceneId: s.id })}
+                onEdit={() => onOpenScene(s.id)}
                 actionsOpen={sceneActions === s.id}
                 onActions={() => setSceneActions((id) => id === s.id ? null : s.id)}
                 onCloseActions={() => setSceneActions(null)}
@@ -896,17 +897,19 @@ function Timeline({
         const plant = data.markers.filter((m) => !m.resolved && markerSetupChapter(m, data) === chapter.id)
         const lineMissing = lens.kind === 'line' && !scenes.some((s) => s.lineIds?.includes(lens.id))
         const isOpen = open.has(chapter.id)
+        const visibleScenes = scenes.filter((scene) => !isPlaceholder(scene, data))
+        const singleScene = visibleScenes.length === 1 ? visibleScenes[0] : undefined
         return (
           <section key={chapter.id} className={`tl-chapter ${isOpen ? 'open' : ''} ${lineMissing ? 'missing' : ''} ${chapter.locked ? 'locked' : ''}`}>
             <div className="tl-head-row">
               <GestureActionButton
                 className="tl-head"
-                onOpen={() => toggle(chapter.id)}
+                onOpen={() => singleScene ? go({ view: 'text', sceneId: singleScene.id }) : toggle(chapter.id)}
                 onActions={() => setChapterActions((id) => id === chapter.id ? null : chapter.id)}
-                ariaDescription="Нажми, чтобы раскрыть главу. Зажми или смахни влево для действий"
-                ariaExpanded={isOpen}
+                ariaDescription={singleScene ? 'Нажми, чтобы открыть текст главы. Зажми или смахни влево для действий' : 'Нажми, чтобы раскрыть главу. Зажми или смахни влево для действий'}
+                ariaExpanded={singleScene ? undefined : isOpen}
               >
-                <span className="tl-caret">{isOpen ? '▾' : '▸'}</span>
+                <span className="tl-caret">{singleScene ? '→' : isOpen ? '▾' : '▸'}</span>
                 <span className="tl-title">{chapter.title}</span>
                 {chapter.locked && (
                   <span className="lock-mark" title="Глава зафиксирована">
@@ -915,28 +918,34 @@ function Timeline({
                 )}
                 {chapter.id === here && !isOpen && !storyEmpty(data) && <span className="here">ты здесь</span>}
                 <span className="spacer" />
-                {scenes.some((s) => !isPlaceholder(s, data)) && (
-                  <span className="tl-meta">{formatScenes(scenes.filter((s) => !isPlaceholder(s, data)).length)}</span>
+                {visibleScenes.length > 1 && (
+                  <span className="tl-meta">{formatScenes(visibleScenes.length)}</span>
                 )}
               </GestureActionButton>
             </div>
             {chapterActions === chapter.id && (
-              <TimelineChapterActions data={data} chapter={chapter} scenes={scenes} onClose={() => setChapterActions(null)} />
+              <TimelineChapterActions
+                data={data}
+                chapter={chapter}
+                scenes={scenes}
+                singleScene={singleScene}
+                onOpenScene={onOpenScene}
+                onClose={() => setChapterActions(null)}
+              />
             )}
             {lineMissing && <div className="tl-gap">нет сцен этой линии</div>}
-            {isOpen && (
+            {isOpen && !singleScene && (
               <div className="tl-body">
                 {chapter.goal && <div className="tl-goal">{chapter.goal}</div>}
                 <BoardChapterProgress data={data} chapter={chapter} scenes={scenes} />
-                {scenes
-                  .filter((s) => !isPlaceholder(s, data))
-                  .map((s) => (
+                {visibleScenes.map((s) => (
                     <TimelineScene
                       key={s.id}
                       data={data}
                       scene={s}
                       lens={lens}
-                      onOpen={() => onOpenScene(s.id)}
+                      onOpen={() => go({ view: 'text', sceneId: s.id })}
+                      onEdit={() => onOpenScene(s.id)}
                       actionsOpen={sceneActions === s.id}
                       onActions={() => setSceneActions((id) => id === s.id ? null : s.id)}
                       onCloseActions={() => setSceneActions(null)}
@@ -966,7 +975,21 @@ function Timeline({
 }
 
 /** Chapter operations that the desktop keeps in its column menu, exposed as a touch-friendly dialog. */
-function TimelineChapterActions({ data, chapter, scenes, onClose }: { data: ProjectData; chapter: Chapter; scenes: Scene[]; onClose: () => void }) {
+function TimelineChapterActions({
+  data,
+  chapter,
+  scenes,
+  singleScene,
+  onOpenScene,
+  onClose,
+}: {
+  data: ProjectData
+  chapter: Chapter
+  scenes: Scene[]
+  singleScene?: Scene
+  onOpenScene: (id: string) => void
+  onClose: () => void
+}) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const index = data.chapters.findIndex((c) => c.id === chapter.id)
   const previous = index > 0 ? data.chapters[index - 1] : undefined
@@ -980,6 +1003,11 @@ function TimelineChapterActions({ data, chapter, scenes, onClose }: { data: Proj
     onClose()
     toastUndo('Глава добавлена')
   }
+  const addSceneHere = async () => {
+    await undoable('новая сцена', () => createScene(data.project.id, chapter.id, '', { status: 'idea' }))
+    onClose()
+    toastUndo('Сцена добавлена')
+  }
   const del = async () => {
     await undoable('удаление главы', () => deleteChapter(chapter.id))
     onClose()
@@ -992,6 +1020,8 @@ function TimelineChapterActions({ data, chapter, scenes, onClose }: { data: Proj
         <button type="button" className="icon-btn" aria-label="Закрыть действия" onClick={onClose}>×</button>
       </div>
       <div className="chapter-action-grid">
+        {singleScene && <button className="btn" onClick={() => { onClose(); onOpenScene(singleScene.id) }}>Карточка текста</button>}
+        {!chapter.locked && <button className="btn" onClick={() => void addSceneHere()}>+ Сцена в этой главе</button>}
         <button
           className="btn"
           onClick={async () => {
@@ -1039,6 +1069,7 @@ function TimelineScene({
   scene,
   lens,
   onOpen,
+  onEdit,
   actionsOpen,
   onActions,
   onCloseActions,
@@ -1047,6 +1078,7 @@ function TimelineScene({
   scene: Scene
   lens: Lens
   onOpen: () => void
+  onEdit: () => void
   actionsOpen: boolean
   onActions: () => void
   onCloseActions: () => void
@@ -1066,7 +1098,7 @@ function TimelineScene({
         {markers.length > 0 && <span className="tl-mk">✦ {markers.length}</span>}
         {current && !storyEmpty(data) && <span className="here">ты здесь</span>}
       </SceneGestureButton>
-      {actionsOpen && <SceneActions data={data} scene={scene} onClose={onCloseActions} />}
+      {actionsOpen && <SceneActions data={data} scene={scene} onClose={onCloseActions} onEdit={onEdit} />}
     </div>
   )
 }

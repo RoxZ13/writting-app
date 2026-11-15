@@ -56,3 +56,19 @@ test('the phone board starts with the next writing action, not repeated headings
   expect(resumeBox!.y).toBeLessThan(structureBox!.y)
   await expect(page.getByRole('heading', { name: 'Доска' })).toHaveClass(/sr-only/)
 })
+
+test('a chapter with one text opens the editor in one tap', async ({ page }, info) => {
+  test.skip(info.project.name === 'desktop', 'phone navigation only')
+  await startStory(page)
+  await page.locator('.tabs-mobile > button').filter({ hasText: 'Доска' }).click()
+  const add = page.getByPlaceholder('Новая сцена').first()
+  await add.fill('Цельная глава')
+  await add.press('Enter')
+
+  await expect(page.locator('.tl-scene').filter({ hasText: 'Цельная глава' })).toHaveCount(0)
+  const chapter = page.locator('.tl-chapter').filter({ hasText: 'Глава 1' }).locator('.tl-head')
+  await expect(chapter.locator('.tl-caret')).toHaveText('→')
+  await chapter.click()
+  await expect(page.locator('.ProseMirror')).toBeVisible()
+  await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/#\/text\//)
+})
