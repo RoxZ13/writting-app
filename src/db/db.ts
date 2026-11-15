@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie'
-import type { PlatformId } from '../lib/platforms'
+import type { PlatformId, PlatformUnit } from '../lib/platforms'
 
 /** Every synced record carries these fields. `syncRev` is the conflict-ordering clock; `updatedAt` is only display time. */
 export interface Base {
@@ -16,6 +16,10 @@ export type StoryStage = 'idea' | 'writing' | 'editing' | 'publishing' | 'done'
 export interface Project extends Base {
   title: string
   createdAt: number
+  /** Editions of one work share the original project's id here. */
+  workId?: string
+  editionNumber?: number
+  previousEditionId?: string
   /** Where the author stopped last time — synced so "Continue" works on every device. */
   lastSceneId?: string
   /** About the book: the header of an imported file (fandom, pairing, summary…) or the author's own words. */
@@ -52,8 +56,13 @@ export interface Project extends Base {
   lengthUnit?: 'pages' | 'chars' | 'words'
   /** The scene's share of the chapter norm, as a ring on the word counter. Off unless the author turns it on. */
   sceneBudget?: boolean
-  /** Where the book goes up; Фикбук when not chosen. */
+  /** Where the book goes up. Undefined means the author did not enable publishing tools. */
   platform?: PlatformId
+  /** Custom publishing profile used when platform === 'other'. */
+  platformName?: string
+  platformUnit?: PlatformUnit
+  platformMax?: number
+  platformUrl?: string
   /** A new chapter every N days. */
   publishEvery?: number
   /** The work's page on that site (the name stayed from when only Ficbook was known); for Ficbook, taken from the imported header when empty. */

@@ -8,17 +8,27 @@ import { readBackupFile, restoreBackup } from '../lib/backup'
 import { FilePick, toast } from '../lib/ui'
 import { remoteSyncAllowed } from '../lib/environment'
 import { getYandexToken } from '../lib/yandex'
+import { StartStoryChoice } from '../components/StartStoryChoice'
+import { NewStoryImport } from '../components/NewStoryImport'
+import type { ImportedBook } from '../lib/importer'
 
 export function Welcome({ onCreated, sync }: { onCreated: (id: string, view: 'text' | 'board') => void; sync: SyncStatus }) {
   const [cloud, setCloud] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [choosing, setChoosing] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
 
   // No name asked: the page opens at once, the name can come later (or from the first phrase).
-  const create = async (file?: File) => {
+  const create = async (view: 'text' | 'board', file?: File, book?: ImportedBook) => {
     setBusy(true)
-    const id = await createStory({ file })
-    setBusy(false)
-    onCreated(id, file ? 'board' : 'text')
+    try {
+      const id = await createStory({ file, book })
+      onCreated(id, file ? 'text' : view)
+    } catch (error) {
+      toast(`Не удалось создать историю: ${error instanceof Error ? error.message : error}`)
+    } finally {
+      setBusy(false)
+    }
   }
 
   return (
@@ -33,10 +43,10 @@ export function Welcome({ onCreated, sync }: { onCreated: (id: string, view: 'te
         </p>
         <div className="stack">
           <div className="row">
-            <button className="btn primary" disabled={busy} onClick={() => void create()}>
+            <button className="btn primary" disabled={busy} onClick={() => setChoosing(true)}>
               Начать историю
             </button>
-            <FilePick className="btn" accept=".docx,.txt,.md,.html,.htm" onFile={(f) => void create(f)}>
+            <FilePick className="btn" accept=".docx,.txt,.md,.html,.htm" onFile={setImportFile}>
               Импортировать .docx / .txt
             </FilePick>
           </div>
@@ -74,6 +84,21 @@ export function Welcome({ onCreated, sync }: { onCreated: (id: string, view: 'te
           )}
         </div>
       </div>
+      {choosing && (
+        <StartStoryChoice
+          busy={busy}
+          onClose={() => setChoosing(false)}
+          onChoose={(view) => void create(view)}
+        />
+      )}
+      {importFile && (
+        <NewStoryImport
+          file={importFile}
+          busy={busy}
+          onClose={() => setImportFile(null)}
+          onConfirm={(book) => void create('text', importFile, book).finally(() => setImportFile(null))}
+        />
+      )}
     </div>
   )
 }

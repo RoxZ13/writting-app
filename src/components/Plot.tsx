@@ -52,10 +52,13 @@ export function Arc({ scenes, isNode }: { scenes: Scene[]; isNode: (s: Scene) =>
 const ESSENCE_KEY = 'manuscript.essence'
 
 /** What the story is about, how it ends and what drives it — kept in sight above the board. */
-export function Essence({ project, embedded }: { project: Project; embedded?: boolean }) {
+export function Essence({ project, embedded, autoOpen }: { project: Project; embedded?: boolean; autoOpen?: boolean }) {
   const filled = !!(project.premise || project.ending || project.drive)
   const [open, setOpenState] = useState(() => {
-    if (embedded && !filled) return true
+    // A blank premise deserves the whole canvas only at the very beginning. Once
+    // there is a manuscript, opening «Книга» should show the book instead of a
+    // form the author deliberately skipped.
+    if (embedded && autoOpen && !filled) return true
     try {
       return localStorage.getItem(ESSENCE_KEY) === '1'
     } catch {

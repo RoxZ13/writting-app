@@ -11,6 +11,9 @@ import { BookCover, CoverPicker } from '../components/BookCover'
 import { useCover } from '../lib/cover'
 import { DateChip } from '../components/DateChip'
 import { Icon } from '../components/Icon'
+import { StartStoryChoice } from '../components/StartStoryChoice'
+import { NewStoryImport } from '../components/NewStoryImport'
+import type { ImportedBook } from '../lib/importer'
 
 /** All stories side by side — authors rarely write just one. */
 export function LibraryView({
@@ -23,12 +26,15 @@ export function LibraryView({
   onOpen: (id: string, view?: 'text' | 'board') => void
 }) {
   const [busy, setBusy] = useState(false)
-  // A new story opens on its text — an imported one too: the author came to keep writing, not to sort cards.
-  const create = async (file?: File) => {
+  const [choosing, setChoosing] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const create = async (view: 'text' | 'board', file?: File, book?: ImportedBook) => {
     setBusy(true)
     try {
-      const id = await createStory({ file })
-      onOpen(id, 'text')
+      const id = await createStory({ file, book })
+      onOpen(id, file ? 'text' : view)
+    } catch (error) {
+      toast(`Не удалось создать историю: ${error instanceof Error ? error.message : error}`)
     } finally {
       setBusy(false)
     }
@@ -46,6 +52,13 @@ export function LibraryView({
     for (const s of scenes) if (by[s.projectId]) (by[s.projectId].words += s.wordCount), by[s.projectId].scenes++
     return by
   }, [projects.map((p) => p.id).join()])
+  const groups = [...projects.reduce((all, project) => {
+    const key = project.workId ?? project.id
+    const group = all.get(key) ?? []
+    group.push(project)
+    all.set(key, group)
+    return all
+  }, new Map<string, Project[]>()).entries()]
 
   return (
     <div className="lib-page">
@@ -53,19 +66,47 @@ export function LibraryView({
         <div style={{ marginRight: 'auto' }}>
           <h1>Истории</h1>
         </div>
-        <FilePick className="btn" accept=".docx,.txt,.md,.html,.htm" onFile={(f) => void create(f)}>
+        <FilePick className="btn" accept=".docx,.txt,.md,.html,.htm" onFile={setImportFile}>
           {busy ? 'Раскладываю…' : 'Импорт .docx / .txt'}
         </FilePick>
-        <button className="btn primary big-pill" disabled={busy} onClick={() => void create()}>
+        <button className="btn primary big-pill" disabled={busy} onClick={() => setChoosing(true)}>
           + Новая история
         </button>
       </div>
 
       <div className="library">
-        {projects.map((p) => (
-          <StoryCard key={p.id} p={p} current={p.id === currentId} stats={stats?.[p.id]} onOpen={() => onOpen(p.id)} />
+        {groups.map(([workId, editions]) => editions.length === 1 ? (
+          <StoryCard key={editions[0].id} p={editions[0]} current={editions[0].id === currentId} stats={stats?.[editions[0].id]} onOpen={(view) => onOpen(editions[0].id, view)} />
+        ) : (
+          <section className="story-group" key={workId}>
+            <div className="story-group-head">
+              <strong>{editions[0].title.replace(/ — редакция \d+$/, '')}</strong>
+              <span className="small muted">{editions.length} редакции</span>
+            </div>
+            <div className="story-group-grid">
+              {[...editions].sort((a, b) => (b.editionNumber ?? 1) - (a.editionNumber ?? 1)).map((p) => (
+                <StoryCard key={p.id} p={p} current={p.id === currentId} stats={stats?.[p.id]} onOpen={(view) => onOpen(p.id, view)} />
+              ))}
+            </div>
+          </section>
         ))}
       </div>
+
+      {choosing && (
+        <StartStoryChoice
+          busy={busy}
+          onClose={() => setChoosing(false)}
+          onChoose={(view) => void create(view)}
+        />
+      )}
+      {importFile && (
+        <NewStoryImport
+          file={importFile}
+          busy={busy}
+          onClose={() => setImportFile(null)}
+          onConfirm={(book) => void create('text', importFile, book).finally(() => setImportFile(null))}
+        />
+      )}
 
     </div>
   )
@@ -80,17 +121,17 @@ function StoryCard({
   p: Project
   current: boolean
   stats?: { words: number; scenes: number; chapters: number; written: number; total: number; of: string }
-  onOpen: () => void
+  onOpen: (view?: 'text' | 'board') => void
 }) {
   const dl = deadlineText(p.deadline)
   const color = p.color ?? '#0b0b0c'
   const cover = useCover(p.id)
   return (
     <article className={`story ${current ? 'current' : ''}`}>
-      <BookCover project={p} onClick={onOpen} />
+      <BookCover project={p} onClick={() => onOpen()} />
       <div className="story-body">
         <div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}>
-          <strong className="story-title" onClick={onOpen}>
+          <strong className="story-title" onClick={() => onOpen()}>
             {p.title}
           </strong>
           <details className="menu">
@@ -147,7 +188,7 @@ function StoryCard({
           {timeAgo(p.updatedAt)}
         </div>
         {dl && <div className={`deadline ${dl.late ? 'late' : ''}`}><Icon name="clock" size={13} /> {dl.text}</div>}
-        <button className="btn sm" style={{ alignSelf: 'flex-start', marginTop: 6 }} onClick={onOpen}>
+        <button className="btn sm" style={{ alignSelf: 'flex-start', marginTop: 6 }} onClick={() => onOpen('text')}>
           Продолжить
         </button>
       </div>

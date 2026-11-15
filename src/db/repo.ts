@@ -83,8 +83,35 @@ export function notifyChange() {
 
 export const alive = <T extends Base>(rows: T[]) => rows.filter((r) => !r.deleted)
 
+/**
+ * Hard-remove a project that never finished being created. This is deliberately
+ * different from the user's recoverable «Удалить»: failed imports/editions must
+ * not leave half a book, orphaned texts or sync jobs behind.
+ */
+export async function discardIncompleteProject(projectId: string): Promise<void> {
+  const rows: { table: SyncedTable; ids: string[] }[] = [
+    { table: 'chapters', ids: (await db.chapters.where('projectId').equals(projectId).primaryKeys()) as string[] },
+    { table: 'scenes', ids: (await db.scenes.where('projectId').equals(projectId).primaryKeys()) as string[] },
+    { table: 'texts', ids: (await db.texts.where('projectId').equals(projectId).primaryKeys()) as string[] },
+    { table: 'markers', ids: (await db.markers.where('projectId').equals(projectId).primaryKeys()) as string[] },
+    { table: 'notes', ids: (await db.notes.where('projectId').equals(projectId).primaryKeys()) as string[] },
+    { table: 'lines', ids: (await db.lines.where('projectId').equals(projectId).primaryKeys()) as string[] },
+    { table: 'characters', ids: (await db.characters.where('projectId').equals(projectId).primaryKeys()) as string[] },
+    { table: 'conflicts', ids: (await db.conflicts.where('projectId').equals(projectId).primaryKeys()) as string[] },
+    // projectId is not an index on snapshots in old databases.
+    { table: 'snapshots', ids: (await db.snapshots.toArray()).filter((row) => row.projectId === projectId).map((row) => row.id) },
+  ]
+  for (const { table, ids } of rows) {
+    if (ids.length) await db.table(table).bulkDelete(ids)
+    await db.outbox.bulkDelete(ids.map((id) => `${table}:${id}`))
+  }
+  await db.projects.delete(projectId)
+  await db.outbox.delete(`projects:${projectId}`)
+  notifyChange()
+}
+
 /** Keep multi-record domain operations all-or-nothing, including their outbox and revision writes. */
-function atomic<T>(tables: SyncedTable[], action: () => Promise<T>): Promise<T> {
+export function atomic<T>(tables: SyncedTable[], action: () => Promise<T>): Promise<T> {
   return db.transaction('rw', [...tables.map((table) => db.table(table)), db.outbox, db.meta], action)
 }
 

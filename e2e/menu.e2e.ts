@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 test('the «⋯» menu closes on a tap outside it', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Начать историю' }).click()
+  await page.getByRole('button', { name: 'Начать с фразы' }).click()
   const ed = page.locator('.ProseMirror')
   await ed.click()
   await page.keyboard.type('Абзац один. Абзац один. Абзац один.')

@@ -28,6 +28,8 @@ describe('new edition', () => {
     await patch<Scene>('scenes', a.id, { wordCount: 2 })
 
     const { projectId } = await newEdition(p.id)
+    const edition = (await db.projects.get(projectId))!
+    expect(edition).toMatchObject({ workId: p.id, previousEditionId: p.id, editionNumber: 2 })
     const scenes = alive(await db.scenes.where('projectId').equals(projectId).toArray())
     const lines = alive(await db.lines.where('projectId').equals(projectId).toArray())
     const ball = scenes.find((s) => s.title === 'Бал')!

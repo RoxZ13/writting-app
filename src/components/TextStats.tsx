@@ -2,7 +2,8 @@ import type { Editor } from '@tiptap/react'
 import { useEffect, useState } from 'react'
 import type { Project, Scene } from '../db/db'
 import { budgetState, sceneBudget } from '../lib/budget'
-import { lengthText } from '../lib/length'
+import { hasNorm, lengthText } from '../lib/length'
+import { platformOf } from '../lib/platforms'
 import { formatChars, formatSheets, formatWords, formatWordsPlus, textStats } from '../lib/text'
 
 /**
@@ -59,9 +60,10 @@ export function TextStats({
   const bs = sb ? budgetState(scene.chars, sb.budget) : null
   const percent = bs ? Math.round(bs.ratio * 100) : 0
   const spent = bs && bs.state === 'over' && !selecting ? ` · +${lengthText(project, bs.over)}` : ''
+  const touchVisible = !!bs || hasNorm(project) || platformOf(project).selected
 
   return (
-    <div className={`text-stats${bs ? ' has-ring' : ''}`}>
+    <div className={`text-stats${bs ? ' has-ring' : ''}${touchVisible ? ' touch-visible' : ''}`}>
       {open && (
         <>
           <div className="typo-back" onClick={() => setOpen(false)} />

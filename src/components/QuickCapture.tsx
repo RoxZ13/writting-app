@@ -66,7 +66,7 @@ export function QuickCapture({ data, onClose }: { data: ProjectData; onClose: ()
       }
       const n = await createNote(t, kind, data.project.id, withPeople ? undefined : scene)
       if (withPeople && who.length) await patch<Note>('notes', n.id, { characterIds: who })
-      toast(withPeople && who.length ? 'Сохранено — всплывёт в главах с этими героями' : 'Сохранено во «Входящие»')
+      toast(withPeople && who.length ? 'Сохранено — всплывёт в главах с этими героями' : 'Сохранено в «Заметки»')
     }
     onClose()
   }

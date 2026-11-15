@@ -3,7 +3,7 @@ import { patch } from '../db/repo'
 import type { ProjectData } from '../lib/hooks'
 import { bank, dayKey, pace, totalWords } from '../lib/pace'
 import { formatWords } from '../lib/text'
-import { PLATFORMS, platformOf } from '../lib/platforms'
+import { PLATFORMS, platformOf, type PlatformId, type PlatformUnit } from '../lib/platforms'
 import { toast } from '../lib/ui'
 import { bookCharsPerWord, chapterLength, hasNorm, lengthText, normText, PAGE, pageSize, sumChars } from '../lib/length'
 import { useState } from 'react'
@@ -141,6 +141,7 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
   const daysLeft = due ? Math.ceil((due.getTime() - Date.now()) / DAY) : undefined
   const link = ficbookLink(p)
   const site = platformOf(p)
+  if (!site.selected) return null
   const copyLabel = site.for ? `Скопировать ${site.for}` : 'Скопировать главу'
 
   return (
@@ -184,16 +185,6 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
       <details>
         <summary className="small">Все главы и план выкладки</summary>
         <div className="stack" style={{ gap: 12, marginTop: 10 }}>
-          <div className="typo-row">
-            <span className="typo-label">Площадка</span>
-            <div className="seg">
-              {PLATFORMS.map((x) => (
-                <button key={x.id} aria-pressed={site.id === x.id} onClick={() => void patch<Project>('projects', p.id, { platform: x.id })}>
-                  {x.name}
-                </button>
-              ))}
-            </div>
-          </div>
           <label className="row" style={{ gap: 10 }}>
             <span className="small">Новая глава каждые</span>
             <NumberField value={p.publishEvery} placeholder="7" onSave={(publishEvery) => void patch<Project>('projects', p.id, { publishEvery })} />
@@ -205,8 +196,10 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
               key={site.id}
               className="input"
               placeholder={site.url}
-              defaultValue={p.ficbookUrl ?? link ?? ''}
-              onBlur={(e) => void patch<Project>('projects', p.id, { ficbookUrl: e.target.value.trim() || undefined })}
+              defaultValue={p.platformUrl ?? p.ficbookUrl ?? link ?? ''}
+              onBlur={(e) => void patch<Project>('projects', p.id, site.id === 'other'
+                ? { platformUrl: e.target.value.trim() || undefined }
+                : { ficbookUrl: e.target.value.trim() || undefined })}
             />
           </label>
         </div>
@@ -236,6 +229,67 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
         </div>
       </details>
     </section>
+  )
+}
+
+/** Publishing is opt-in: choosing a site is the moment platform-specific tools appear. */
+export function PublishingSetup({ project }: { project: Project }) {
+  const site = platformOf(project)
+  const select = (id: PlatformId) => {
+    const next = PLATFORMS.find((item) => item.id === id)
+    const changes: Partial<Project> = { platform: id, stage: project.stage === 'idea' ? 'writing' : project.stage }
+    // Recommendations fill an empty chapter norm once; changing a site never
+    // overwrites a limit the author set deliberately.
+    if (next?.recommended && !hasNorm(project)) {
+      const range = next.recommended
+      const cpw = bookCharsPerWord()
+      const chars = (value?: number) => value ? Math.round(range.unit === 'words' ? value * cpw : value) : undefined
+      changes.lengthUnit = range.unit === 'words' ? 'words' : 'chars'
+      changes.chapterMin = chars(range.min)
+      changes.chapterMax = chars(range.max ?? range.target)
+    }
+    void patch<Project>('projects', project.id, changes)
+  }
+  return (
+    <div className="publish-setup">
+      <div className="publish-platforms" role="group" aria-label="Площадка публикации">
+        {PLATFORMS.map((item) => (
+          <button key={item.id} className="btn sm" aria-pressed={site.selected && site.id === item.id} onClick={() => select(item.id)}>
+            {item.name}
+          </button>
+        ))}
+      </div>
+      {site.selected && site.id === 'other' && (
+        <div className="publish-custom-fields">
+          <label>
+            <span className="field-label">Название площадки</span>
+            <input className="input" defaultValue={project.platformName ?? ''} placeholder="Например, Telegram" onBlur={(event) => void patch<Project>('projects', project.id, { platformName: event.target.value.trim() || undefined })} />
+          </label>
+          <label>
+            <span className="field-label">Считать</span>
+            <select className="input" value={project.platformUnit ?? 'chars'} onChange={(event) => void patch<Project>('projects', project.id, { platformUnit: event.target.value as PlatformUnit })}>
+              <option value="chars">знаки</option>
+              <option value="words">слова</option>
+            </select>
+          </label>
+          <label>
+            <span className="field-label">Максимум</span>
+            <NumberField value={project.platformMax} placeholder="необязательно" onSave={(platformMax) => void patch<Project>('projects', project.id, { platformMax })} />
+          </label>
+        </div>
+      )}
+      {site.selected && (
+        <button className="link small muted" onClick={() => void patch<Project>('projects', project.id, {
+          platform: undefined,
+          platformName: undefined,
+          platformUnit: undefined,
+          platformMax: undefined,
+          platformUrl: undefined,
+        })}>
+          Не готовлю к публикации
+        </button>
+      )}
+    </div>
   )
 }
 

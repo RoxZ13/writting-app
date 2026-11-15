@@ -12,6 +12,12 @@ async function openText(page: Page) {
   await expect(page.locator('.ProseMirror')).toBeVisible()
 }
 
+async function openLengthNorm(page: Page) {
+  const plan = page.locator('.book-section-list > details').first()
+  if (!(await plan.evaluate((element) => element.hasAttribute('open')))) await plan.locator('summary').click()
+  await plan.getByRole('button', { name: /\+ длина главы|изменить/ }).click()
+}
+
 /** In «Об истории», with «+ длина главы» open: the unit «знаки» and the upper bound. */
 async function setNorm(page: Page, max: number) {
   const unit = page.getByRole('button', { name: 'знаки', exact: true })
@@ -43,7 +49,7 @@ test.describe('scene budget ring', () => {
 
     // «Об истории»: a norm of 300 characters and the toggle.
     await page.evaluate(() => (location.hash = '#/book'))
-    await page.getByRole('button', { name: '+ длина главы' }).click()
+    await openLengthNorm(page)
     await setNorm(page, 300)
     await expect(page.getByLabel('Кольцо объёма у счётчика сцены')).not.toBeChecked()
     await page.getByLabel('Кольцо объёма у счётчика сцены').click()
@@ -76,7 +82,7 @@ test.describe('scene budget ring', () => {
     // Turning it off removes the ring again.
     await page.keyboard.press('Escape')
     await page.evaluate(() => (location.hash = '#/book'))
-    await page.getByRole('button', { name: 'изменить' }).click()
+    await openLengthNorm(page)
     await page.getByLabel('Кольцо объёма у счётчика сцены').click()
     await openText(page)
     await expect(ring(page)).toHaveCount(0)
@@ -87,7 +93,7 @@ test.describe('scene budget ring', () => {
     await startStory(page)
     await typeInEditor(page, 'Слово ')
     await page.evaluate(() => (location.hash = '#/book'))
-    await page.getByRole('button', { name: '+ длина главы' }).click()
+    await openLengthNorm(page)
     await page.getByRole('button', { name: 'Author.Today · 15–40 тыс. знаков' }).click()
     const fields = page.locator('.length-norm .num-input')
     await expect(fields.nth(0)).toHaveValue('15000')
@@ -102,7 +108,7 @@ test.describe('scene budget ring', () => {
     await startStory(page)
     await typeInEditor(page, 'Слово '.repeat(5))
     await page.evaluate(() => (location.hash = '#/book'))
-    await page.getByRole('button', { name: '+ длина главы' }).click()
+    await openLengthNorm(page)
     await setNorm(page, 300)
     await page.getByLabel('Кольцо объёма у счётчика сцены').click()
     await openText(page)
@@ -138,7 +144,7 @@ test('screenshots in every theme', async ({ page }, info) => {
   await startStory(page)
   await typeInEditor(page, 'Слово '.repeat(5))
   await page.evaluate(() => (location.hash = '#/book'))
-  await page.getByRole('button', { name: '+ длина главы' }).click()
+  await openLengthNorm(page)
   await setNorm(page, 300)
   await page.getByLabel('Кольцо объёма у счётчика сцены').click()
   await waitSaveTick(page).catch(() => {})

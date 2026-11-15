@@ -85,12 +85,16 @@ test.describe('a Ficbook export of ~110 scenes', () => {
     await page.goto('/')
     await expect(page.getByRole('button', { name: 'Начать историю' })).toBeVisible()
     const t0 = Date.now()
-    // NOTE: the welcome screen has no preview step — the file is imported at once (see audit/e2e-volume.md).
+    // The same structural preview is used on the welcome screen and in the library.
     await page.locator(WELCOME_IMPORT).setInputFiles(asFile('ficbook-export.txt', book.text))
+    await page.getByRole('dialog', { name: 'Импорт истории' }).getByRole('button', { name: 'Импортировать' }).click()
+    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 180_000 })
+    const textMs = Date.now() - t0
+    await page.goto('/#/board')
     await expect(page.locator(DESKTOP_COLUMNS)).toHaveCount(17, { timeout: 180_000 })
     const boardMs = Date.now() - t0
-    log(`welcome import -> board with 17 columns: ${boardMs} ms`)
-    perf({ test: 'welcome-import-120k', project: 'desktop', fileToBoardMs: boardMs, words: book.totalWords, scenes: book.sceneCount })
+    log(`welcome import -> last scene: ${textMs} ms; board with 17 columns: ${boardMs} ms`)
+    perf({ test: 'welcome-import-120k', project: 'desktop', fileToTextMs: textMs, fileToBoardMs: boardMs, words: book.totalWords, scenes: book.sceneCount })
 
     // give the first-open maintenance (recount words/chars, tidy) time to finish before reading the DB
     await page.waitForTimeout(3000)
@@ -123,6 +127,7 @@ test.describe('a Ficbook export of ~110 scenes', () => {
   test('a2. the same book through "Добавить текст": preview shows 17 parts, then confirm', async () => {
     await page.goto('/#/library')
     await page.getByRole('button', { name: '+ Новая история' }).click()
+    await page.getByRole('button', { name: 'Начать с фразы' }).click()
     await expect(page.locator('.ProseMirror')).toBeVisible()
     await page.goto('/#/book')
     await page.locator('summary', { hasText: 'Файлы и версии' }).click()
@@ -135,6 +140,8 @@ test.describe('a Ficbook export of ~110 scenes', () => {
 
     const t0 = Date.now()
     await page.getByRole('button', { name: 'Импортировать', exact: true }).click()
+    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 180_000 })
+    await page.goto('/#/board')
     // the new story already has its starter chapter, so 17 + 1
     await expect(page.locator(DESKTOP_COLUMNS)).toHaveCount(18, { timeout: 180_000 })
     const ms = Date.now() - t0
@@ -159,7 +166,7 @@ test.describe('a Ficbook export of ~110 scenes', () => {
     await page.goto('/#/book')
     await page.locator('summary', { hasText: 'Файлы и версии' }).click()
     const t0 = Date.now()
-    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 120_000 }), page.getByRole('button', { name: 'Вся история в Word (.docx)' }).click()])
+    const [download] = await Promise.all([page.waitForEvent('download', { timeout: 120_000 }), page.getByRole('button', { name: 'Скачать Word-копию (.docx)' }).click()])
     const path = await download.path()
     docx = readFileSync(path)
     log(`docx export: ${download.suggestedFilename()}, ${Math.round(docx.length / 1024)} KB, ${Date.now() - t0} ms`)
@@ -173,6 +180,7 @@ test.describe('a Ficbook export of ~110 scenes', () => {
       mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       buffer: docx,
     })
+    await page.getByRole('dialog', { name: 'Импорт истории' }).getByRole('button', { name: 'Импортировать' }).click()
     await expect.poll(async () => (await dumpDb(page, null, '')).projects.length, { timeout: 180_000 }).toBe(before + 1)
     await page.waitForTimeout(3000)
     const back = await dumpDb(page, null, book.commentMarker)
@@ -289,6 +297,9 @@ for (const rate of [1, 4]) {
     const t0 = Date.now()
     const l0 = await nowInPage(page)
     await page.locator(WELCOME_IMPORT).setInputFiles(asFile('many.txt', book.text))
+    await page.getByRole('dialog', { name: 'Импорт истории' }).getByRole('button', { name: 'Импортировать' }).click()
+    await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 600_000 })
+    await page.goto('/#/board')
     await (phone ? expect(page.locator('.tl-chapter')).toHaveCount(18, { timeout: 600_000 }) : expect(page.locator(DESKTOP_COLUMNS)).toHaveCount(17, { timeout: 600_000 }))
     result.importToBoardMs = Date.now() - t0
     result.importLongTasks = await longTasksSince(page, l0)

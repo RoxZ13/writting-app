@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { db, type Project } from '../db/db'
+import type { Table } from 'dexie'
+import type { Base } from '../db/db'
+import { db, type Chapter, type Note, type OutboxEntry, type Project, type Scene, type SceneText } from '../db/db'
 import { alive, createChapter, createNote, createScene, patch, save } from '../db/repo'
 import {
   parseBook,
@@ -12,34 +14,111 @@ import {
 import { formatWords } from '../lib/text'
 import { FilePick, toast } from '../lib/ui'
 
-export async function importBook(projectId: string, book: ImportedBook) {
-  const project = await db.projects.get(projectId)
-  if (project && book.preface) {
-    if (!project.description) await save<Project>('projects', { ...project, description: book.preface })
-    // The project already has its own description: do not drop the file's header, keep it as a note.
-    else await createNote(`Шапка из файла:\n${book.preface}`, 'note', projectId)
-  }
-  return importChapters(projectId, book.chapters)
+export interface ImportResult {
+  firstSceneId?: string
+  lastSceneId?: string
+  chapterIds: string[]
+  sceneIds: string[]
 }
 
-export async function importChapters(projectId: string, chapters: ImportedBook['chapters']) {
+interface ImportState {
+  project?: Project
+  chapters: Chapter[]
+  scenes: Scene[]
+  texts: SceneText[]
+  notes: Note[]
+  outbox: OutboxEntry[]
+}
+
+async function captureImportState(projectId: string): Promise<ImportState> {
+  const [project, chapters, scenes, texts, notes, outbox] = await Promise.all([
+    db.projects.get(projectId),
+    db.chapters.where('projectId').equals(projectId).toArray(),
+    db.scenes.where('projectId').equals(projectId).toArray(),
+    db.texts.where('projectId').equals(projectId).toArray(),
+    db.notes.where('projectId').equals(projectId).toArray(),
+    db.outbox.toArray(),
+  ])
+  return { project, chapters, scenes, texts, notes, outbox }
+}
+
+/** Restore the exact pre-import rows if reading or storage fails halfway through. */
+async function restoreImportState(projectId: string, before: ImportState): Promise<void> {
+  const current = await captureImportState(projectId)
+  const groups = [
+    ['chapters', db.chapters, before.chapters, current.chapters],
+    ['scenes', db.scenes, before.scenes, current.scenes],
+    ['texts', db.texts, before.texts, current.texts],
+    ['notes', db.notes, before.notes, current.notes],
+  ] as const
+  const touchedOutbox = new Set<string>([`projects:${projectId}`])
+  for (const [name, table, oldRows, currentRows] of groups) {
+    const ids = new Set([...oldRows, ...currentRows].map((row) => row.id))
+    ids.forEach((id) => touchedOutbox.add(`${name}:${id}`))
+    const target = table as Table<Base, string>
+    if (currentRows.length) await target.bulkDelete(currentRows.map((row) => row.id))
+    if (oldRows.length) await target.bulkPut(oldRows as Base[])
+  }
+  if (before.project) await db.projects.put(before.project)
+  else await db.projects.delete(projectId)
+  await db.outbox.bulkDelete([...touchedOutbox])
+  const oldJobs = before.outbox.filter((entry) => touchedOutbox.has(entry.key))
+  if (oldJobs.length) await db.outbox.bulkPut(oldJobs)
+}
+
+async function rollbackImport<T>(projectId: string, action: () => Promise<T>): Promise<T> {
+  const before = await captureImportState(projectId)
+  try {
+    return await action()
+  } catch (error) {
+    await restoreImportState(projectId, before).catch(() => {})
+    throw error
+  }
+}
+
+async function writeImportedChapters(projectId: string, chapters: ImportedBook['chapters']): Promise<ImportResult> {
   const existing = alive(await db.chapters.where('projectId').equals(projectId).toArray())
   let order = existing.length ? Math.max(...existing.map((c) => c.order)) + 1 : 0
   let firstScene: string | undefined
+  let lastImportedScene: string | undefined
+  const chapterIds: string[] = []
+  const sceneIds: string[] = []
   for (const ch of chapters) {
     const chapter = await createChapter(projectId, ch.title, order++)
+    chapterIds.push(chapter.id)
     let lastScene: string | undefined
     for (const sc of ch.scenes) {
       const scene = await createScene(projectId, chapter.id, sc.title, { status: 'written', excerpt: sc.excerpt, epigraph: sc.epigraph }, sc.doc, sc.wordCount)
       firstScene ??= scene.id
       lastScene = scene.id
+      lastImportedScene = scene.id
+      sceneIds.push(scene.id)
     }
     // The author's note to readers is not prose: it hangs on the part's last scene as a note.
     if (ch.comment) await createNote(`Комментарий к части «${ch.title}»:\n${ch.comment}`, 'note', projectId, lastScene)
   }
   // Written chapters came in: the board asks once whether to fix them in place.
   if (chapters.length > 1) await patch<Project>('projects', projectId, { lockAsked: false })
-  return firstScene
+  return { firstSceneId: firstScene, lastSceneId: lastImportedScene, chapterIds, sceneIds }
+}
+
+export async function importBook(projectId: string, book: ImportedBook): Promise<ImportResult> {
+  return rollbackImport(projectId, async () => {
+    const project = await db.projects.get(projectId)
+    if (project && book.preface) {
+      if (!project.description) await save<Project>('projects', { ...project, description: book.preface })
+      // The project already has its own description: do not drop the file's header, keep it as a note.
+      else await createNote(`Шапка из файла:\n${book.preface}`, 'note', projectId)
+    }
+    const result = await writeImportedChapters(projectId, book.chapters)
+    // Continue an imported manuscript where its text actually ends, not at its first scene.
+    if (project && result.lastSceneId) await patch<Project>('projects', projectId, { lastSceneId: result.lastSceneId })
+    return result
+  })
+}
+
+export async function importChapters(projectId: string, chapters: ImportedBook['chapters']): Promise<ImportResult> {
+  return rollbackImport(projectId, () => writeImportedChapters(projectId, chapters))
 }
 
 /** Import from .docx / .txt / pasted text, with a preview before anything is written. */
@@ -77,13 +156,18 @@ export function ImportPanel({ projectId, onDone }: { projectId: string; onDone?:
   const confirm = async () => {
     if (!book) return
     setBusy(true)
-    const first = await importBook(projectId, book)
-    setBusy(false)
-    toast('Текст импортирован')
-    setBook(null)
-    setPasted('')
-    setPastedHtml(null)
-    onDone?.(first)
+    try {
+      const result = await importBook(projectId, book)
+      toast('Текст импортирован')
+      setBook(null)
+      setPasted('')
+      setPastedHtml(null)
+      onDone?.(result.lastSceneId)
+    } catch (cause) {
+      setError(`Импорт не завершён, история не изменилась: ${cause instanceof Error ? cause.message : cause}`)
+    } finally {
+      setBusy(false)
+    }
   }
 
   if (preview) {
@@ -116,6 +200,7 @@ export function ImportPanel({ projectId, onDone }: { projectId: string; onDone?:
             Назад
           </button>
         </div>
+        {error && <div className="small" style={{ color: 'var(--danger-ink)' }}>{error}</div>}
       </div>
     )
   }

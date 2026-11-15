@@ -10,14 +10,14 @@ test.setTimeout(45_000)
  */
 const knownBug = (note: string) => test.fail(!process.env.E2E_SHOW_BUGS, note)
 
-/** Open a top-level tab (Текст / Доска / Герои) — they are plain buttons in the header on both layouts. */
-const openTab = (page: Page, name: 'Текст' | 'Доска') => page.locator('.tabs > button', { hasText: name }).first().click()
+/** Open the visible top-level navigation (header on desktop, bottom bar on a phone). */
+const openTab = (page: Page, name: 'Текст' | 'Доска') => page.locator('.tabs:visible > button').filter({ hasText: name }).click()
 
 const board = (page: Page) => openTab(page, 'Доска')
 
 /** Add a scene with the one-line input of the first chapter on the board (desktop column / phone timeline). */
 async function addSceneOnBoard(page: Page, title: string, nth = 0) {
-  const input = page.getByPlaceholder('+ сцена: кратко, что происходит').nth(nth)
+  const input = page.getByPlaceholder(/Новая сцена|\+ сцена: кратко, что происходит/).nth(nth)
   await input.click()
   await page.keyboard.type(title)
   await page.keyboard.press('Enter')
@@ -321,20 +321,26 @@ test.describe('7. find and replace', () => {
 })
 
 // ---------------------------------------------------------------------------------------------
-/** Library: click the story name in the header («Все истории»). */
+/** Library: the logo on desktop, or the book menu on a phone. */
 const toLibrary = async (page: Page) => {
-  await page.locator('.project-name').click()
+  const logo = page.locator('.app-header .logo:visible')
+  if (await logo.count()) await logo.click()
+  else {
+    await page.locator('.project-name-mobile > summary').click()
+    await page.getByRole('button', { name: 'Все истории' }).click()
+  }
   await expect(page.getByRole('heading', { name: 'Истории' })).toBeVisible()
 }
 
 async function newStoryFromLibrary(page: Page) {
   await page.getByRole('button', { name: '+ Новая история' }).click()
+  await page.getByRole('button', { name: 'Начать с фразы' }).click()
   await expect(page.locator('.ProseMirror')).toBeVisible()
 }
 
 async function deleteStoryInLibrary(page: Page, which: string) {
   const card = page.locator(`.story${which}`).first()
-  const actions = card.locator('summary[aria-label="Действия"]')
+  const actions = card.locator('summary[aria-label^="Настроить"]')
   const del = card.getByRole('button', { name: 'Удалить историю' })
   await actions.click()
   // Under load WebKit sometimes misses the first tap on <summary>; a person would simply tap again.
@@ -494,8 +500,8 @@ test.describe('12. restoring a version updates the counters (B-109)', () => {
     await waitSaveTick(page)
     await waitTextInDb(page, v1)
     page.on('dialog', (d) => void d.accept())
-    const openPlan = () => page.locator('.tool', { hasText: 'План' }).click()
-    const closePlan = () => page.getByRole('button', { name: 'Скрыть план', exact: true }).click() // on a phone the plan covers the page
+    const openPlan = () => page.locator('.tool', { hasText: 'О сцене' }).click()
+    const closePlan = () => page.locator('.plan').getByRole('button', { name: 'Скрыть «О сцене»', exact: true }).click() // on a phone the panel covers the page
     const openVersions = () => page.locator('summary', { hasText: 'Ещё: линии, глава, версии' }).click()
     await openPlan()
     await openVersions()

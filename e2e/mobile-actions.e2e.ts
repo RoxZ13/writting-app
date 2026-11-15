@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { aliveRows, startStory } from './helpers'
+import { aliveRows, startStory, waitSaveTick } from './helpers'
 
 const openTab = (page: Page, name: 'Доска' | 'Герои') => page.locator('.tabs-mobile > button', { hasText: name }).click()
 
@@ -156,12 +156,13 @@ test.describe('mobile actions stay reachable', () => {
   test('book parameters no longer occupy a bottom navigation slot', async ({ page }) => {
     await startStory(page)
     await expect(page.locator('.tabs').getByText('История', { exact: true })).toHaveCount(0)
-    await page.locator('.project-name').click()
+    await page.locator('.project-name-mobile > summary').click()
+    await page.getByRole('button', { name: 'О книге' }).click()
     await expect(page.locator('.book-page')).toBeVisible()
     await expect(page.locator('.book-hero')).toBeHidden()
     const premise = page.getByPlaceholder('Суть истории в одной-двух фразах')
     await expect(premise).toBeVisible()
-    await expect(page.locator('.book-section-list > details')).toHaveCount(4)
+    await expect(page.locator('.book-section-list > details')).toHaveCount(5)
     await expect(page.getByText('План', { exact: true })).toBeVisible()
     await premise.fill('Героиня пытается вернуть украденную память')
     await premise.blur()
@@ -171,8 +172,8 @@ test.describe('mobile actions stay reachable', () => {
     await title.fill('Новая книга')
     await title.blur()
     await expect.poll(async () => (await aliveRows<any>(page, 'projects')).some((project) => project.title === 'Новая книга')).toBe(true)
-    await page.locator('.tabs-mobile > button').filter({ hasText: 'Входящие' }).click()
-    await expect(page.getByRole('heading', { name: 'Входящие' })).toBeVisible()
+    await page.locator('.tabs-mobile > button').filter({ hasText: 'Заметки' }).click()
+    await expect(page.getByRole('heading', { name: 'Заметки' })).toBeVisible()
   })
 
   test('the scene list opens only on request as a bottom sheet and controls do not overlap', async ({ page }) => {
@@ -193,6 +194,30 @@ test.describe('mobile actions stay reachable', () => {
 
     await assertNoOverlap(page.locator('.write-top').getByRole('button'))
     await assertNoOverlap(page.locator('.tabs > button'))
+  })
+
+  test('rewriting keeps the new page first and opens the old text as a bottom sheet', async ({ page }) => {
+    const editor = await startStory(page)
+    await editor.fill('Старый текст сцены.')
+    await waitSaveTick(page)
+    await page.locator('.write-top').getByRole('button', { name: 'Ещё' }).click()
+    await page.getByRole('button', { name: 'Переписать' }).click()
+    await page.getByRole('dialog', { name: 'Переписать сцену' }).getByRole('button', { name: 'С чистого листа' }).click()
+
+    await expect(editor).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Было', exact: true })).toBeVisible()
+    await expect(page.locator('.old-text')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Было', exact: true }).click()
+    const old = page.getByRole('dialog', { name: 'Прежний текст сцены' })
+    await expect(old).toContainText('Старый текст сцены')
+    await expect(old.getByRole('button', { name: 'Готово, оставить новый' })).toBeDisabled()
+    const box = await old.boundingBox()
+    expect(box!.y).toBeGreaterThan(150)
+
+    await old.getByRole('button', { name: 'скрыть' }).click()
+    await editor.fill('Новая версия сцены.')
+    await page.getByRole('button', { name: 'Было', exact: true }).click()
+    await expect(old.getByRole('button', { name: 'Готово, оставить новый' })).toBeEnabled()
   })
 })
 

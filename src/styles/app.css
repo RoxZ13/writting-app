@@ -2882,6 +2882,9 @@ main.page {
   font-size: var(--fs-sm);
   font-weight: 500;
 }
+.old-mobile-backdrop {
+  display: none;
+}
 @media (max-width: 760px) {
   .editor-area {
     flex-direction: column;
@@ -2910,6 +2913,52 @@ main.page {
   .modes button {
     padding: 5px 8px;
     font-size: var(--fs-sm);
+  }
+}
+
+/* Mobile rewriting: the new page stays primary; «Было» opens as a sheet. */
+@media (max-width: 760px) {
+  .old-mobile-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: calc(var(--z-modal) - 1);
+    border: 0;
+    background: rgba(0, 0, 0, 0.28);
+  }
+  .old-text {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    z-index: var(--z-modal);
+    max-height: min(72dvh, 680px);
+    margin: 0;
+    border: 0;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    padding: 14px 0 calc(14px + env(safe-area-inset-bottom));
+  }
+  .old-head {
+    padding: 0 16px 10px;
+  }
+  .old-body {
+    padding: 0 18px 18px;
+  }
+  .old-foot {
+    padding: 12px 18px 0;
+  }
+  .old-tab {
+    align-self: flex-start;
+    position: sticky;
+    top: calc(var(--header-h) + 54px);
+    z-index: 2;
+    margin: 8px 16px -42px;
+    background: var(--ink);
+    color: var(--bg);
+    box-shadow: var(--shadow);
   }
 }
 
@@ -3242,6 +3291,23 @@ main.page {
   color: var(--mk-late);
 }
 .library {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 22px;
+}
+.story-group {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+.story-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+.story-group-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   gap: 22px;
@@ -4729,6 +4795,24 @@ main.page {
   width: 150px;
   padding: 4px 8px;
 }
+@media (max-width: 760px) {
+  .publish-next .row {
+    flex-wrap: wrap;
+  }
+  .publish-row {
+    flex-wrap: wrap;
+    padding: 10px 0;
+    border-top: 1px solid var(--line);
+  }
+  .publish-title {
+    flex: 1 0 100%;
+  }
+  .publish-row .input {
+    width: auto;
+    min-width: 0;
+    flex: 1;
+  }
+}
 .column-meta .published {
   color: var(--st-done);
   font-weight: 500;
@@ -5988,7 +6072,8 @@ button.avatar {
     display: none;
   }
   /* The ring is the one reason to keep the counter on a touch screen. */
-  .text-stats.has-ring {
+  .text-stats.has-ring,
+  .text-stats.touch-visible {
     display: block;
   }
 }
@@ -8199,6 +8284,82 @@ button.avatar {
   }
 }
 
+/* First-run and mobile shell: one intent choice, and the book title owns the
+   compact navigation menu when the desktop logo is not present. */
+.project-name-mobile {
+  display: none;
+}
+.start-story-choice {
+  width: min(420px, calc(100vw - 32px));
+}
+.start-story-choice h2 {
+  margin: 0 0 8px;
+}
+.start-story-choice .btn {
+  width: 100%;
+  justify-content: flex-start;
+}
+.new-story-import {
+  width: min(560px, calc(100vw - 32px));
+}
+.new-story-import h2 {
+  margin: 0;
+}
+.import-preview-list {
+  max-height: min(300px, 38dvh);
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+.import-preview-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+}
+.import-preview-list > div + div {
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 760px) {
+  .project-name-desktop {
+    display: none;
+  }
+  .project-name-mobile {
+    display: block;
+    min-width: 0;
+  }
+  .project-name-mobile > summary.project-name {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    max-width: min(62vw, 280px);
+  }
+  .project-name-mobile > summary.project-name::after {
+    content: '⌄';
+    color: var(--ink-3);
+    font-size: var(--fs-xs);
+  }
+  .project-name-mobile[open] > summary.project-name::after {
+    transform: rotate(180deg);
+  }
+  .project-menu-list {
+    top: 38px;
+    right: auto;
+    left: 0;
+    min-width: 190px;
+  }
+  .start-story-choice {
+    align-self: end;
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    border-radius: var(--r-xl) var(--r-xl) 0 0;
+    padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+}
+
 @media (max-width: 760px) {
   .app-header {
     gap: 8px;
@@ -8584,6 +8745,39 @@ button.avatar {
 .book-mobile-identity-fields {
   display: none;
 }
+.publish-setup {
+  display: grid;
+  gap: 14px;
+}
+.publish-platforms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.publish-platforms .btn[aria-pressed='true'] {
+  color: var(--bg);
+  background: var(--ink);
+  border-color: var(--ink);
+}
+.publish-custom-fields {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 140px 140px;
+  gap: 12px;
+}
+.publish-custom-fields label {
+  display: grid;
+  gap: 6px;
+}
+.book-pace-setup {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+.book-pace-setup label {
+  display: grid;
+  gap: 6px;
+}
 .essence-book-editor {
   margin: 0 !important;
   padding: 26px 28px;
@@ -8690,7 +8884,16 @@ button.avatar {
     display: grid;
     gap: 14px;
   }
+  .publish-custom-fields {
+    grid-template-columns: 1fr;
+  }
+  .book-pace-setup {
+    grid-template-columns: 1fr;
+  }
   .book-fold-peek {
     max-width: 46%;
+  }
+  .old-text {
+    max-height: min(72dvh, 680px);
   }
 }

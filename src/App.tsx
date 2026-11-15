@@ -137,6 +137,7 @@ export function App() {
   }, [projectId, route.view])
 
   useEffect(() => {
+    const captureNow = () => setCapture(true)
     const onKey = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.code === 'KeyJ') {
         e.preventDefault()
@@ -147,8 +148,12 @@ export function App() {
         setSearching('')
       }
     }
+    window.addEventListener('manuscript:capture', captureNow)
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('manuscript:capture', captureNow)
+      window.removeEventListener('keydown', onKey)
+    }
   }, [])
 
   if (projects === undefined || (projects.length > 0 && data === undefined)) {
@@ -259,11 +264,20 @@ function AppHeader({ data, route, safety, onSearch }: { data: ProjectData; route
         <div className="crumb">
           <button className="logo" title="Все истории" onClick={() => go({ view: 'library' })}>Manuscript.</button>
           <span className="slash">/</span>
-          <button className="project-name" title="Параметры книги" onClick={() => go({ view: 'book' })}>
+          <button className="project-name project-name-desktop" title="Параметры книги" onClick={() => go({ view: 'book' })}>
             {data.project.title}
             <span className="project-settings-label">Параметры</span>
             <span className="project-settings-icon"><Icon name="settings" size={13} /></span>
           </button>
+          <details className="menu project-name-mobile">
+            <summary className="project-name" aria-label={`Меню книги «${data.project.title}»`}>
+              {data.project.title}
+            </summary>
+            <div className="menu-list card project-menu-list">
+              <button onClick={() => go({ view: 'book' })}>О книге</button>
+              <button onClick={() => go({ view: 'library' })}>Все истории</button>
+            </div>
+          </details>
           <button
             className="data-safety"
             data-state={safety.state}
@@ -303,11 +317,11 @@ function WorkspaceTabs({ className, route, inbox, onSearch }: { className: strin
           </span>
           <span className="tab-label">Поиск</span>
         </button>
-        <button className="tab-aux" aria-current={route.view === 'inbox' ? 'page' : undefined} title="Входящие: быстрые мысли" onClick={() => go({ view: 'inbox' })}>
+        <button className="tab-aux" aria-current={route.view === 'inbox' ? 'page' : undefined} title="Заметки и быстрые мысли" onClick={() => go({ view: 'inbox' })}>
           <span className="tab-ico">
             <Icon name="inbox" />
           </span>
-          <span className="tab-label">Входящие</span>
+          <span className="tab-label">Заметки</span>
           {inbox > 0 && <span className="badge">{inbox}</span>}
         </button>
     </nav>

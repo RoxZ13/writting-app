@@ -864,12 +864,12 @@ function Timeline({
   const poolOpen = open.has('pool')
   return (
     <div className="timeline">
-      {data.pool.scenes.length > 0 && <section className={`tl-chapter pool ${poolOpen ? 'open' : ''}`}>
+      <section className={`tl-chapter pool ${poolOpen ? 'open' : ''} ${data.pool.scenes.length ? '' : 'is-empty'}`}>
         <button className="tl-head" aria-expanded={poolOpen} onClick={() => toggle('pool')}>
           <span className="tl-caret">{poolOpen ? '▾' : '▸'}</span>
-          <span className="tl-title">Пока без места</span>
+          <span className="tl-title">Идеи сцен</span>
           <span className="spacer" />
-          {data.pool.scenes.length > 0 && <span className="tl-meta">{formatScenes(data.pool.scenes.length)}</span>}
+          <span className="tl-meta">{data.pool.scenes.length ? formatScenes(data.pool.scenes.length) : 'без места'}</span>
         </button>
         {poolOpen && (
           <div className="tl-body">
@@ -889,7 +889,7 @@ function Timeline({
             <ThreeParts data={data} />
           </div>
         )}
-      </section>}
+      </section>
       {data.outline.map(({ chapter, scenes }) => {
         const pay = data.markers.filter((m) => !m.resolved && markerPayoffChapter(m, data) === chapter.id)
         const plant = data.markers.filter((m) => !m.resolved && markerSetupChapter(m, data) === chapter.id)

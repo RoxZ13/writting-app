@@ -140,7 +140,7 @@ test.describe('«В запас»', () => {
     await stash(page)
     await waitSaveTick(page)
     await page.evaluate(() => (location.hash = '#/inbox'))
-    await expect(page.getByRole('heading', { name: 'Входящие' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Заметки' })).toBeVisible()
     await page.getByRole('button', { name: /Привязанные к сценам/ }).click()
     await expect(page.locator('.note-item')).toContainText('из сцены «')
     await page.getByRole('button', { name: 'Вернуть в текст' }).click()

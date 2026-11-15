@@ -32,7 +32,7 @@ export function InboxView({ data }: { data: ProjectData }) {
   return (
     <div>
       <div className="toolbar">
-        <h1 style={{ marginRight: 'auto' }}>Входящие</h1>
+        <h1 style={{ marginRight: 'auto' }}>Заметки</h1>
       </div>
 
       <div className="card inbox-capture">
@@ -99,7 +99,7 @@ function NoteRow({ note, data }: { note: Note; data: ProjectData }) {
     if (!scene) return
     await updateBeats(scene.id, (all) => [...all, { id: uid(), text: note.text, done: false }])
     await patch<Note>('notes', note.id, { archived: true })
-    toast('Добавлено в план сцены')
+    toast('Добавлено в пункты сцены')
   }
   const toMarker = async () => {
     await createMarker(data.project.id, { title: note.text, setupSceneId: note.sceneId })
@@ -168,7 +168,7 @@ function NoteRow({ note, data }: { note: Note; data: ProjectData }) {
             <div className="note-detail-actions">
               {scene && (
                 <button className="btn sm" onClick={() => void toBeat()}>
-                  ☑ В план сцены
+                  ☑ В пункты сцены
                 </button>
               )}
               <button className="btn sm" onClick={() => void toMarker()}>

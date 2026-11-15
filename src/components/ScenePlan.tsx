@@ -51,7 +51,7 @@ export function SceneNow({ data, scene, onOpenPlan }: { data: ProjectData; scene
         <div className="pp-now">
           <button className="compass-check" title="Готово — к следующему пункту" onClick={() => tick(next)} />
           <span className="muted">Сейчас:</span>
-          <button className="link-plain pp-now-text" title="Открыть план сцены" onClick={onOpenPlan}>
+          <button className="link-plain pp-now-text" title="Открыть «О сцене»" onClick={onOpenPlan}>
             {next.text}
           </button>
         </div>
@@ -59,7 +59,7 @@ export function SceneNow({ data, scene, onOpenPlan }: { data: ProjectData; scene
         scene.goal && (
           <div className="pp-now">
             <span className="muted">Зачем:</span>
-            <button className="link-plain pp-now-text" title="Открыть план сцены" onClick={onOpenPlan}>
+            <button className="link-plain pp-now-text" title="Открыть «О сцене»" onClick={onOpenPlan}>
               {scene.goal}
             </button>
           </div>
@@ -118,11 +118,11 @@ export function ScenePlan({
   }
 
   return (
-    <section className="plan" aria-label="План сцены">
+    <section className="plan" aria-label="О сцене">
       <div className="plan-head">
-        <span className="eyebrow">План сцены</span>
+        <span className="eyebrow">О сцене</span>
         <span className="spacer" />
-        <button className="icon-btn" aria-label="Скрыть план" title="Скрыть план" onClick={onClose}>
+        <button className="icon-btn" aria-label="Скрыть «О сцене»" title="Скрыть «О сцене»" onClick={onClose}>
           <Icon name="close" size={15} />
         </button>
       </div>

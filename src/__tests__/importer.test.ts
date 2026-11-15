@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { ManuscriptDB, useDatabase, db } from '../db/db'
 import { importBook, importChapters } from '../components/ImportPanel'
 import { blocksToChapters, isChapterTitle, isEpigraph, parseBook, parseTaggedRuns, textToBlocks } from '../lib/importer'
@@ -267,5 +267,31 @@ describe('import into the database: notes', () => {
     expect(notes).toHaveLength(1)
     expect(notes[0]).toMatchObject({ projectId: 'p', kind: 'note', text: 'Шапка из файла:\nНазвание\nФэндом: ГП' })
     expect(notes[0].sceneId).toBeUndefined()
+  })
+
+  it('returns both ends of an import and continues from the last scene', async () => {
+    await fresh()
+    await db.projects.put({ id: 'p', title: 'Книга', updatedAt: 1 } as never)
+    const book = parseBook(textToBlocks('Глава 1\nОдин.\n***\nДва.\nГлава 2\nТри.'))
+    const result = await importBook('p', book)
+    expect(result.sceneIds).toHaveLength(3)
+    expect(result.firstSceneId).toBe(result.sceneIds[0])
+    expect(result.lastSceneId).toBe(result.sceneIds[2])
+    expect((await db.projects.get('p'))?.lastSceneId).toBe(result.lastSceneId)
+  })
+
+  it('does not leave a half-imported outline when storage fails', async () => {
+    await fresh()
+    await db.projects.put({ id: 'p', title: 'Книга', updatedAt: 1 } as never)
+    const original = await db.chapters.put({ id: 'old', projectId: 'p', title: 'Старая глава', order: 0, goal: '', updatedAt: 1 } as never)
+    const book = parseBook(textToBlocks('Глава 1\nОдин.\n***\nДва.'))
+    const failure = vi.spyOn(db.table('texts'), 'put').mockRejectedValueOnce(new Error('disk full'))
+
+    await expect(importBook('p', book)).rejects.toThrow('disk full')
+    failure.mockRestore()
+    expect((await db.chapters.where('projectId').equals('p').toArray()).map((row) => row.id)).toEqual([original])
+    expect(await db.scenes.where('projectId').equals('p').count()).toBe(0)
+    expect(await db.texts.where('projectId').equals('p').count()).toBe(0)
+    expect((await db.projects.get('p'))?.lastSceneId).toBeUndefined()
   })
 })

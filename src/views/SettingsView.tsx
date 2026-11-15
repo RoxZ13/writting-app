@@ -201,7 +201,7 @@ const FIELD_NAMES: Record<string, string> = {
   order: 'Порядок',
   chapterId: 'Глава',
   status: 'Статус',
-  beats: 'План сцены',
+  beats: 'Пункты сцены',
   note: 'Пояснение',
   resolved: 'Состояние',
   archived: 'Архив',

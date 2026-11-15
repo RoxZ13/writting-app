@@ -32,10 +32,20 @@ async function seedStory(page: Page, { extras }: { extras?: boolean } = {}) {
   const book = smallBook()
   await page.goto('/')
   await page.locator(WELCOME_IMPORT).setInputFiles(asFile('small.txt', book.text))
-  await expect(page.locator('.board, .timeline')).toBeVisible({ timeout: 30_000 })
+  await page.getByRole('dialog', { name: 'Импорт истории' }).getByRole('button', { name: 'Импортировать' }).click()
+  await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 30_000 })
+  await page.goto('/#/board')
+  await expect(page.locator('.board, .timeline')).toBeVisible()
   if (extras) {
-    await page.goto('/#/characters')
-    await page.getByRole('button', { name: 'Добавить героя' }).click()
+    // Navigate through the visible mobile/desktop shell after the import has settled.
+    // A direct hash written while the import refresh finishes can be replaced by lastSceneId.
+    await page.waitForTimeout(1_000)
+    const charactersTab = page.locator('.tabs-mobile:visible > button, .tabs-desktop:visible > button').filter({ hasText: 'Герои' })
+    await charactersTab.click()
+    await expect(page.locator('.characters-layout')).toBeVisible()
+    const addHero = page.getByRole('button', { name: 'Добавить героя' })
+    await expect(addHero).toBeVisible()
+    await addHero.click({ force: true })
     await page.getByPlaceholder('Имя нового героя').fill('Ирина')
     await page.keyboard.press('Enter')
     await expect(seen(page, 'Ирина')).toBeVisible()
@@ -150,11 +160,11 @@ const SCREENS: Screen[] = [
     },
   },
   {
-    name: 'Входящие',
+    name: 'Заметки',
     extras: true,
     open: async (page) => {
       await page.goto('/#/inbox')
-      await expect(page.getByRole('heading', { name: 'Входящие' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Заметки' })).toBeVisible()
       await expect(seen(page, 'Проверить, откуда у Глеба ключ')).toBeVisible()
     },
   },

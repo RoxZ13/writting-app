@@ -1,34 +1,41 @@
 import { db } from '../db/db'
-import { alive, createProject, remove, save } from '../db/repo'
+import { alive, createProject, discardIncompleteProject, patch, remove, save } from '../db/repo'
+import type { Project } from '../db/db'
 import { importBook } from '../components/ImportPanel'
-import { parseBook, readFileAsBlocks } from './importer'
+import { parseBook, readFileAsBlocks, type ImportedBook } from './importer'
 
 /** A story created without a name; the first phrase can name it later. */
 export const UNTITLED = 'Без названия'
 
 /** Create a story, optionally from a file (its header gives the title when none is typed). */
-export async function createStory(opts: { title?: string; file?: File; color?: string; deadline?: string; genre?: string }) {
-  const book = opts.file ? parseBook(await readFileAsBlocks(opts.file)) : undefined
+export async function createStory(opts: { title?: string; file?: File; book?: ImportedBook; color?: string; deadline?: string; genre?: string }) {
+  const book = opts.book ?? (opts.file ? parseBook(await readFileAsBlocks(opts.file)) : undefined)
   const name = opts.title?.trim() || book?.title || opts.file?.name.replace(/\.[^.]+$/, '') || UNTITLED
   const project = await createProject(name)
-  if (book) {
-    // Replace the starter chapter with the imported text.
-    for (const c of alive(await db.chapters.where('projectId').equals(project.id).toArray())) {
-      for (const s of await db.scenes.where('chapterId').equals(c.id).toArray()) {
-        await remove('scenes', s.id)
-        await remove('texts', s.id)
+  try {
+    if (book) {
+      // Replace the starter chapter with the imported text.
+      for (const c of alive(await db.chapters.where('projectId').equals(project.id).toArray())) {
+        for (const s of await db.scenes.where('chapterId').equals(c.id).toArray()) {
+          await remove('scenes', s.id)
+          await remove('texts', s.id)
+        }
+        await remove('chapters', c.id)
       }
-      await remove('chapters', c.id)
+      const result = await importBook(project.id, book)
+      // Also clears the starter scene when a valid but empty import produced no scenes.
+      await patch<Project>('projects', project.id, { lastSceneId: result.lastSceneId })
     }
-    const first = await importBook(project.id, book)
-    await save('projects', { ...(await db.projects.get(project.id))!, lastSceneId: first })
+    const fresh = (await db.projects.get(project.id))!
+    // No colour asked for: a quiet one that the other books on the shelf do not use yet.
+    const used = new Set(alive(await db.projects.toArray()).map((p) => p.color))
+    const color = opts.color ?? COVERS.find((c) => !used.has(c)) ?? COVERS[Math.floor(Math.random() * COVERS.length)]
+    await save('projects', { ...fresh, color, deadline: opts.deadline || undefined, genre: opts.genre?.trim() || undefined, stage: book ? 'writing' : 'idea' })
+    return project.id
+  } catch (error) {
+    await discardIncompleteProject(project.id).catch(() => {})
+    throw error
   }
-  const fresh = (await db.projects.get(project.id))!
-  // No colour asked for: a quiet one that the other books on the shelf do not use yet.
-  const used = new Set(alive(await db.projects.toArray()).map((p) => p.color))
-  const color = opts.color ?? COVERS.find((c) => !used.has(c)) ?? COVERS[Math.floor(Math.random() * COVERS.length)]
-  await save('projects', { ...fresh, color, deadline: opts.deadline || undefined, genre: opts.genre?.trim() || undefined, stage: book ? 'writing' : 'idea' })
-  return project.id
 }
 
 /** "через 12 дн. · 15 окт" — calm wording, no alarms. */

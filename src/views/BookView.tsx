@@ -8,7 +8,7 @@ import { BookCover, CoverPicker } from '../components/BookCover'
 import { Essence } from '../components/Plot'
 import { DateChip } from '../components/DateChip'
 import { useCover } from '../lib/cover'
-import { LengthNorm, NumberField, PaceSection, PublishSection } from '../components/BookSections'
+import { LengthNorm, NumberField, PaceSection, PublishingSetup, PublishSection } from '../components/BookSections'
 import { chapterProgress } from '../lib/pace'
 import { chapterToFicbook, chapterToRich, download, exportDocx, type ExportChapter } from '../lib/exporter'
 import { platformOf } from '../lib/platforms'
@@ -38,6 +38,7 @@ export function BookView({ data }: { data: ProjectData }) {
   const planPeek = [p.deadline ? `до ${p.deadline}` : '', p.targetChapters ? `${p.targetChapters} глав` : ''].filter(Boolean).join(' · ')
   const descriptionPeek = (p.description ?? '').split('\n').find((line) => line.trim())?.trim()
   const [left, setLeft] = useState(false)
+  const [paceSetup, setPaceSetup] = useState(false)
 
   const exportWord = async () => download(await exportDocx(p.title, await loadChapters(data)), `${p.title}.docx`)
   const platform = platformOf(p)
@@ -77,7 +78,7 @@ export function BookView({ data }: { data: ProjectData }) {
         </div>
       </div>
 
-      <Essence project={p} embedded />
+      <Essence project={p} embedded autoOpen={words === 0} />
       {left && <LeftToWrite data={data} onClose={() => setLeft(false)} />}
 
       <section className="book-section-list card" aria-label="Настройки книги">
@@ -96,6 +97,21 @@ export function BookView({ data }: { data: ProjectData }) {
               <NumberField value={p.targetChapters || undefined} placeholder="Не задано" onSave={(targetChapters) => set({ targetChapters })} />
             </label>
             <LengthNorm project={p} />
+            {!p.dailyGoal && !p.targetWords && (paceSetup ? (
+              <div className="book-pace-setup">
+                <label>
+                  <span className="field-label">Цель на день, слов</span>
+                  <NumberField value={p.dailyGoal} placeholder="например, 500" onSave={(dailyGoal) => set({ dailyGoal })} />
+                </label>
+                <label>
+                  <span className="field-label">Объём истории, слов</span>
+                  <NumberField value={p.targetWords} placeholder="например, 80 000" onSave={(targetWords) => set({ targetWords })} />
+                </label>
+                <button className="link small muted" onClick={() => setPaceSetup(false)}>скрыть</button>
+              </div>
+            ) : (
+              <button className="link small" onClick={() => setPaceSetup(true)}>+ темп и цель</button>
+            ))}
             {!early && <button className="link small" onClick={() => setLeft(true)}>Что осталось дописать</button>}
           </div>
         </details>
@@ -106,6 +122,16 @@ export function BookView({ data }: { data: ProjectData }) {
             {descriptionPeek && <span className="muted small book-fold-peek">{descriptionPeek}</span>}
           </summary>
           <InlineEdit className="input book-desc" multiline placeholder="Фандом, пэйринг, аннотация — что угодно" value={p.description ?? ''} onSave={(description) => set({ description })} />
+        </details>
+
+        <details className="settings-section book-fold">
+          <summary>
+            <span>Публикация</span>
+            <span className="muted small book-fold-peek">{platform.selected ? platform.name : 'не настроена'}</span>
+          </summary>
+          <div className="book-mobile-fields">
+            <PublishingSetup project={p} />
+          </div>
         </details>
 
         <details className="settings-section book-fold book-mobile-section">
@@ -139,19 +165,15 @@ export function BookView({ data }: { data: ProjectData }) {
           <summary><span>Файлы и версии</span></summary>
           <div className="stack book-file-actions">
             <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void exportWord()}>
-              Вся история в Word (.docx)
+              Скачать Word-копию (.docx)
             </button>
             <div>
               <span className="field-label">Добавить текст</span>
-              <div className="small muted">Главы из файла встанут в конец истории.</div>
-              <ImportPanel projectId={p.id} onDone={() => go({ view: 'board' })} />
+              <ImportPanel projectId={p.id} onDone={(sceneId) => go(sceneId ? { view: 'text', sceneId } : { view: 'board' })} />
             </div>
             <div>
-              <span className="field-label">Переписать книгу заново</span>
-              <div className="small muted">
-                Новая история с тем же скелетом: главы, сцены с целями и пунктами, ветки, герои, матчасть, маячки — но пустые страницы. В каждой
-                сцене сбоку будет её прежний текст. Эта редакция останется как есть.
-              </div>
+              <span className="field-label">Новая редакция</span>
+              <div className="small muted">Пустой текст с прежним планом; эта редакция сохранится.</div>
               <button
                 className="btn"
                 style={{ marginTop: 8 }}
@@ -170,26 +192,29 @@ export function BookView({ data }: { data: ProjectData }) {
                 Новая редакция
               </button>
             </div>
-            <button
-              className="btn ghost"
-              style={{ color: 'var(--danger-ink)', alignSelf: 'flex-start' }}
-              onClick={async () => {
-                if (!confirm(`Удалить историю «${p.title}» со всеми главами и заметками?`)) return
-                await remove('projects', p.id)
-                toast('История удалена', () => patch('projects', p.id, { deleted: false }))
-                go({ view: 'library' })
-              }}
-            >
-              Удалить эту историю
-            </button>
+            <details className="danger-zone">
+              <summary className="small muted">Удаление</summary>
+              <button
+                className="btn ghost"
+                style={{ color: 'var(--danger-ink)', alignSelf: 'flex-start', marginTop: 10 }}
+                onClick={async () => {
+                  if (!confirm(`Удалить историю «${p.title}» со всеми главами и заметками?`)) return
+                  await remove('projects', p.id)
+                  toast('История удалена', () => patch('projects', p.id, { deleted: false }))
+                  go({ view: 'library' })
+                }}
+              >
+                Удалить эту историю
+              </button>
+            </details>
           </div>
         </details>
       </section>
 
-      {/* Publishing and pace mean something from the first thousand words; on an empty book they only reproach. */}
-      {!early && <PublishSection data={data} onCopy={(id) => void copyChapter(id)} />}
+      {/* Platform-specific tools appear only after the author has chosen a destination. */}
+      {platform.selected && <PublishSection data={data} onCopy={(id) => void copyChapter(id)} />}
 
-      {!early && <PaceSection data={data} />}
+      {(p.dailyGoal || p.targetWords) && <PaceSection data={data} />}
     </div>
   )
 }

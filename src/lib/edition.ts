@@ -1,5 +1,5 @@
 import { db, uid, type Chapter, type Character, type Line, type Marker, type Note, type Project, type Scene, type SceneText, type Snapshot } from '../db/db'
-import { alive, save } from '../db/repo'
+import { alive, discardIncompleteProject, save } from '../db/repo'
 import { emptyDoc } from './text'
 
 /** «Геката Сотейра» → «Геката Сотейра — редакция 2»; «… — редакция 2» → «… — редакция 3». */
@@ -15,6 +15,10 @@ export function editionTitle(title: string): string {
  * not a draft to patch. The old story stays untouched.
  */
 export async function newEdition(projectId: string): Promise<{ projectId: string; firstSceneId?: string }> {
+  return writeEdition(projectId)
+}
+
+async function writeEdition(projectId: string): Promise<{ projectId: string; firstSceneId?: string }> {
   const old = await db.projects.get(projectId)
   if (!old) throw new Error('no project')
   const now = Date.now()
@@ -37,6 +41,9 @@ export async function newEdition(projectId: string): Promise<{ projectId: string
     id: uid(),
     title: editionTitle(old.title),
     createdAt: now,
+    workId: old.workId ?? old.id,
+    editionNumber: (old.editionNumber ?? Number(old.title.match(/ — редакция (\d+)$/)?.[1] ?? 1)) + 1,
+    previousEditionId: old.id,
     updatedAt: 0,
     description: old.description,
     color: old.color,
@@ -49,19 +56,26 @@ export async function newEdition(projectId: string): Promise<{ projectId: string
     targetWords: old.targetWords,
     dailyGoal: old.dailyGoal,
     platform: old.platform,
+    platformName: old.platformName,
+    platformUnit: old.platformUnit,
+    platformMax: old.platformMax,
+    platformUrl: old.platformUrl,
     publishEvery: old.publishEvery,
     ficbookUrl: old.ficbookUrl,
     chapterMin: old.chapterMin,
     chapterMax: old.chapterMax,
     pageChars: old.pageChars,
     lengthUnit: old.lengthUnit,
+    sceneBudget: old.sceneBudget,
   }
   await save<Project>('projects', p)
 
-  for (const l of lines) await save<Line>('lines', { ...l, id: id(l.id), projectId: p.id, updatedAt: 0 })
-  for (const c of characters) await save<Character>('characters', { ...c, id: id(c.id), projectId: p.id, ignoreSceneIds: undefined, updatedAt: 0 })
-  for (const c of chapters)
-    await save<Chapter>('chapters', { ...c, id: id(c.id), projectId: p.id, publishedAt: undefined, locked: undefined, updatedAt: 0 })
+  try {
+    for (const l of lines) await save<Line>('lines', { ...l, id: id(l.id), projectId: p.id, updatedAt: 0 })
+    for (const c of characters)
+      await save<Character>('characters', { ...c, id: id(c.id), projectId: p.id, ignoreSceneIds: undefined, updatedAt: 0 })
+    for (const c of chapters)
+      await save<Chapter>('chapters', { ...c, id: id(c.id), projectId: p.id, publishedAt: undefined, locked: undefined, updatedAt: 0 })
 
   const ordered = [...scenes].sort(
     (a, b) => (chapters.find((c) => c.id === a.chapterId)?.order ?? 0) - (chapters.find((c) => c.id === b.chapterId)?.order ?? 0) || a.order - b.order,
@@ -136,8 +150,12 @@ export async function newEdition(projectId: string): Promise<{ projectId: string
       updatedAt: 0,
     })
 
-  const cover = await db.texts.get(`cover:${projectId}`)
-  if (cover) await save<SceneText>('texts', { ...cover, id: `cover:${p.id}`, projectId: p.id, updatedAt: 0 })
-  if (firstSceneId) await save<Project>('projects', { ...p, lastSceneId: firstSceneId })
-  return { projectId: p.id, firstSceneId }
+    const cover = await db.texts.get(`cover:${projectId}`)
+    if (cover) await save<SceneText>('texts', { ...cover, id: `cover:${p.id}`, projectId: p.id, updatedAt: 0 })
+    if (firstSceneId) await save<Project>('projects', { ...p, lastSceneId: firstSceneId })
+    return { projectId: p.id, firstSceneId }
+  } catch (error) {
+    await discardIncompleteProject(p.id).catch(() => {})
+    throw error
+  }
 }

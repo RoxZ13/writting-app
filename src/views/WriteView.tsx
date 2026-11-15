@@ -350,11 +350,11 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
           )}
           <button
             className={`tool ${panels.plan ? 'on' : ''}`}
-            title={panels.plan ? 'Скрыть план сцены' : 'План сцены: зачем она, по пунктам, маячки, кто в ней'}
+            title={panels.plan ? 'Скрыть «О сцене»' : 'О сцене: зачем она, по пунктам, маячки, кто в ней'}
             onClick={() => togglePanel('plan')}
           >
             <Icon name="sidebar" size={17} />
-            <span className="tool-label">План</span>
+            <span className="tool-label">О сцене</span>
             {scene.beats.length > 0 && (
               <span className="tool-count">
                 {beatsDone}/{scene.beats.length}
@@ -407,6 +407,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                   </div>
                   {(
                     [
+                      ['bolt', 'Быстрая заметка', isMac ? '⌘J' : 'Ctrl+J', () => window.dispatchEvent(new Event('manuscript:capture'))],
                       ['spark', 'Маячок здесь', isMac ? '⌘M' : 'Ctrl+M', () => editor && setAction(selectionForMarker(editor))],
                       ...(chapter && !chapter.pool && !chapter.locked
                         ? [['cut', 'Новая глава с этого абзаца', '', () => void splitChapterHere(data.project, scene, editor)] as [string, string, string, () => void]]
@@ -467,7 +468,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
         )}
 
         <div className="editor-area">
-          {rewriting && <RewriteOld scene={scene} editor={editor} onDone={() => setModeState('write')} />}
+          {rewriting && <RewriteOld scene={scene} editor={editor} onOpenPlan={openPlan} onDone={() => setModeState('write')} />}
           <div className="editor-wrap">
             {text && !rewriting && storyEmpty && <TitlePage key={`title-${scene.id}`} project={data.project} editor={editor} empty />}
             {text && !rewriting && (
@@ -524,7 +525,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
       />
       {keysOpen && <Shortcuts onClose={() => setKeysOpen(false)} />}
 
-      <aside className="write-brief" aria-label="План сцены">
+      <aside className="write-brief" aria-label="О сцене">
         <div className="inner">
           {panels.plan && (
             <ScenePlan key={scene.id} data={data} scene={scene} editor={editor} onOpenMarker={setOpenMarker} onClose={() => togglePanel('plan')} />
@@ -656,12 +657,28 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
 }
 
 /** The previous text, quiet and to the side, while the scene is being rewritten. */
-function RewriteOld({ scene, editor, onDone }: { scene: Scene; editor: Editor | null; onDone: () => void }) {
+function RewriteOld({ scene, editor, onOpenPlan, onDone }: { scene: Scene; editor: Editor | null; onOpenPlan: () => void; onDone: () => void }) {
   const snap = useLiveQuery(() => (scene.rewriteFrom ? db.snapshots.get(scene.rewriteFrom) : undefined), [scene.rewriteFrom])
-  const [hidden, setHidden] = useState(false)
+  // On a phone the old version is a reference sheet, not the first thing that
+  // should push the new page below the fold.
+  const [hidden, setHidden] = useState(() => typeof matchMedia !== 'undefined' && matchMedia('(max-width: 760px)').matches)
   const [changes, setChanges] = useState(false)
+  const [hasNewText, setHasNewText] = useState(() => !!editor && !editor.isEmpty)
   const now = useLiveQuery(() => (changes ? db.texts.get(scene.id) : undefined), [changes, scene.id])
+  useEffect(() => {
+    if (!editor) return
+    const update = () => setHasNewText(!editor.isEmpty)
+    update()
+    editor.on('transaction', update)
+    return () => {
+      editor.off('transaction', update)
+    }
+  }, [editor])
   const finish = async (keepNew: boolean) => {
+    if (keepNew && (!editor || editor.isEmpty)) {
+      toast('Новый текст пока пуст — напиши хотя бы одну фразу или верни старый')
+      return
+    }
     if (!keepNew && snap && editor) {
       if (!confirm('Вернуть старый текст? Новый черновик сохранится в версиях.')) return
       const t = await db.texts.get(scene.id)
@@ -680,7 +697,9 @@ function RewriteOld({ scene, editor, onDone }: { scene: Scene; editor: Editor | 
     )
   }
   return (
-    <aside className="old-text">
+    <>
+    <button className="old-mobile-backdrop" aria-label="Закрыть прежний текст" onClick={() => setHidden(true)} />
+    <aside className="old-text" role="dialog" aria-label="Прежний текст сцены">
       <div className="old-head">
         <div className="seg old-seg">
           <button aria-pressed={!changes} onClick={() => setChanges(false)}>
@@ -711,14 +730,18 @@ function RewriteOld({ scene, editor, onDone }: { scene: Scene; editor: Editor | 
         )}
       </div>
       <div className="old-foot">
-        <button className="btn sm primary" onClick={() => void finish(true)}>
+        <button className="btn sm primary" disabled={!hasNewText} onClick={() => void finish(true)}>
           Готово, оставить новый
         </button>
         <button className="btn sm ghost" onClick={() => void finish(false)}>
           Вернуть старый
         </button>
+        <button className="link small" onClick={() => { setHidden(true); onOpenPlan() }}>
+          Версии — в «О сцене»
+        </button>
       </div>
     </aside>
+    </>
   )
 }
 
