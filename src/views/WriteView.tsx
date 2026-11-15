@@ -469,12 +469,11 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
           <ChapterMeter
             project={data.project}
             chars={chapterChars}
-            chapterTitle={chapter.title}
+            chapter={chapter}
             scene={scene}
             scenes={chapterScenes}
             bookScenes={data.scenes}
-            chapterIds={data.chapters.filter((item) => !item.pool).map((item) => item.id)}
-            bookWords={bookWords}
+            chapters={data.chapters}
           />
         )}
 

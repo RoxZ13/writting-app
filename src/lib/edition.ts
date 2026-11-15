@@ -54,6 +54,7 @@ async function writeEdition(projectId: string): Promise<{ projectId: string; fir
     drive: old.drive,
     targetChapters: old.targetChapters,
     targetWords: old.targetWords,
+    targetChars: old.targetChars,
     dailyGoal: old.dailyGoal,
     platform: old.platform,
     platformName: old.platformName,

@@ -469,7 +469,7 @@ function Column({
           value={chapter.goal}
           onSave={(goal) => edit('цель главы', { goal })}
         />
-        <BoardChapterProgress data={data} scenes={scenes} />
+        <BoardChapterProgress data={data} chapter={chapter} scenes={scenes} />
         {deadlineText(chapter.deadline) && (
           <div className={`deadline column-deadline ${deadlineText(chapter.deadline)!.late ? 'late' : ''}`}>
             <Icon name="clock" size={13} /> {deadlineText(chapter.deadline)!.text}
@@ -637,8 +637,8 @@ function AskLock({ data }: { data: ProjectData }) {
   )
 }
 
-function BoardChapterProgress({ data, scenes }: { data: ProjectData; scenes: Scene[] }) {
-  const progress = chapterWritingProgress(data.project, scenes)
+function BoardChapterProgress({ data, chapter, scenes }: { data: ProjectData; chapter: Chapter; scenes: Scene[] }) {
+  const progress = chapterWritingProgress(data.project, scenes, undefined, chapter)
   if (!scenes.length && !progress.target) return null
   const number = (value: number) => Math.round(value).toLocaleString('ru-RU')
   const ratio = progress.target ? progress.ratio : progress.total ? progress.ready / progress.total : 0
@@ -649,7 +649,7 @@ function BoardChapterProgress({ data, scenes }: { data: ProjectData; scenes: Sce
         {scenes.map((scene, index) => <i key={scene.id} className={sceneProgressState(scene)} style={{ left: `${((index + 1) / scenes.length) * 100}%` }} />)}
       </div>
       <div className="board-chapter-progress-copy">
-        <span>{progress.target ? `${number(progress.chars)} / ${number(progress.target)} зн.` : `${progress.written} из ${progress.total} написано`}</span>
+        <span>{progress.target ? `${number(progress.chars)} зн. · цель ${progress.min && progress.max ? `${number(progress.min)}–${number(progress.max)}` : number(progress.target)}` : `${progress.written} из ${progress.total} написано`}</span>
         <strong>{progress.ready} {progress.ready === 1 ? 'сцена готова' : 'сцен готово'}</strong>
       </div>
     </div>
@@ -932,7 +932,7 @@ function Timeline({
             {isOpen && (
               <div className="tl-body">
                 {chapter.goal && <div className="tl-goal">{chapter.goal}</div>}
-                <BoardChapterProgress data={data} scenes={scenes} />
+                <BoardChapterProgress data={data} chapter={chapter} scenes={scenes} />
                 {scenes
                   .filter((s) => !isPlaceholder(s, data))
                   .map((s) => (

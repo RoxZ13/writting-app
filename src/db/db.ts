@@ -43,6 +43,8 @@ export interface Project extends Base {
   dailyGoal?: number
   /** Planned length of the whole book, in words. */
   targetWords?: number
+  /** Fixed planned length of the whole book, in characters with spaces. It never grows when chapters are added. */
+  targetChars?: number
   /** How many chapters the book will have — a landmark besides the deadline. 0 = «не знаю» (shown as «?»). */
   targetChapters?: number
   /** The «lock the written chapters?» question after an import was asked, whatever the answer. */
@@ -83,6 +85,9 @@ export interface Chapter extends Base {
   publishedAt?: string
   /** Fixed in place: its scenes are not moved, added or removed by accident. The text stays editable. */
   locked?: boolean
+  /** Optional range for this chapter. When absent, the project's common chapter range is used. */
+  targetMin?: number
+  targetMax?: number
 }
 
 export type SceneStatus = 'idea' | 'draft' | 'written' | 'logic' | 'style' | 'done'

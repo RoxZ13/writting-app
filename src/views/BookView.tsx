@@ -35,7 +35,7 @@ export function BookView({ data }: { data: ProjectData }) {
   const cover = useCover(p.id)
   const cp = chapterProgress(p, data.chapters, data.scenes)
   const early = words < 1000 && !data.chapters.some((c) => c.publishedAt)
-  const planPeek = [p.deadline ? `до ${p.deadline}` : '', p.targetChapters ? `${p.targetChapters} глав` : ''].filter(Boolean).join(' · ')
+  const planPeek = [p.deadline ? `до ${p.deadline}` : '', p.targetChapters ? `${p.targetChapters} глав` : '', p.targetChars ? `${p.targetChars.toLocaleString('ru-RU')} знаков` : ''].filter(Boolean).join(' · ')
   const descriptionPeek = (p.description ?? '').split('\n').find((line) => line.trim())?.trim()
   const [left, setLeft] = useState(false)
   const [paceSetup, setPaceSetup] = useState(false)
@@ -95,6 +95,10 @@ export function BookView({ data }: { data: ProjectData }) {
             <label>
               <span className="field-label">Количество глав</span>
               <NumberField value={p.targetChapters || undefined} placeholder="Не задано" onSave={(targetChapters) => set({ targetChapters })} />
+            </label>
+            <label>
+              <span className="field-label">Плановый объём книги, знаков</span>
+              <NumberField value={p.targetChars} placeholder="например, 400 000" onSave={(targetChars) => set({ targetChars })} />
             </label>
             <LengthNorm project={p} />
             {!p.dailyGoal && !p.targetWords && (paceSetup ? (
