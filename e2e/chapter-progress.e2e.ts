@@ -3,31 +3,28 @@ import { startStory, typeInEditor, waitSaveTick } from './helpers'
 
 const SHOTS = process.env.PROGRESS_SHOTS
 
-async function setChapterLimit(page: Page, max: number) {
-  await page.evaluate(() => (location.hash = '#/book'))
-  const plan = page.locator('.book-section-list > details').first()
-  if (!(await plan.evaluate((element) => element.hasAttribute('open')))) await plan.locator('summary').click()
-  await plan.getByRole('button', { name: /\+ длина главы|изменить/ }).click()
-  const unit = page.getByRole('button', { name: 'знаки', exact: true })
-  await unit.click()
-  await expect(unit).toHaveAttribute('aria-pressed', 'true')
-  const maxField = page.locator('.length-norm .num-input').nth(1)
-  await maxField.fill(String(max))
-  await maxField.blur()
-  await expect(maxField).toHaveValue(String(max))
+async function setChapterLimitHere(page: Page, max: number) {
+  const trigger = page.locator('.chapter-progress-trigger')
+  await expect(trigger).toContainText('Задать цель главы')
+  await trigger.click()
+  const panel = page.getByRole('dialog', { name: /Прогресс главы/ })
+  const input = panel.getByLabel('Цель главы')
+  await input.fill(String(max))
+  await input.blur()
+  await expect(panel).toContainText(`из ${max.toLocaleString('ru-RU')} знаков`)
+  await panel.getByRole('button', { name: 'Закрыть' }).click()
 }
 
 test('chapter goal stays visible and opens scene progress', async ({ page }, info) => {
   await startStory(page)
   await typeInEditor(page, 'Слово '.repeat(20))
   await waitSaveTick(page)
-  await setChapterLimit(page, 1_000)
-  await page.evaluate(() => (location.hash = '#/text'))
+  await setChapterLimitHere(page, 1_000)
 
   const trigger = page.locator('.chapter-progress-trigger')
   await expect(trigger).toBeVisible()
-  await expect(trigger).toContainText(/\d+ \/ 1[\s ]?000 зн\./)
-  await expect(trigger).toContainText('осталось')
+  await expect(trigger).toContainText(/\d+ из 1[\s ]?000 знаков/)
+  await expect(trigger).toContainText(/\d+%/)
   await trigger.click()
 
   const panel = page.getByRole('dialog', { name: /Прогресс главы/ })
@@ -53,7 +50,7 @@ test('board gives every chapter a compact progress overview', async ({ page }) =
   await startStory(page)
   await typeInEditor(page, 'Первый черновик сцены.')
   await waitSaveTick(page)
-  await setChapterLimit(page, 5_000)
+  await setChapterLimitHere(page, 5_000)
   await page.locator('.tabs-mobile:visible > button, .tabs-desktop:visible > button').filter({ hasText: 'Доска' }).click()
   await expect(page.locator('.board, .timeline')).toBeVisible()
   const progress = page.locator('.board-chapter-progress').first()

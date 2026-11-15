@@ -89,12 +89,14 @@ export function ChapterMeter({
   bookWords: number
 }) {
   const [open, setOpen] = useState(false)
+  const [goalDraft, setGoalDraft] = useState(() => String(project.chapterMax || project.chapterMin || ''))
   useEffect(() => {
     if (!open) return
     const close = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false)
     addEventListener('keydown', close)
     return () => removeEventListener('keydown', close)
   }, [open])
+  useEffect(() => setGoalDraft(String(project.chapterMax || project.chapterMin || '')), [project.chapterMax, project.chapterMin])
 
   const liveMine = Math.max(0, chars - scenes.filter((item) => item.id !== scene.id).reduce((sum, item) => sum + (item.charCount ?? 0), 0))
   const progress = chapterWritingProgress(project, scenes, { sceneId: scene.id, chars: liveMine })
@@ -104,19 +106,27 @@ export function ChapterMeter({
   const percent = Math.round(ratio * 100)
   const complete = progress.total > 0 && progress.ready === progress.total && (!progress.target || progress.chars >= progress.target)
   const number = (value: number) => Math.round(value).toLocaleString('ru-RU')
-  const remaining = progress.target
-    ? progress.over
-      ? `сверх лимита ${number(progress.over)}`
-      : progress.left === 0
-        ? 'лимит набран'
-        : `осталось ${number(progress.left ?? 0)}`
-    : `${progress.ready} из ${progress.total} сцен готовы`
   const tone = complete ? 'done' : progress.over ? 'over' : ratio >= 0.9 ? 'near' : 'calm'
+  const saveGoal = async (raw = goalDraft) => {
+    const value = Math.max(0, Math.round(Number(raw.replace(/\s/g, '')) || 0))
+    setGoalDraft(value ? String(value) : '')
+    await patch<Project>('projects', project.id, {
+      lengthUnit: 'chars',
+      chapterMax: value || undefined,
+      chapterMin: project.chapterMin && value && project.chapterMin < value ? project.chapterMin : undefined,
+    })
+  }
 
   return (
     <div className={`chapter-meter ${tone}${complete ? ' complete' : ''}`}>
       <button className="chapter-progress-trigger" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}>
-        <span className="chapter-progress-label">Глава</span>
+        <span className="chapter-progress-label">{chapterTitle}</span>
+        <span className="chapter-progress-summary">
+          {progress.target ? `${number(progress.chars)} из ${number(progress.target)} знаков` : 'Задать цель главы'}
+        </span>
+        <span className="chapter-progress-percent">
+          {progress.target ? `${percent}%` : `${progress.ready} из ${progress.total} сцен готовы`}
+        </span>
         <span
           className="chapter-progress-track"
           role="progressbar"
@@ -126,18 +136,7 @@ export function ChapterMeter({
           aria-valuenow={Math.min(100, percent)}
         >
           <span className="chapter-progress-fill" style={{ width: `${Math.min(100, percent)}%` }} />
-          {scenes.map((item, index) => (
-            <span
-              key={item.id}
-              className={`chapter-progress-tick ${sceneProgressState(item)}`}
-              style={{ left: `${((index + 1) / scenes.length) * 100}%` }}
-            />
-          ))}
         </span>
-        <span className="chapter-progress-value">
-          {progress.target ? `${number(progress.chars)} / ${number(progress.target)} зн.` : `${progress.ready}/${progress.total}`}
-        </span>
-        <span className="chapter-progress-left">{remaining}</span>
       </button>
 
       {open && (
@@ -152,9 +151,35 @@ export function ChapterMeter({
               <button className="icon-btn" aria-label="Закрыть" onClick={() => setOpen(false)}>×</button>
             </header>
 
+            <div className="chapter-goal-editor">
+              <label htmlFor="chapter-goal-input">Цель главы</label>
+              <div className="chapter-goal-input-row">
+                <input
+                  id="chapter-goal-input"
+                  className="input"
+                  inputMode="numeric"
+                  value={goalDraft}
+                  placeholder="например, 40 000"
+                  onChange={(event) => setGoalDraft(event.target.value.replace(/[^\d\s]/g, ''))}
+                  onBlur={() => void saveGoal()}
+                  onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.blur()}
+                />
+                <span>знаков</span>
+              </div>
+              <div className="chapter-goal-presets" aria-label="Быстрый выбор цели главы">
+                {[10_000, 20_000, 40_000].map((value) => (
+                  <button key={value} className="chip" onClick={() => void saveGoal(String(value))}>
+                    {number(value)}
+                  </button>
+                ))}
+                {!!progress.target && <button className="link small muted" onClick={() => void saveGoal('')}>без лимита</button>}
+              </div>
+              <span className="chapter-goal-hint">Действует для всех глав. Изменить можно здесь в любой момент.</span>
+            </div>
+
             <div className={`chapter-progress-hero ${tone}`}>
               <div className="chapter-progress-number">
-                {progress.target ? <><strong>{number(progress.chars)}</strong><span>из {number(progress.target)} знаков</span></> : <><strong>{progress.ready}/{progress.total}</strong><span>сцен готовы</span></>}
+                {progress.target ? <><strong>{number(progress.chars)}</strong><span>написано из {number(progress.target)} знаков</span></> : <><strong>{progress.ready}/{progress.total}</strong><span>сцен готовы</span></>}
               </div>
               <div className="chapter-progress-bigtrack"><span style={{ width: `${Math.min(100, percent)}%` }} /></div>
               <div className="chapter-progress-message">
@@ -195,7 +220,6 @@ export function ChapterMeter({
               >
                 {scene.status === 'done' ? 'Вернуть сцену в работу' : 'Отметить эту сцену готовой'}
               </button>
-              {!progress.target && <button className="link small" onClick={() => go({ view: 'book' })}>Задать лимит главы</button>}
             </div>
 
             <footer className="chapter-progress-book">
