@@ -33,6 +33,7 @@ import { Shortcuts } from '../components/Shortcuts'
 import { SceneActions, SceneGestureButton } from '../components/SceneActions'
 
 type Mode = 'write' | 'edit' | 'rewrite'
+type MenuTool = [icon: string, label: string, keys: string, run: () => void]
 const PANELS_KEY = 'manuscript.panels'
 const PANELS_RESET_KEY = 'manuscript.panelsReset2'
 const MODE_KEY = 'manuscript.mode'
@@ -311,6 +312,43 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   const chapterScenes = chapter && !chapter.pool ? data.scenes.filter((s) => s.chapterId === scene.chapterId) : []
   const wholeChapter = chapterScenes.length === 1 && (!scene.title.trim() || scene.title === 'Первая сцена')
   const bookWords = totalWords([...data.scenes, ...data.pool.scenes]) - scene.wordCount + (words ?? scene.wordCount)
+  const quickMenuTools: MenuTool[] = [
+    ['bolt', 'Быстрая заметка', isMac ? '⌘J' : 'Ctrl+J', () => window.dispatchEvent(new Event('manuscript:capture'))],
+    ['search', 'Найти и заменить', isMac ? '⌘⇧H' : 'Ctrl+H', () => setFind({ replace: true })],
+  ]
+  const moreMenuTools: MenuTool[] = [
+    ['type', 'Шрифт и вид страницы', '', () => setTypoOpen(true)],
+    ['sidebar', `О ${wholeChapter ? 'главе' : 'сцене'}`, '', () => togglePanel('plan')],
+    ['spark', 'Маячок здесь', isMac ? '⌘M' : 'Ctrl+M', () => editor && setAction(selectionForMarker(editor))],
+    ...(chapter && !chapter.pool && !chapter.locked
+      ? [['cut', 'Новая глава с этого абзаца', '', () => void splitChapterHere(data.project, scene, editor)] as MenuTool]
+      : []),
+    ['type', 'Исправить типографику', '', typeset],
+    ['focus', 'Фокус с таймером', '', () => setFocusOpen(true)],
+    ['check', 'Закончить на сегодня', '', () => setFinishing(true)],
+    ['help', 'Справка', '', () => go({ view: 'help' })],
+  ]
+  const desktopMenuTools: MenuTool[] = [
+    quickMenuTools[0],
+    moreMenuTools[2],
+    ...(chapter && !chapter.pool && !chapter.locked ? [moreMenuTools[3]] : []),
+    quickMenuTools[1],
+    ...moreMenuTools.slice(chapter && !chapter.pool && !chapter.locked ? 4 : 3),
+  ]
+  const renderMenuTool = ([ico, label, keys, run]: MenuTool) => (
+    <button
+      key={label}
+      className="menu-item"
+      onClick={() => {
+        setMenuOpen(false)
+        run()
+      }}
+    >
+      <Icon name={ico} size={17} />
+      <span>{label}</span>
+      {keys && <kbd className="menu-keys">{hotkey(keys)}</kbd>}
+    </button>
+  )
 
   return (
     <div className={cls}>
@@ -426,37 +464,15 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                       </button>
                     ))}
                   </div>
-                  {(
-                    [
-                      ...(isTouch() ? [['type', 'Шрифт и вид страницы', '', () => setTypoOpen(true)]] : []),
-                      ...(isTouch()
-                        ? [['sidebar', `О ${wholeChapter ? 'главе' : 'сцене'}`, '', () => togglePanel('plan')]]
-                        : []),
-                      ['bolt', 'Быстрая заметка', isMac ? '⌘J' : 'Ctrl+J', () => window.dispatchEvent(new Event('manuscript:capture'))],
-                      ['spark', 'Маячок здесь', isMac ? '⌘M' : 'Ctrl+M', () => editor && setAction(selectionForMarker(editor))],
-                      ...(chapter && !chapter.pool && !chapter.locked
-                        ? [['cut', 'Новая глава с этого абзаца', '', () => void splitChapterHere(data.project, scene, editor)] as [string, string, string, () => void]]
-                        : []),
-                      ['search', 'Найти и заменить', isMac ? '⌘⇧H' : 'Ctrl+H', () => setFind({ replace: true })],
-                      ['type', 'Исправить типографику', '', typeset],
-                      ['focus', 'Фокус с таймером', '', () => setFocusOpen(true)],
-                      ['check', 'Закончить на сегодня', '', () => setFinishing(true)],
-                      ['help', 'Справка', '', () => go({ view: 'help' })],
-                    ] as [string, string, string, () => void][]
-                  ).map(([ico, label, keys, run]) => (
-                    <button
-                      key={label}
-                      className="menu-item"
-                      onClick={() => {
-                        setMenuOpen(false)
-                        run()
-                      }}
-                    >
-                      <Icon name={ico} size={17} />
-                      <span>{label}</span>
-                      {keys && <kbd className="menu-keys">{hotkey(keys)}</kbd>}
-                    </button>
-                  ))}
+                  {isTouch() ? (
+                    <>
+                      {quickMenuTools.map(renderMenuTool)}
+                      <details className="write-menu-more">
+                        <summary>Ещё инструменты</summary>
+                        <div>{moreMenuTools.map(renderMenuTool)}</div>
+                      </details>
+                    </>
+                  ) : desktopMenuTools.map(renderMenuTool)}
                   {!isTouch() && (
                     <button
                       className="menu-foot"

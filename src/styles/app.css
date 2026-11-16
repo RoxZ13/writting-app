@@ -7344,6 +7344,32 @@ button.avatar {
 .menu-modes button {
   padding: 6px 8px;
 }
+.write-menu-more {
+  border-top: 1px solid var(--line);
+  margin-top: 4px;
+  padding-top: 4px;
+}
+.write-menu-more > summary {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  color: var(--ink-2);
+  font-size: var(--fs-ui);
+  cursor: pointer;
+  list-style: none;
+}
+.write-menu-more > summary::-webkit-details-marker {
+  display: none;
+}
+.write-menu-more > summary::after {
+  content: '⌄';
+  margin-left: auto;
+  color: var(--ink-3);
+}
+.write-menu-more[open] > summary::after {
+  transform: rotate(180deg);
+}
 /* On a phone the «⋯» menu opens right under its button (the shared popover rule pins it to the bottom, under the resume bar). */
 @media (max-width: 600px) {
   .typo-pop.write-menu {
