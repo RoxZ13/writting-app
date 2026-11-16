@@ -3,7 +3,7 @@ import WebKit
 
 final class ManuscriptViewController: UIViewController, WKNavigationDelegate, WKUIDelegate, WKDownloadDelegate {
     private let home = URL(string: "https://roxz13.github.io/writting-app/")!
-    private let web = WKWebView()
+    private let web = WKWebView(frame: .zero)
     private let retry = UIButton(type: .system)
     private let cancelSignIn = UIButton(type: .system)
     private var signInInProgress = false

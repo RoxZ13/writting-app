@@ -6,23 +6,25 @@ Personal Team. Профиль действует 7 дней с момента в
 
 ## Первая установка
 
-1. На Mac скачай свежий код из GitHub. Для существующей копии репозитория выполни `git pull --ff-only`, для новой:
+1. На Mac [скачай ZIP с GitHub](https://github.com/RoxZ13/writting-app/archive/refs/heads/main.zip),
+   распакуй его и дважды щёлкни `ios/Manuscript.xcodeproj` в Finder. Если работаешь с Git,
+   обнови существующую копию командой `git pull --ff-only` или скачай новую:
 
    ```sh
    git clone https://github.com/RoxZ13/writting-app.git
    cd writting-app
+   open ios/Manuscript.xcodeproj
    ```
 
-2. Открой проект: `open ios/Manuscript.xcodeproj`.
-3. В Xcode открой **Xcode → Settings → Accounts** и добавь свой Apple Account.
+2. В Xcode открой **Xcode → Settings → Accounts** и добавь свой Apple Account.
    Выбери проект **Manuscript → TARGETS → Manuscript → Signing & Capabilities**,
    включи **Automatically manage signing** и выбери свою **Personal Team**.
    Если Xcode сообщает, что Bundle Identifier уже занят, задай свой
    вместо `com.roxz13.manuscript.personal`. Сохрани этот идентификатор для следующих запусков.
-4. Подключи и разблокируй телефон, подтверди доверие компьютеру. Выбери телефон рядом со схемой **Manuscript** в Xcode.
+3. Подключи и разблокируй телефон, подтверди доверие компьютеру. Выбери телефон рядом со схемой **Manuscript** в Xcode.
    При запросе включи на телефоне **Настройки → Конфиденциальность и безопасность → Режим разработчика**,
    перезагрузи телефон и подтверди включение.
-5. Нажми **Run** (⌘R). Если телефон сообщает о недоверенном разработчике,
+4. Нажми **Run** (⌘R). Если телефон сообщает о недоверенном разработчике,
    подтверди доверие своей подписи в **Настройки → Основные → VPN и управление устройством**, затем открой Manuscript.
 
 ## Рукописи и повторная установка
