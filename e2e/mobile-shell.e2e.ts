@@ -75,6 +75,41 @@ test('a chapter with one text opens the editor in one tap', async ({ page }, inf
   await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/#\/text\//)
 })
 
+test('the chapter navigator does not add a scene level to a whole chapter', async ({ page }, info) => {
+  test.skip(info.project.name === 'desktop', 'phone navigator only')
+  await startStory(page)
+  await page.locator('.scene-nav-tool').click()
+
+  const navigator = page.locator('.write-side')
+  await expect(navigator).toBeVisible()
+  await expect(navigator.locator('.navi-head')).toBeHidden()
+  await expect(navigator.locator('.navi-scenes')).toHaveCount(0)
+  const chapter = navigator.locator('.navi-row').filter({ hasText: 'Глава 1' })
+  await expect(chapter).not.toHaveAttribute('aria-expanded')
+  await chapter.click()
+  await expect(navigator).toBeHidden()
+  await expect(page.locator('.ProseMirror')).toBeVisible()
+})
+
+test('rare page controls stay under More and the chapter panel speaks about the chapter', async ({ page }, info) => {
+  test.skip(info.project.name === 'desktop', 'phone editor hierarchy only')
+  await startStory(page)
+
+  await expect(page.locator('.typo-font-anchor > .tool')).toBeHidden()
+  await page.getByRole('button', { name: 'Ещё' }).click()
+  await page.getByRole('button', { name: 'Шрифт и вид страницы' }).click()
+  await expect(page.locator('.typo-pop').filter({ has: page.locator('.typo') })).toBeVisible()
+  await page.getByRole('button', { name: 'Закрыть настройки текста' }).click()
+
+  await page.getByRole('button', { name: /О главе/ }).click()
+  const chapterPanel = page.getByRole('region', { name: 'О главе' })
+  await expect(chapterPanel).toBeVisible()
+  await chapterPanel.getByRole('button', { name: 'зачем глава' }).click()
+  await chapterPanel.getByRole('button', { name: 'кто в главе' }).click()
+  await expect(chapterPanel.getByText('Зачем эта глава')).toBeVisible()
+  await expect(chapterPanel.getByText('Кто в главе')).toBeVisible()
+})
+
 test('the phone library is a compact picker and opens a story from its title', async ({ page }, info) => {
   test.skip(info.project.name === 'desktop', 'phone library only')
   await startStory(page)

@@ -3085,6 +3085,9 @@ main.page {
   max-height: calc(100dvh - var(--header-h) - 110px);
 }
 @media (max-width: 600px) {
+  .typo-font-anchor > .tool {
+    display: none;
+  }
   .write-top {
     flex-wrap: wrap;
     row-gap: 2px;
@@ -3167,6 +3170,16 @@ main.page {
   padding: 18px 20px;
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-2);
+}
+.typo-pop-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.typo-pop-head .icon-btn {
+  margin: -6px -8px -6px 0;
 }
 .typo {
   display: flex;
@@ -6875,6 +6888,12 @@ button.avatar {
     height: calc(100% - 14px);
     padding: 8px 12px calc(env(safe-area-inset-bottom) + 24px);
     overflow-y: auto;
+  }
+  .write-side .navi-head {
+    display: none;
+  }
+  .write-side .navi-label {
+    margin-top: 4px;
   }
   .write.nav-open .write-side {
     clip-path: inset(0 0 0 0);

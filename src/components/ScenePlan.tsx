@@ -40,7 +40,7 @@ export function sceneMarkers(data: ProjectData, scene: Scene) {
  * The one quiet line above the text: the current plan item (or what the scene is for),
  * and the markers that must be paid off right here. Everything else lives in the plan on the side.
  */
-export function SceneNow({ data, scene, onOpenPlan }: { data: ProjectData; scene: Scene; onOpenPlan: () => void }) {
+export function SceneNow({ data, scene, wholeChapter = false, onOpenPlan }: { data: ProjectData; scene: Scene; wholeChapter?: boolean; onOpenPlan: () => void }) {
   const { toPay } = sceneMarkers(data, scene)
   const next = scene.beats.find((b) => !b.done)
   const tick = (b: Beat) => void updateBeats(scene.id, (all) => all.map((x) => (x.id === b.id ? { ...x, done: true } : x)))
@@ -51,7 +51,7 @@ export function SceneNow({ data, scene, onOpenPlan }: { data: ProjectData; scene
         <div className="pp-now">
           <button className="compass-check" title="Готово — к следующему пункту" onClick={() => tick(next)} />
           <span className="muted">Сейчас:</span>
-          <button className="link-plain pp-now-text" title="Открыть «О сцене»" onClick={onOpenPlan}>
+          <button className="link-plain pp-now-text" title={`Открыть «О ${wholeChapter ? 'главе' : 'сцене'}»`} onClick={onOpenPlan}>
             {next.text}
           </button>
         </div>
@@ -59,7 +59,7 @@ export function SceneNow({ data, scene, onOpenPlan }: { data: ProjectData; scene
         scene.goal && (
           <div className="pp-now">
             <span className="muted">Зачем:</span>
-            <button className="link-plain pp-now-text" title="Открыть «О сцене»" onClick={onOpenPlan}>
+            <button className="link-plain pp-now-text" title={`Открыть «О ${wholeChapter ? 'главе' : 'сцене'}»`} onClick={onOpenPlan}>
               {scene.goal}
             </button>
           </div>
@@ -82,12 +82,14 @@ export function ScenePlan({
   data,
   scene,
   editor,
+  wholeChapter = false,
   onOpenMarker,
   onClose,
 }: {
   data: ProjectData
   scene: Scene
   editor: Editor | null
+  wholeChapter?: boolean
   onOpenMarker: (id: string) => void
   onClose: () => void
 }) {
@@ -118,18 +120,18 @@ export function ScenePlan({
   }
 
   return (
-    <section className="plan" aria-label="О сцене">
+    <section className="plan" aria-label={`О ${wholeChapter ? 'главе' : 'сцене'}`}>
       <div className="plan-head">
-        <span className="eyebrow">О сцене</span>
+        <span className="eyebrow">О {wholeChapter ? 'главе' : 'сцене'}</span>
         <span className="spacer" />
-        <button className="icon-btn" aria-label="Скрыть «О сцене»" title="Скрыть «О сцене»" onClick={onClose}>
+        <button className="icon-btn" aria-label={`Скрыть «О ${wholeChapter ? 'главе' : 'сцене'}»`} title={`Скрыть «О ${wholeChapter ? 'главе' : 'сцене'}»`} onClick={onClose}>
           <Icon name="close" size={15} />
         </button>
       </div>
       <div className="pp-body">
         {show('goal') && (
           <div className="pp-section">
-            <h4>Зачем эта сцена</h4>
+            <h4>Зачем эта {wholeChapter ? 'глава' : 'сцена'}</h4>
             <Field inputRef={goalRef} value={scene.goal} placeholder="Что в ней меняется?" onSave={(goal) => void patch<Scene>('scenes', scene.id, { goal })} />
           </div>
         )}
@@ -155,7 +157,7 @@ export function ScenePlan({
 
         {show('people') && (
           <div className="pp-section">
-            <h4>Кто в сцене</h4>
+            <h4>Кто в {wholeChapter ? 'главе' : 'сцене'}</h4>
             <RefChips data={data} sceneId={scene.id} field="characterIds" selected={people} />
             {quotes.length > 0 && <Quotes data={data} scene={scene} editor={editor} quotes={quotes} />}
           </div>
@@ -200,10 +202,10 @@ export function ScenePlan({
           <span className="muted small">+ добавить:</span>
           {(
             [
-              ['goal', 'зачем сцена'],
+              ['goal', `зачем ${wholeChapter ? 'глава' : 'сцена'}`],
               ['beats', 'по пунктам'],
               ['markers', 'маячок'],
-              ['people', 'кто в сцене'],
+              ['people', `кто в ${wholeChapter ? 'главе' : 'сцене'}`],
               ['lore', 'мир'],
             ] as [PlanPart, string][]
           )
@@ -215,7 +217,7 @@ export function ScenePlan({
             ))}
         </div>
 
-        <More data={data} scene={scene} editor={editor} />
+        <More data={data} scene={scene} editor={editor} wholeChapter={wholeChapter} />
       </div>
     </section>
   )
@@ -360,11 +362,11 @@ function Quotes({ data, scene, editor, quotes }: { data: ProjectData; scene: Sce
   )
 }
 
-function More({ data, scene, editor }: { data: ProjectData; scene: Scene; editor: Editor | null }) {
+function More({ data, scene, editor, wholeChapter = false }: { data: ProjectData; scene: Scene; editor: Editor | null; wholeChapter?: boolean }) {
   const chapter = data.chapterById.get(scene.chapterId)
   return (
     <details className="pp-more">
-      <summary>Ещё: линии, глава, версии</summary>
+      <summary>{wholeChapter ? 'Ещё: линии, версии' : 'Ещё: линии, глава, версии'}</summary>
       <div className="stack" style={{ gap: 16, marginTop: 12 }}>
         <div>
           <h4>Линии</h4>
@@ -410,13 +412,13 @@ function More({ data, scene, editor }: { data: ProjectData; scene: Scene; editor
             className="btn sm ghost"
             style={{ color: 'var(--danger-ink)' }}
             onClick={async () => {
-              if (!confirm('Удалить эту сцену вместе с текстом?')) return
+              if (!confirm(wholeChapter ? 'Удалить текст этой главы? Сама глава останется пустой.' : 'Удалить эту сцену вместе с текстом?')) return
               await undoable('удаление сцены', () => deleteScene(scene.id))
               go({ view: 'board' })
-              toastUndo('Сцена удалена')
+              toastUndo(wholeChapter ? 'Текст главы удалён' : 'Сцена удалена')
             }}
           >
-            Удалить сцену
+            {wholeChapter ? 'Удалить текст главы' : 'Удалить сцену'}
           </button>
         </div>
       </div>

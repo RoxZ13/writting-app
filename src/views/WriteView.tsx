@@ -361,11 +361,15 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
           )}
           <button
             className={`tool ${panels.plan ? 'on' : ''}`}
-            title={panels.plan ? 'Скрыть «О сцене»' : 'О сцене: зачем она, по пунктам, маячки, кто в ней'}
+            title={
+              panels.plan
+                ? `Скрыть «О ${wholeChapter ? 'главе' : 'сцене'}»`
+                : `О ${wholeChapter ? 'главе' : 'сцене'}: зачем она, по пунктам, маячки, кто в ней`
+            }
             onClick={() => togglePanel('plan')}
           >
             <Icon name="sidebar" size={17} />
-            <span className="tool-label">О сцене</span>
+            <span className="tool-label">О {wholeChapter ? 'главе' : 'сцене'}</span>
             {scene.beats.length > 0 && (
               <span className="tool-count">
                 {beatsDone}/{scene.beats.length}
@@ -373,7 +377,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
             )}
             {due > 0 && <span className="tool-due" title="Здесь нужно раскрыть маячок" />}
           </button>
-          <div className="typo-anchor">
+          <div className="typo-anchor typo-font-anchor">
             <button className={`tool ${typoOpen ? 'on' : ''}`} title="Шрифт, размер, ширина текста" onClick={() => setTypoOpen(!typoOpen)}>
               <span className="aa">Aa</span>
               <span className="tool-label">Шрифт</span>
@@ -382,6 +386,12 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
               <>
                 <div className="typo-back" onClick={() => setTypoOpen(false)} />
                 <div className="typo-pop card">
+                  <div className="typo-pop-head">
+                    <strong>Вид текста</strong>
+                    <button className="icon-btn" aria-label="Закрыть настройки текста" onClick={() => setTypoOpen(false)}>
+                      <Icon name="close" size={16} />
+                    </button>
+                  </div>
                   <TypoControls />
                 </div>
               </>
@@ -418,6 +428,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                   </div>
                   {(
                     [
+                      ...(isTouch() ? [['type', 'Шрифт и вид страницы', '', () => setTypoOpen(true)]] : []),
                       ['bolt', 'Быстрая заметка', isMac ? '⌘J' : 'Ctrl+J', () => window.dispatchEvent(new Event('manuscript:capture'))],
                       ['spark', 'Маячок здесь', isMac ? '⌘M' : 'Ctrl+M', () => editor && setAction(selectionForMarker(editor))],
                       ...(chapter && !chapter.pool && !chapter.locked
@@ -472,7 +483,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
           />
         )}
         <div className="passport-wrap">
-          <SceneNow data={data} scene={scene} onOpenPlan={openPlan} />
+          <SceneNow data={data} scene={scene} wholeChapter={wholeChapter} onOpenPlan={openPlan} />
         </div>
         {chapter && !chapter.pool && (
           <ChapterMeter
@@ -554,10 +565,10 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
       />
       {keysOpen && <Shortcuts onClose={() => setKeysOpen(false)} />}
 
-      <aside className="write-brief" aria-label="О сцене">
+      <aside className="write-brief" aria-label={`О ${wholeChapter ? 'главе' : 'сцене'}`}>
         <div className="inner">
           {panels.plan && (
-            <ScenePlan key={scene.id} data={data} scene={scene} editor={editor} onOpenMarker={setOpenMarker} onClose={() => togglePanel('plan')} />
+            <ScenePlan key={scene.id} data={data} scene={scene} editor={editor} wholeChapter={wholeChapter} onOpenMarker={setOpenMarker} onClose={() => togglePanel('plan')} />
           )}
         </div>
       </aside>
@@ -638,6 +649,7 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
       {groups.map(({ chapter, scenes }) => {
         const here = chapter.id === current?.chapterId
         const isOpen = open.has(chapter.id)
+        const wholeText = scenes.length === 1 && (!scenes[0].title.trim() || scenes[0].title === 'Первая сцена')
         const tone = chapter.pool
           ? 'var(--line-2)'
           : here
@@ -649,12 +661,23 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
                 : 'var(--line-2)'
         return (
           <div key={chapter.id} className={`navi-chapter ${here ? 'here' : ''} ${chapter.pool ? 'pool' : ''}`}>
-            <button className="navi-row" aria-expanded={isOpen} onClick={() => toggle(chapter.id)}>
+            <button
+              className="navi-row"
+              aria-expanded={wholeText ? undefined : isOpen}
+              onClick={() => {
+                if (wholeText) {
+                  go({ view: 'text', sceneId: scenes[0].id })
+                  onPick()
+                } else toggle(chapter.id)
+              }}
+            >
               <span className="navi-dot" style={{ background: tone }} />
               <span className="navi-title">{chapter.pool ? 'Без места' : chapter.title}</span>
-              {!isOpen && scenes.length > 0 && <span className="navi-count">{scenes.length}</span>}
+              {wholeText
+                ? <Icon name="right" size={15} />
+                : !isOpen && scenes.length > 0 && <span className="navi-count">{scenes.length}</span>}
             </button>
-            {isOpen && (
+            {isOpen && !wholeText && (
               <div className="navi-scenes">
                 {scenes.map((s) => (
                   <div key={s.id} className={`navi-scene-wrap ${actions === s.id ? 'actions-open' : ''}`}>
