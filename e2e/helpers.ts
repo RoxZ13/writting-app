@@ -49,7 +49,7 @@ export function docText(content: any): string {
 export async function startStory(page: Page) {
   await page.goto('/')
   await page.getByRole('button', { name: 'Начать историю' }).click()
-  await page.getByRole('button', { name: 'Начать с фразы' }).click()
+  await page.getByRole('button', { name: 'Писать главу' }).click()
   const editor = page.locator('.ProseMirror')
   await expect(editor).toBeVisible()
   // The editor appears as soon as the story exists, while «create» is still finishing and then calls go('#/text'):

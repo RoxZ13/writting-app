@@ -47,6 +47,7 @@
   --r-sm: 6px; /* chips, keys, small inputs */
   --r-md: 10px; /* buttons, scene cards, menus */
   --r-lg: 16px; /* panels, modals, section cards */
+  --r-xl: 22px; /* bottom sheets and large touch surfaces */
   --radius: var(--r-lg);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 4px 16px rgba(0, 0, 0, 0.04);
   /* Things that float above the page: menus, popovers, modals. */
@@ -8969,9 +8970,32 @@ button.avatar {
 .start-story-choice h2 {
   margin: 0 0 8px;
 }
-.start-story-choice .btn {
+.start-path {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) 20px;
+  align-items: center;
+  gap: 12px;
   width: 100%;
-  justify-content: flex-start;
+  min-height: 58px;
+  border: 1px solid var(--line-2);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 16px;
+  font: inherit;
+  font-weight: 650;
+  text-align: left;
+}
+.start-path:hover {
+  background: var(--fill);
+}
+.start-path.primary {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--on-brand);
+}
+.start-path > .ico:last-child {
+  opacity: 0.55;
 }
 .new-story-import {
   width: min(560px, calc(100vw - 32px));

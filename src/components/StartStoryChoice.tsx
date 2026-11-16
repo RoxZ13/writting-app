@@ -1,4 +1,5 @@
 import { Modal } from '../lib/ui'
+import { Icon } from './Icon'
 
 /** One lightweight choice, not an onboarding form: both paths stay available afterwards. */
 export function StartStoryChoice({
@@ -13,14 +14,17 @@ export function StartStoryChoice({
   return (
     <Modal label="Новая история" onClose={onClose} className="start-story-choice">
       <div className="stack">
-        <h2>С чего начнём?</h2>
-        <button className="btn primary big" disabled={busy} onClick={() => onChoose('text')}>
-          Начать с фразы
+        <h2>Как начнём?</h2>
+        <button className="start-path primary" disabled={busy} onClick={() => onChoose('text')}>
+          <Icon name="pen" size={20} />
+          <span>Писать главу</span>
+          <Icon name="right" size={18} />
         </button>
-        <button className="btn big" disabled={busy} onClick={() => onChoose('board')}>
-          Набросать сцены
+        <button className="start-path" disabled={busy} onClick={() => onChoose('board')}>
+          <Icon name="plan" size={20} />
+          <span>Разложить по сценам</span>
+          <Icon name="right" size={18} />
         </button>
-        <div className="small muted">Между текстом и планом можно переключаться в любой момент.</div>
       </div>
     </Modal>
   )

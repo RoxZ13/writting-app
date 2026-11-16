@@ -26,6 +26,8 @@ test('the mobile shell behaves like an app surface', async ({ page }, info) => {
 test('chapter progress keeps plan controls in a separate sheet on phones', async ({ page }, info) => {
   test.skip(info.project.name === 'desktop', 'phone hierarchy only')
   await startStory(page)
+  await page.locator('.ProseMirror').click()
+  await page.keyboard.type('Первая фраза')
   await page.locator('.chapter-progress-trigger').click()
 
   const progress = page.getByRole('dialog', { name: /Прогресс главы/ })

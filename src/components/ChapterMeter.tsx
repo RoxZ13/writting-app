@@ -77,6 +77,7 @@ export function ChapterMeter({
   scenes,
   bookScenes,
   chapters,
+  wholeChapter = false,
 }: {
   project: Project
   chars: number
@@ -85,6 +86,7 @@ export function ChapterMeter({
   scenes: Scene[]
   bookScenes: Scene[]
   chapters: Chapter[]
+  wholeChapter?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -123,6 +125,10 @@ export function ChapterMeter({
     setOpen(false)
   }
 
+  // A blank page should invite the first sentence, not report zeroes. The meter
+  // appears after writing starts, or immediately when the author already set a range.
+  if (!progress.target && progress.chars === 0) return null
+
   return (
     <div className={`chapter-meter ${tone}`}>
       <button className="chapter-progress-trigger" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}>
@@ -133,9 +139,7 @@ export function ChapterMeter({
         <span className="chapter-progress-summary chapter-progress-summary-mobile">
           {number(progress.chars)}{range ? ` из ${range}` : ' · без цели'}
         </span>
-        <span className="chapter-progress-percent">
-          {progress.ready}/{progress.total} сцен
-        </span>
+        {!wholeChapter && <span className="chapter-progress-percent">{progress.ready}/{progress.total} сцен</span>}
         <span
           className={`chapter-progress-track range${progress.target ? '' : ' no-goal'}`}
           role="img"
@@ -171,10 +175,10 @@ export function ChapterMeter({
               </div>
               <div className="chapter-range-labels"><span>0</span>{progress.min && <span style={{ left: `${bandStart}%` }}>{number(progress.min)}</span>}{progress.max && <span style={{ left: `${bandEnd}%` }}>{number(progress.max)}</span>}</div>
               <div className="chapter-progress-message">{chapterMessage}</div>
-              {complete && <div className="chapter-scenes-complete">Все сцены готовы. Решение о длине остаётся за тобой.</div>}
+              {complete && <div className="chapter-scenes-complete">{wholeChapter ? 'Глава отмечена готовой.' : 'Все сцены готовы. Решение о длине остаётся за тобой.'}</div>}
             </div>
 
-            <div className="chapter-progress-scenes">
+            {!wholeChapter && <div className="chapter-progress-scenes">
               <div className="chapter-progress-section-title">
                 <strong>Сцены</strong>
                 <span>{progress.written} написано · {progress.ready} готово</span>
@@ -198,14 +202,16 @@ export function ChapterMeter({
                   </button>
                 )
               })}
-            </div>
+            </div>}
 
             <div className="chapter-progress-actions">
               <button
                 className={`btn sm ${scene.status === 'done' ? 'ghost' : 'primary'}`}
                 onClick={() => void patch<Scene>('scenes', scene.id, { status: scene.status === 'done' ? (liveMine > 0 ? 'written' : 'draft') : 'done' })}
               >
-                {scene.status === 'done' ? 'Вернуть сцену в работу' : 'Отметить эту сцену готовой'}
+                {scene.status === 'done'
+                  ? `Вернуть ${wholeChapter ? 'главу' : 'сцену'} в работу`
+                  : `Отметить ${wholeChapter ? 'главу' : 'эту сцену'} готовой`}
               </button>
             </div>
 

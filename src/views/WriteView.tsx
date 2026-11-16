@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useState } from 'react'
-import { db, type Marker, type Note, type Project, type Scene, type SceneText } from '../db/db'
+import { db, type Chapter, type Marker, type Note, type Project, type Scene, type SceneText } from '../db/db'
 import { createMarker, createNote, createScene, patch, save, snapshotScene } from '../db/repo'
 import { SceneNow, ScenePlan, sceneMarkers } from '../components/ScenePlan'
 import { Icon } from '../components/Icon'
@@ -309,6 +309,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
     sumChars(data.scenes.filter((s) => s.chapterId === scene.chapterId && s.id !== scene.id)) +
     (live?.id === scene.id ? live.chars : (scene.charCount ?? 0))
   const chapterScenes = chapter && !chapter.pool ? data.scenes.filter((s) => s.chapterId === scene.chapterId) : []
+  const wholeChapter = chapterScenes.length === 1 && (!scene.title.trim() || scene.title === 'Первая сцена')
   const bookWords = totalWords([...data.scenes, ...data.pool.scenes]) - scene.wordCount + (words ?? scene.wordCount)
 
   return (
@@ -323,18 +324,16 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
         <div className="write-top">
           <button
             className={`tool scene-nav-tool ${panels.nav ? 'on' : ''}`}
-            title={panels.nav ? 'Скрыть сцены' : 'Показать сцены'}
+            title={panels.nav ? `Скрыть ${wholeChapter ? 'главы' : 'сцены'}` : `Показать ${wholeChapter ? 'главы' : 'сцены'}`}
             aria-expanded={panels.nav}
             onClick={() => togglePanel('nav')}
           >
             <Icon name="panel" size={17} />
-            <span className="tool-label">Сцены</span>
+            <span className="tool-label">{wholeChapter ? 'Главы' : 'Сцены'}</span>
           </button>
           <div className="crumbs">
-            <span className="hide-sm" style={{ whiteSpace: 'nowrap' }}>
-              {chapter?.title} ›
-            </span>
-            <span className="crumb-scene">{sceneName(data, scene)}</span>
+            {!wholeChapter && <span className="hide-sm" style={{ whiteSpace: 'nowrap' }}>{chapter?.title} ›</span>}
+            <span className="crumb-scene">{wholeChapter ? chapter?.title : sceneName(data, scene)}</span>
             {mode !== 'write' && <span className="mode-chip">{mode === 'edit' ? 'самопроверка' : 'переписываю'}</span>}
           </div>
           {mode === 'edit' && (
@@ -484,6 +483,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
             scenes={chapterScenes}
             bookScenes={data.scenes}
             chapters={data.chapters}
+            wholeChapter={wholeChapter}
           />
         )}
 
@@ -492,14 +492,23 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
           <div className="editor-wrap">
             {text && !rewriting && storyEmpty && <TitlePage key={`title-${scene.id}`} project={data.project} editor={editor} empty />}
             {text && !rewriting && (
-              <header className="scene-head">
-                <div className="scene-head-chapter">{chapter?.title}</div>
-                <InlineEdit
-                  className="scene-head-title"
-                  value={scene.title}
-                  placeholder={sceneName(data, scene)}
-                  onSave={(title) => void patch<Scene>('scenes', scene.id, { title })}
-                />
+              <header className={`scene-head ${wholeChapter ? 'whole-chapter' : ''}`}>
+                {!wholeChapter && <div className="scene-head-chapter">{chapter?.title}</div>}
+                {wholeChapter && chapter ? (
+                  <InlineEdit
+                    className="scene-head-title"
+                    value={chapter.title}
+                    placeholder="Глава без названия"
+                    onSave={(title) => void patch<Chapter>('chapters', chapter.id, { title })}
+                  />
+                ) : (
+                  <InlineEdit
+                    className="scene-head-title"
+                    value={scene.title}
+                    placeholder={sceneName(data, scene)}
+                    onSave={(title) => void patch<Scene>('scenes', scene.id, { title })}
+                  />
+                )}
               </header>
             )}
             {text && (

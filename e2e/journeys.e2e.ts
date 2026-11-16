@@ -350,7 +350,7 @@ const toLibrary = async (page: Page) => {
 
 async function newStoryFromLibrary(page: Page) {
   await page.getByRole('button', { name: '+ Новая история' }).click()
-  await page.getByRole('button', { name: 'Начать с фразы' }).click()
+  await page.getByRole('button', { name: 'Писать главу' }).click()
   await expect(page.locator('.ProseMirror')).toBeVisible()
 }
 

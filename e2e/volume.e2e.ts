@@ -127,7 +127,7 @@ test.describe('a Ficbook export of ~110 scenes', () => {
   test('a2. the same book through "Добавить текст": preview shows 17 parts, then confirm', async () => {
     await page.goto('/#/library')
     await page.getByRole('button', { name: '+ Новая история' }).click()
-    await page.getByRole('button', { name: 'Начать с фразы' }).click()
+    await page.getByRole('button', { name: 'Писать главу' }).click()
     await expect(page.locator('.ProseMirror')).toBeVisible()
     await page.goto('/#/book')
     await page.locator('summary', { hasText: 'Файлы и версии' }).click()

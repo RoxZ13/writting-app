@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 test('self-check is explicit and does not resize the writing page', async ({ page }) => {
   await page.goto('/')
   await page.getByRole('button', { name: 'Начать историю' }).click()
-  await page.getByRole('button', { name: 'Начать с фразы' }).click()
+  await page.getByRole('button', { name: 'Писать главу' }).click()
 
   const editor = page.locator('.ProseMirror')
   await editor.click()
