@@ -7,3 +7,5 @@ dev-dist
 test-results
 playwright-report
 dist-*
+xcuserdata/
+DerivedData/
