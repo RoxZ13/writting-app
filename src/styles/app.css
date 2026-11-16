@@ -3085,7 +3085,8 @@ main.page {
   max-height: calc(100dvh - var(--header-h) - 110px);
 }
 @media (max-width: 600px) {
-  .typo-font-anchor > .tool {
+  .typo-font-anchor > .tool,
+  .write-top > .plan-tool {
     display: none;
   }
   .write-top {

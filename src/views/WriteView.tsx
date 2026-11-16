@@ -360,7 +360,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
             </button>
           )}
           <button
-            className={`tool ${panels.plan ? 'on' : ''}`}
+            className={`tool plan-tool ${panels.plan ? 'on' : ''}`}
             title={
               panels.plan
                 ? `Скрыть «О ${wholeChapter ? 'главе' : 'сцене'}»`
@@ -429,6 +429,9 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                   {(
                     [
                       ...(isTouch() ? [['type', 'Шрифт и вид страницы', '', () => setTypoOpen(true)]] : []),
+                      ...(isTouch()
+                        ? [['sidebar', `О ${wholeChapter ? 'главе' : 'сцене'}`, '', () => togglePanel('plan')]]
+                        : []),
                       ['bolt', 'Быстрая заметка', isMac ? '⌘J' : 'Ctrl+J', () => window.dispatchEvent(new Event('manuscript:capture'))],
                       ['spark', 'Маячок здесь', isMac ? '⌘M' : 'Ctrl+M', () => editor && setAction(selectionForMarker(editor))],
                       ...(chapter && !chapter.pool && !chapter.locked

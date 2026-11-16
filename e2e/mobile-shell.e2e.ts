@@ -96,12 +96,14 @@ test('rare page controls stay under More and the chapter panel speaks about the 
   await startStory(page)
 
   await expect(page.locator('.typo-font-anchor > .tool')).toBeHidden()
+  await expect(page.locator('.plan-tool')).toBeHidden()
   await page.getByRole('button', { name: 'Ещё' }).click()
   await page.getByRole('button', { name: 'Шрифт и вид страницы' }).click()
   await expect(page.locator('.typo-pop').filter({ has: page.locator('.typo') })).toBeVisible()
   await page.getByRole('button', { name: 'Закрыть настройки текста' }).click()
 
-  await page.getByRole('button', { name: /О главе/ }).click()
+  await page.getByRole('button', { name: 'Ещё' }).click()
+  await page.getByRole('button', { name: 'О главе', exact: true }).click()
   const chapterPanel = page.getByRole('region', { name: 'О главе' })
   await expect(chapterPanel).toBeVisible()
   await chapterPanel.getByRole('button', { name: 'зачем глава' }).click()
