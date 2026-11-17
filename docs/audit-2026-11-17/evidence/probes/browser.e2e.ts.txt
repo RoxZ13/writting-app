@@ -1,0 +1,94 @@
+import { expect, test, type Page, type TestInfo } from '@playwright/test'
+import { allTexts, dbAll, startStory, typeInEditor, waitTextInDb } from '../e2e/helpers'
+
+const toBackup = async (page: Page, info: TestInfo, name: string) => {
+  await page.goto('/#/settings')
+  const download = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Скачать копию', exact: true }).click()
+  const path = info.outputPath(name)
+  await (await download).saveAs(path)
+  return path
+}
+
+const restore = async (page: Page, file: string) => {
+  await page.goto('/#/settings')
+  const dialog = page.waitForEvent('dialog')
+  const importFile = page.locator('input[type=file][accept*="json"]').setInputFiles(file)
+  const confirm = await dialog
+  const message = confirm.message()
+  await confirm.accept()
+  await importFile
+  await expect(page.getByRole('status')).toContainText(/Готово/)
+  return message
+}
+
+test('regular download and restore propagate a deletion behind the no-deletion confirmation', async ({ page, browser, baseURL }, info) => {
+  await startStory(page)
+  const phrase = 'Контрольный абзац для двух устройств.'
+  await typeInEditor(page, phrase)
+  await waitTextInDb(page, phrase)
+  const activeBackup = await toBackup(page, info, '01-active.json')
+  const receiverContext = await browser.newContext({ baseURL })
+  try {
+    const receiver = await receiverContext.newPage()
+    await startStory(receiver)
+    await restore(receiver, activeBackup)
+    const id = (await dbAll(page, 'projects'))[0].id
+    expect((await dbAll(receiver, 'projects')).find((project) => project.id === id)?.deleted).toBeFalsy()
+    expect((await allTexts(receiver)).some((scene) => scene.text.includes(phrase))).toBe(true)
+
+    await page.goto('/#/library')
+    await page.locator('.story summary[aria-label^="Настроить"]').click()
+    page.once('dialog', (dialog) => void dialog.accept())
+    await page.getByRole('button', { name: 'Удалить историю' }).click()
+    await expect.poll(async () => (await dbAll(page, 'projects')).find((project) => project.id === id)?.deleted).toBe(true)
+    await startStory(page)
+    const deletedBackup = await toBackup(page, info, '02-after-deletion.json')
+    const message = await restore(receiver, deletedBackup)
+    expect(message).toContain('Ничего не удаляется.')
+    expect((await dbAll(receiver, 'projects')).find((project) => project.id === id)?.deleted).toBe(true)
+    await receiver.goto('/#/library')
+    await expect(receiver.locator('.story')).toHaveCount(2)
+    console.log('Manual restore: project deleted=true in receiver despite confirmation. The stored text is still present:', (await allTexts(receiver)).some((scene) => scene.text.includes(phrase)))
+  } finally {
+    await receiverContext.close()
+  }
+})
+
+test('works as observed: a mouse-controlled narrow window loses the plan and font entries', async ({ page }) => {
+  await page.setViewportSize({ width: 580, height: 800 })
+  await startStory(page)
+  expect(await page.evaluate(() => matchMedia('(pointer: coarse)').matches)).toBe(false)
+  await expect(page.locator('.plan-tool')).toBeHidden()
+  await expect(page.locator('.typo-font-anchor > .tool')).toBeHidden()
+  await page.getByRole('button', { name: 'Ещё', exact: true }).click()
+  await expect(page.getByRole('button', { name: 'О главе', exact: true })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Шрифт и вид страницы', exact: true })).toHaveCount(0)
+  await page.setViewportSize({ width: 650, height: 800 })
+  await expect(page.locator('.plan-tool')).toBeVisible()
+  await expect(page.locator('.typo-font-anchor > .tool')).toBeVisible()
+})
+
+test('missing required scene content is accepted through restore and prevents opening the book', async ({ page }) => {
+  await startStory(page)
+  const tables: Record<string, unknown[]> = {}
+  for (const table of ['projects', 'chapters', 'scenes', 'texts']) {
+    tables[table] = await dbAll(page, table)
+  }
+  const scene = tables.scenes[0] as Record<string, unknown>
+  delete scene.beats
+  scene.updatedAt = Date.now() + 1000
+  // Legacy copies have no revision metadata and remain an accepted import format.
+  delete scene.syncRev
+  delete scene.syncVersion
+  await page.goto('/#/settings')
+  page.on('dialog', (dialog) => void dialog.accept())
+  await page.locator('input[type=file][accept*="json"]').setInputFiles({
+    name: 'malformed-scene.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(tables)),
+  })
+  await expect.poll(async () => (await dbAll(page, 'scenes'))[0].beats).toBeUndefined()
+  await page.goto('/#/text')
+  await expect(page.getByRole('heading', { name: 'Экран не открылся' })).toBeVisible()
+})

@@ -1,0 +1,100 @@
+import 'fake-indexeddb/auto'
+import { describe, expect, it } from 'vitest'
+import { db, ManuscriptDB, useDatabase, type Project, type SceneText } from '../src/db/db'
+import { createProject, patch, remove } from '../src/db/repo'
+import { makeBackup, parseBackupText, restoreBackup, type Backup } from '../src/lib/backup'
+import { syncWithStore, type FileStore } from '../src/lib/filesync'
+import { docParagraphs } from '../src/lib/text'
+
+describe('Manuscript audit: synthetic records, no cloud access', () => {
+  it('round-trips text and its links through backup into a clean database', async () => {
+    useDatabase(new ManuscriptDB('audit-original'))
+    const project = await createProject('Книга для аудита')
+    const scene = (await db.scenes.toArray())[0]
+    const content = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Контрольная фраза № 17.' }] }] }
+    await patch<SceneText>('texts', scene.id, { content, wordCount: 4 })
+    const serialized = JSON.stringify(await makeBackup())
+    const exported = parseBackupText(serialized)
+    useDatabase(new ManuscriptDB('audit-restored'))
+    await restoreBackup(exported)
+    expect(await makeBackup()).toEqual(exported)
+    expect((await db.scenes.get(scene.id))?.projectId).toBe(project.id)
+    expect((await db.chapters.get(scene.chapterId))?.projectId).toBe(project.id)
+    expect(docParagraphs((await db.texts.get(scene.id))!.content)).toEqual(['Контрольная фраза № 17.'])
+  })
+
+  it('documents that a current, valid backup carries a deletion to another library', async () => {
+    const author = new ManuscriptDB('audit-delete-author')
+    const receiver = new ManuscriptDB('audit-delete-receiver')
+    useDatabase(author)
+    const project = await createProject('Книга, видимая на втором устройстве')
+    const beforeDeletion = await makeBackup()
+    useDatabase(receiver)
+    await restoreBackup(beforeDeletion)
+    expect((await db.projects.get(project.id))?.deleted).toBeFalsy()
+
+    useDatabase(author)
+    await remove('projects', project.id)
+    const afterDeletion = parseBackupText(JSON.stringify(await makeBackup()))
+    useDatabase(receiver)
+    const result = await restoreBackup(afterDeletion)
+    expect(result.updated).toBeGreaterThan(0)
+    expect((await db.projects.get(project.id))?.deleted).toBe(true)
+    console.log('valid backup: active receiver project -> deleted=true after manual restore')
+  })
+
+  it('documents that a missing scene field is accepted and committed', async () => {
+    useDatabase(new ManuscriptDB('audit-incomplete-scene'))
+    const project = await createProject('Книга с неполной копией')
+    const broken = await makeBackup()
+    const rawScene = broken.scenes[0] as unknown as Record<string, unknown>
+    delete rawScene.beats
+    const id = rawScene.id as string
+    const accepted = parseBackupText(JSON.stringify(broken))
+    useDatabase(new ManuscriptDB('audit-incomplete-scene-restored'))
+    await restoreBackup(accepted)
+    const scene = await db.scenes.get(id)
+    expect(scene?.projectId).toBe(project.id)
+    expect(scene?.beats).toBeUndefined()
+    expect(() => scene!.beats.filter((beat) => beat.done)).toThrow(TypeError)
+    console.log('missing beats: parse -> restore -> IndexedDB accepted; editor operation throws TypeError')
+  })
+
+  it('keeps the old sync base after an upload failure and converges on retry', async () => {
+    const deviceA = new ManuscriptDB('audit-sync-a')
+    const deviceB = new ManuscriptDB('audit-sync-b')
+    const files = new Map<string, Backup>()
+    let offline = false
+    const store: FileStore = {
+      name: 'in-memory test disk',
+      async read() {
+        return [...files].map(([source, data]) => ({ source, version: 'test', data: structuredClone(data) }))
+      },
+      async write(data, slot) {
+        if (offline) throw new Error('synthetic upload failure')
+        files.set(slot, structuredClone(data))
+      },
+    }
+    useDatabase(deviceA)
+    const a = await createProject('С устройства A')
+    await syncWithStore(store)
+    useDatabase(deviceB)
+    const b = await createProject('С устройства B')
+    await syncWithStore(store)
+    useDatabase(deviceA)
+    const before = await db.meta.get('filesync.base.v2')
+    expect(before).toBeDefined()
+    await patch<Project>('projects', a.id, { title: 'Локальная правка A' })
+    offline = true
+    await expect(syncWithStore(store)).rejects.toThrow('synthetic upload failure')
+    expect(await db.meta.get('filesync.base.v2')).toEqual(before)
+    expect((await db.projects.get(a.id))?.title).toBe('Локальная правка A')
+    expect((await db.projects.get(b.id))?.title).toBe('С устройства B')
+    offline = false
+    await syncWithStore(store)
+    const contents = await makeBackup()
+    useDatabase(deviceB)
+    await syncWithStore(store)
+    expect(await makeBackup()).toEqual(contents)
+  })
+})

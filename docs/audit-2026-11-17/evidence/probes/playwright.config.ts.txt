@@ -1,0 +1,9 @@
+import { defineConfig } from '@playwright/test'
+import baseline from '../playwright.config'
+
+export default defineConfig({
+  ...baseline,
+  testDir: '.',
+  outputDir: '../test-results/data-audit',
+  webServer: { ...(baseline.webServer as Exclude<typeof baseline.webServer, any[]>), cwd: process.cwd() },
+})
