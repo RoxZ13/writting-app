@@ -2496,6 +2496,7 @@ main.page.wide {
   --app-safe-top: env(safe-area-inset-top, 0px);
   --header-height-with-inset: calc(64px + var(--app-safe-top));
   --header-h: var(--header-height-with-inset);
+  --write-toolbar-height: 50px;
 }
 .app {
   min-height: 100dvh;
@@ -2704,6 +2705,7 @@ main.page {
 }
 .write-top {
   top: var(--header-h);
+  min-height: var(--write-toolbar-height);
   padding: 8px 12px;
   gap: 4px;
 }
@@ -3352,6 +3354,13 @@ main.page {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+}
+.story-heading {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
 }
 .story-title {
   appearance: none;
@@ -3366,9 +3375,21 @@ main.page {
   text-align: left;
   cursor: pointer;
   flex: 1;
+  min-width: 0;
 }
-.story-settings-icon {
-  display: none;
+.story-title > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.story-heading > .story-settings {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  justify-content: center;
 }
 .story-continue {
   align-self: flex-start;
@@ -3754,7 +3775,7 @@ main.page {
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  padding: calc(env(safe-area-inset-top) + 44px) 22px 24px;
+  padding: calc(var(--app-safe-top) + 44px) 22px 24px;
   background: var(--side);
   border-right: 1px solid var(--line);
 }
@@ -3790,6 +3811,10 @@ main.page {
 }
 .lib-back {
   margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   border: 0;
   background: none;
   text-align: left;
@@ -3798,6 +3823,8 @@ main.page {
   font-size: var(--fs-ui);
   padding: 10px 16px;
   border-radius: var(--r-md);
+}
+.lib-back-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -3825,10 +3852,19 @@ main.page {
   margin-top: 6px;
   font-size: var(--fs-lg);
 }
-.btn.big-pill {
-  padding: 14px 26px;
-  font-size: var(--fs-lg);
-  box-shadow: var(--shadow-2);
+.library-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.library-actions {
+  display: flex;
+  gap: 8px;
+}
+.library-actions > .btn {
+  min-height: 44px;
 }
 .help {
   display: grid;
@@ -3854,7 +3890,7 @@ main.page {
     flex-wrap: wrap;
     align-items: center;
     gap: 8px 12px;
-    padding: calc(env(safe-area-inset-top) + 12px) 16px 12px;
+    padding: calc(var(--app-safe-top) + 12px) 16px 12px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
   }
@@ -3865,10 +3901,11 @@ main.page {
   .lib-side .side-label {
     display: none;
   }
-  .lib-nav {
+  .lib-side .lib-nav {
     flex-direction: row;
     width: 100%;
     gap: 4px;
+    margin-top: 0;
   }
   .lib-nav button {
     padding: 8px 14px;
@@ -3977,7 +4014,7 @@ main.page {
   .lib-side {
     flex-wrap: nowrap;
     gap: 10px;
-    padding: calc(env(safe-area-inset-top) + 8px) 16px 8px;
+    padding: calc(var(--app-safe-top) + 8px) 16px 8px;
   }
   .lib-side .brand {
     display: none;
@@ -3987,17 +4024,18 @@ main.page {
     flex: 1;
     width: auto;
     min-width: 0;
+    min-height: 44px;
     padding: 10px 0;
     color: var(--ink-2);
   }
-  .lib-nav {
+  .lib-side .lib-nav {
     flex: none;
     width: auto;
     gap: 4px;
   }
   .lib-nav button {
-    width: 42px;
-    height: 42px;
+    width: 44px;
+    height: 44px;
     justify-content: center;
     padding: 0;
     border-radius: 50%;
@@ -4011,26 +4049,21 @@ main.page {
     padding-top: 22px;
   }
   .lib-head {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 10px;
     padding-bottom: 18px;
     margin-bottom: 6px;
   }
-  .lib-head > div:first-child {
-    grid-column: 1;
+  .library-head {
+    align-items: stretch;
+    flex-direction: column;
   }
-  .lib-head > .big-pill {
-    grid-column: 2;
-    grid-row: 1;
-    min-height: 42px;
-    padding: 0 14px;
-    font-size: var(--fs-ui);
-    box-shadow: none;
+  .library-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .lib-head > label {
-    grid-column: 1 / -1;
-    justify-self: start;
+  .library-actions > .btn {
+    justify-content: center;
+    padding-inline: 6px;
+    text-align: center;
   }
   .library,
   .story-group-grid {
@@ -4042,6 +4075,7 @@ main.page {
     margin: 20px 0 0;
   }
   .story {
+    position: relative;
     display: grid;
     grid-template-columns: 64px minmax(0, 1fr);
     align-items: center;
@@ -4084,35 +4118,28 @@ main.page {
     gap: 5px;
   }
   .story-title {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     font-size: var(--fs-lg);
+    min-height: 44px;
   }
   .story-meta {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .story-body .menu > summary {
-    width: 42px;
-    min-width: 42px;
-    height: 42px;
-    padding: 0;
-    justify-content: center;
+  .story-heading {
+    position: static;
   }
-  .story-settings-label,
+  .story-heading > .story-settings {
+    width: 44px;
+    height: 44px;
+  }
   .story-continue {
     display: none;
   }
-  .story-settings-icon {
-    display: inline-grid;
-    place-items: center;
-  }
   .story-menu {
-    left: auto;
-    right: 0;
-    width: min(320px, calc(100vw - 32px));
+    top: 100%;
+    min-width: 0;
+    width: min(320px, 100%);
   }
 }
 
@@ -5492,9 +5519,20 @@ button.deadline {
   width: min(520px, 100%);
   padding: 36px;
 }
+.welcome-actions > .btn {
+  min-height: 44px;
+}
 @media (max-width: 480px) {
   .welcome-card {
     padding: 28px 22px;
+  }
+  .welcome-actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .welcome-actions > .btn {
+    justify-content: center;
+    text-align: center;
   }
 }
 .welcome-more {
@@ -6911,7 +6949,7 @@ button.avatar {
   .write-top {
     flex-wrap: nowrap;
     gap: 0;
-    min-height: 48px;
+    min-height: var(--write-toolbar-height);
     padding-left: 6px;
     padding-right: 6px;
   }
@@ -7274,20 +7312,15 @@ button.avatar {
   padding: 0 22px;
   border-radius: var(--r-md);
 }
-.lib-side .lib-nav {
-  margin-top: 28px;
+@media (min-width: 901px) {
+  .lib-side .lib-nav {
+    margin-top: 28px;
+  }
 }
 .brand .tagline {
   margin-top: 6px;
   color: var(--ink-3);
 }
-.lib-back {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
-
 /* The «⋯» menu over the text: the mode on top, then a short list of actions. */
 .write-menu {
   width: 270px;
@@ -7691,7 +7724,7 @@ button.avatar {
 /* The editor's visible goal: chapter limit + scene readiness. Details stay one tap away. */
 .chapter-meter {
   position: sticky;
-  top: 52px;
+  top: calc(var(--header-h) + var(--write-toolbar-height));
   z-index: var(--z-meter);
   width: 100%;
   padding: 4px 12px 7px;
@@ -7784,10 +7817,6 @@ button.avatar {
   background: var(--ink);
   transform: translate(-1px, -50%);
   box-shadow: 0 0 0 2px var(--surface);
-}
-.chapter-progress-track.no-goal .chapter-current-marker {
-  left: 0 !important;
-  opacity: 0.5;
 }
 .chapter-progress-fill,
 .chapter-progress-bigtrack > span,
@@ -8154,7 +8183,6 @@ button.avatar {
 
 @media (max-width: 760px) {
   .chapter-meter {
-    top: calc(env(safe-area-inset-top) + 48px);
     padding: 3px 8px 6px;
   }
   .chapter-progress-trigger {
@@ -8627,6 +8655,7 @@ button.avatar {
      and masquerade as part of the editor. */
   :root[data-keyboard='open'] .tabs-mobile,
   :root[data-keyboard='open'] .write .passport-wrap,
+  :root[data-keyboard='open'] .write .resume,
   :root[data-keyboard='open'] .fab {
     opacity: 0 !important;
     visibility: hidden;
@@ -8637,7 +8666,7 @@ button.avatar {
 
 @media (max-width: 900px) and (pointer: coarse) {
   /* Let WebKit scroll the caret past the upper bars as the keyboard opens. */
-  :root[data-keyboard='open']:not([data-focusrun='on']) .app-text :is(.app-header, .write-top) {
+  :root[data-keyboard='open']:not([data-focusrun='on']) .app-text :is(.app-header, .write-top, .chapter-meter) {
     position: relative;
     top: auto;
   }
@@ -8856,11 +8885,9 @@ button.avatar {
   .tl-body {
     padding: 0 0 10px 18px;
   }
-  .tl-body .board-chapter-progress-copy > span {
-    display: none;
-  }
-  .tl-body .board-chapter-progress-copy {
-    justify-content: flex-end;
+  .tl-chapter > .board-chapter-progress {
+    padding: 0 4px 10px 18px;
+    margin-top: 0;
   }
   .tl-goal {
     margin: 0 4px 6px;

@@ -42,7 +42,7 @@ export function Welcome({ onCreated, sync }: { onCreated: (id: string, view: 'te
           Пиши с первой фразы или начни с плана — сцены, главы и всё, что нельзя забыть, будут рядом.
         </p>
         <div className="stack">
-          <div className="row">
+          <div className="row welcome-actions">
             <button className="btn primary" disabled={busy} onClick={() => setChoosing(true)}>
               Начать историю
             </button>

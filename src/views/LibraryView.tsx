@@ -62,16 +62,16 @@ export function LibraryView({
 
   return (
     <div className="lib-page">
-      <div className="lib-head row">
-        <div style={{ marginRight: 'auto' }}>
-          <h1>Истории</h1>
+      <div className="lib-head library-head">
+        <h1>Истории</h1>
+        <div className="library-actions">
+          <button className="btn primary" disabled={busy} onClick={() => setChoosing(true)}>
+            + Новая история
+          </button>
+          <FilePick className="btn" accept=".docx,.txt,.md,.html,.htm" disabled={busy} onFile={setImportFile}>
+            {busy ? 'Раскладываю…' : 'Импорт .docx / .txt'}
+          </FilePick>
         </div>
-        <FilePick className="btn" accept=".docx,.txt,.md,.html,.htm" onFile={setImportFile}>
-          {busy ? 'Раскладываю…' : 'Импорт .docx / .txt'}
-        </FilePick>
-        <button className="btn primary big-pill" disabled={busy} onClick={() => setChoosing(true)}>
-          + Новая история
-        </button>
       </div>
 
       <div className="library">
@@ -126,19 +126,26 @@ function StoryCard({
   const dl = deadlineText(p.deadline)
   const color = p.color ?? '#0b0b0c'
   const cover = useCover(p.id)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   return (
     <article className={`story ${current ? 'current' : ''}`}>
       <BookCover project={p} onClick={() => onOpen()} />
       <div className="story-body">
-        <div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}>
+        <div className="story-heading">
           <button className="story-title" onClick={() => onOpen()}>
-            {p.title}
+            <span>{p.title}</span>
           </button>
-          <details className="menu">
-            <summary className="btn sm ghost" aria-label={`Настроить «${p.title}»`}>
-              <span className="story-settings-label">Настроить</span>
-              <span className="story-settings-icon" aria-hidden="true"><Icon name="settings" size={18} /></span>
-            </summary>
+          <button
+            type="button"
+            className="btn sm ghost story-settings"
+            aria-label={`Настроить «${p.title}»`}
+            aria-expanded={settingsOpen}
+            title="Настроить историю"
+            onClick={() => setSettingsOpen(!settingsOpen)}
+          >
+            <Icon name="settings" size={18} />
+          </button>
+          {settingsOpen && (
             <div className="menu-list card story-menu">
               <label className="menu-field">
                 <span>Название</span>
@@ -180,7 +187,7 @@ function StoryCard({
                 Удалить историю
               </button>
             </div>
-          </details>
+          )}
         </div>
         {p.genre && <div className="story-meta">{p.genre}</div>}
         <div className="story-meta">

@@ -16,6 +16,7 @@ test('self-check is explicit and does not resize the writing page', async ({ pag
   await page.locator('.write-top').getByRole('button', { name: /Ещё/ }).click()
   const menu = page.locator('.write-menu')
   await expect(menu.getByRole('button', { name: 'Самопроверка' })).toBeVisible()
+  if ((await page.viewportSize())!.width <= 600) await menu.getByText('Ещё инструменты', { exact: true }).click()
   await expect(menu.getByRole('button', { name: 'Исправить типографику' })).toBeVisible()
   await menu.getByRole('button', { name: 'Самопроверка' }).click()
 

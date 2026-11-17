@@ -632,20 +632,25 @@ function AskLock({ data }: { data: ProjectData }) {
   )
 }
 
-function BoardChapterProgress({ data, chapter, scenes }: { data: ProjectData; chapter: Chapter; scenes: Scene[] }) {
+function BoardChapterProgress({ data, chapter, scenes, singleChapter = false }: { data: ProjectData; chapter: Chapter; scenes: Scene[]; singleChapter?: boolean }) {
   const progress = chapterWritingProgress(data.project, scenes, undefined, chapter)
   if (!scenes.length && !progress.target) return null
+  if (singleChapter && !progress.target && !progress.ready) return null
   const number = (value: number) => Math.round(value).toLocaleString('ru-RU')
   const ratio = progress.target ? progress.ratio : progress.total ? progress.ready / progress.total : 0
   return (
     <div className="board-chapter-progress" title={progress.target ? `Лимит главы: ${number(progress.target)} знаков` : 'Готовность сцен главы'}>
       <div className="board-chapter-track">
         <span style={{ width: `${Math.min(100, ratio * 100)}%` }} />
-        {scenes.map((scene, index) => <i key={scene.id} className={sceneProgressState(scene)} style={{ left: `${((index + 1) / scenes.length) * 100}%` }} />)}
+        {!singleChapter && scenes.map((scene, index) => <i key={scene.id} className={sceneProgressState(scene)} style={{ left: `${((index + 1) / scenes.length) * 100}%` }} />)}
       </div>
       <div className="board-chapter-progress-copy">
-        <span>{progress.target ? `${number(progress.chars)} зн. · цель ${progress.min && progress.max ? `${number(progress.min)}–${number(progress.max)}` : number(progress.target)}` : `${progress.written} из ${progress.total} написано`}</span>
-        <strong>{progress.ready} {progress.ready === 1 ? 'сцена готова' : 'сцен готово'}</strong>
+        {progress.target
+          ? <span>{number(progress.chars)} зн. · цель {progress.min && progress.max ? `${number(progress.min)}–${number(progress.max)}` : number(progress.target)}</span>
+          : !singleChapter && <span>{progress.written} из {progress.total} написано</span>}
+        {singleChapter
+          ? progress.ready > 0 && <strong>Глава готова</strong>
+          : <strong>{progress.ready} {progress.ready === 1 ? 'сцена готова' : 'сцен готово'}</strong>}
       </div>
     </div>
   )
@@ -923,6 +928,7 @@ function Timeline({
                 )}
               </GestureActionButton>
             </div>
+            {singleScene && <BoardChapterProgress data={data} chapter={chapter} scenes={[singleScene]} singleChapter />}
             {chapterActions === chapter.id && (
               <TimelineChapterActions
                 data={data}

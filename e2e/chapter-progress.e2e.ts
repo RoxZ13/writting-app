@@ -20,7 +20,7 @@ async function setChapterRangeHere(page: Page, min: number, max: number) {
   await panel.getByRole('button', { name: 'Закрыть' }).click()
 }
 
-test('chapter goal stays visible and opens scene progress', async ({ page }, info) => {
+test('a whole chapter has its own writing goal and completion status', async ({ page }, info) => {
   await startStory(page)
   await typeInEditor(page, 'Слово '.repeat(20))
   await waitSaveTick(page)
@@ -34,16 +34,16 @@ test('chapter goal stays visible and opens scene progress', async ({ page }, inf
   } else {
     await expect(trigger).toContainText(/\d+ из 600–1[\s ]?000/)
   }
-  await expect(trigger).toContainText('0/1 сцен')
+  await expect(trigger.locator('.chapter-progress-percent')).toHaveCount(0)
   await trigger.click()
 
   const panel = page.getByRole('dialog', { name: /Прогресс главы/ })
   await expect(panel).toBeVisible()
   await expect(panel).toContainText('знаков написано')
   await expect(panel).toContainText('До целевого диапазона осталось')
-  await expect(panel.locator('.chapter-progress-scene')).toHaveCount(1)
-  await panel.getByRole('button', { name: 'Отметить эту сцену готовой' }).click()
-  await expect(panel).toContainText('1 готово')
+  await expect(panel.locator('.chapter-progress-scene')).toHaveCount(0)
+  await panel.getByRole('button', { name: 'Отметить главу готовой' }).click()
+  await expect(panel).toContainText('Глава отмечена готовой')
 
   if (info.project.name !== 'desktop') {
     const box = await panel.boundingBox()
@@ -57,7 +57,7 @@ test('chapter goal stays visible and opens scene progress', async ({ page }, inf
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${info.project.name}-chapter-progress.png` })
 })
 
-test('board gives every chapter a compact progress overview', async ({ page }) => {
+test('the board shows a whole chapter’s volume goal without extra navigation', async ({ page, isMobile }) => {
   await startStory(page)
   await typeInEditor(page, 'Первый черновик сцены.')
   await waitSaveTick(page)
@@ -66,6 +66,6 @@ test('board gives every chapter a compact progress overview', async ({ page }) =
   await expect(page.locator('.board, .timeline')).toBeVisible()
   const progress = page.locator('.board-chapter-progress').first()
   await expect(progress).toBeVisible()
-  await expect(progress).toContainText('цель 3 000–5 000')
-  await expect(progress).toContainText('0 сцен готово')
+  await expect(progress).toContainText(/цель 3\s000–5\s000/)
+  if (isMobile) await expect(page.locator('.tl-chapter').filter({ hasText: 'Глава 1' }).locator('.tl-caret')).toHaveText('→')
 })

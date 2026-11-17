@@ -1,6 +1,6 @@
 import type { Editor } from '@tiptap/react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { db, type Chapter, type Marker, type Note, type Project, type Scene, type SceneText } from '../db/db'
 import { createMarker, createNote, createScene, patch, save, snapshotScene } from '../db/repo'
 import { SceneNow, ScenePlan, sceneMarkers } from '../components/ScenePlan'
@@ -15,7 +15,7 @@ import { editHintsKey } from '../components/EditHints'
 import { countHints } from '../lib/editcheck'
 import { markerPayoffChapter, markerSetupChapter, markerStatus, sceneName, sceneShort, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
-import { hotkey, isTouch, session } from '../lib/session'
+import { hotkey, session } from '../lib/session'
 import { clock, useSprint } from '../lib/sprint'
 import { endFocus, FocusStart } from '../components/Focus'
 import { sumChars } from '../lib/length'
@@ -57,6 +57,13 @@ function loadPanels(): { nav: boolean; plan: boolean } {
 }
 const isMac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
 const isWide = () => matchMedia('(min-width: 1101px)').matches
+const compactToolbar = '(max-width: 600px)'
+const isCompactToolbar = () => matchMedia(compactToolbar).matches
+function subscribeToCompactToolbar(onChange: () => void) {
+  const query = matchMedia(compactToolbar)
+  query.addEventListener('change', onChange)
+  return () => query.removeEventListener('change', onChange)
+}
 function loadMode(): Mode {
   try {
     const m = localStorage.getItem(MODE_KEY)
@@ -89,6 +96,7 @@ function selectionForMarker(editor: Editor): SelectionAction {
 }
 
 export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; sceneId: string; onSearch: (query?: string) => void }) {
+  const compact = useSyncExternalStore(subscribeToCompactToolbar, isCompactToolbar)
   const scene = data.sceneById.get(sceneId)
   const text = useLiveQuery(() => db.texts.get(sceneId), [sceneId])
   const [panels, setPanels] = useState(loadPanels)
@@ -464,7 +472,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                       </button>
                     ))}
                   </div>
-                  {isTouch() ? (
+                  {compact ? (
                     <>
                       {quickMenuTools.map(renderMenuTool)}
                       <details className="write-menu-more">
@@ -473,7 +481,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                       </details>
                     </>
                   ) : desktopMenuTools.map(renderMenuTool)}
-                  {!isTouch() && (
+                  {!compact && (
                     <button
                       className="menu-foot"
                       onClick={() => {

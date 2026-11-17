@@ -28,19 +28,24 @@ export function GestureActionButton({
     clearTimeout(timer.current)
     timer.current = undefined
   }
-  const actions = () => {
+  useEffect(() => () => clearTimeout(timer.current), [])
+  const actions = (fromGesture = false) => {
     clear()
     setPressing(false)
-    suppressClick.current = true
+    if (fromGesture) {
+      if (suppressClick.current) return
+      suppressClick.current = true
+    }
     navigator.vibrate?.(12)
     onActions()
   }
   const down = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    suppressClick.current = false
     if (event.pointerType === 'mouse') return
     start.current = { x: event.clientX, y: event.clientY }
     setPressing(true)
     clear()
-    timer.current = setTimeout(actions, 380)
+    timer.current = setTimeout(() => actions(true), 380)
   }
   const move = (event: ReactPointerEvent<HTMLButtonElement>) => {
     if (!start.current) return
@@ -55,7 +60,7 @@ export function GestureActionButton({
     if (start.current) {
       const dx = event.clientX - start.current.x
       const dy = event.clientY - start.current.y
-      if (dx < -56 && Math.abs(dx) > Math.abs(dy) * 1.25) actions()
+      if (dx < -56 && Math.abs(dx) > Math.abs(dy) * 1.25) actions(true)
     }
     start.current = null
   }
@@ -75,7 +80,7 @@ export function GestureActionButton({
       }}
       onContextMenu={(event) => {
         event.preventDefault()
-        actions()
+        actions(start.current !== null)
       }}
       onKeyDown={(event) => {
         if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
@@ -84,7 +89,7 @@ export function GestureActionButton({
         }
       }}
       onClick={(event) => {
-        if (suppressClick.current) {
+        if (suppressClick.current && event.detail > 0) {
           suppressClick.current = false
           event.preventDefault()
           return

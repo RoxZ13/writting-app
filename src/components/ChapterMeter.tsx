@@ -137,17 +137,15 @@ export function ChapterMeter({
           {number(progress.chars)} зн.{range ? ` · цель ${range}` : ' · задать диапазон'}
         </span>
         <span className="chapter-progress-summary chapter-progress-summary-mobile">
-          {number(progress.chars)}{range ? ` из ${range}` : ' · без цели'}
+          {number(progress.chars)}{range ? ` из ${range} зн.` : ' зн. · без цели'}
         </span>
         {!wholeChapter && <span className="chapter-progress-percent">{progress.ready}/{progress.total} сцен</span>}
-        <span
-          className={`chapter-progress-track range${progress.target ? '' : ' no-goal'}`}
-          role="img"
-          aria-label={`В главе ${number(progress.chars)} знаков${range ? `, целевой диапазон ${range}` : ''}`}
-        >
-          {progress.target && <span className="chapter-target-band" style={{ left: `${bandStart}%`, width: `${Math.max(2, bandEnd - bandStart)}%` }} />}
-          <span className="chapter-current-marker" style={{ left: `${marker}%` }} />
-        </span>
+        {progress.target && (
+          <span className="chapter-progress-track range" aria-hidden="true">
+            <span className="chapter-target-band" style={{ left: `${bandStart}%`, width: `${Math.max(2, bandEnd - bandStart)}%` }} />
+            <span className="chapter-current-marker" style={{ left: `${marker}%` }} />
+          </span>
+        )}
       </button>
 
       {open && (

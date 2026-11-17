@@ -232,7 +232,8 @@ export function App() {
             ))}
           </nav>
           <button className="lib-back" onClick={() => go({ view: lastView(data.project.id) })}>
-            ← {data.project.title}
+            <span aria-hidden="true">←</span>
+            <span className="lib-back-title">{data.project.title}</span>
           </button>
         </aside>
         <main className="lib-main">
