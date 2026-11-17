@@ -2493,7 +2493,9 @@ main.page.wide {
    One workspace: header with tabs, text with modes, board, people.
    ===================================================================== */
 :root {
-  --header-h: 64px;
+  --app-safe-top: env(safe-area-inset-top, 0px);
+  --header-height-with-inset: calc(64px + var(--app-safe-top));
+  --header-h: var(--header-height-with-inset);
 }
 .app {
   min-height: 100dvh;
@@ -2506,7 +2508,7 @@ main.page.wide {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: env(safe-area-inset-top) 20px 0 24px;
+  padding: var(--app-safe-top) 20px 0 24px;
   background: color-mix(in srgb, var(--side) 92%, transparent);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
@@ -2624,10 +2626,10 @@ main.page {
 }
 @media (max-width: 900px) {
   :root {
-    --header-h: 52px;
+    --header-height-with-inset: calc(52px + var(--app-safe-top));
   }
   .app-header {
-    padding: env(safe-area-inset-top) 16px 0;
+    padding: var(--app-safe-top) 16px 0;
   }
   .data-safety {
     padding: 6px;
@@ -5257,7 +5259,7 @@ button.deadline {
     left: 0;
     right: 0;
     top: 0;
-    height: 64px;
+    height: var(--header-height-with-inset);
     opacity: 0;
     transform: translateY(-100%);
     pointer-events: none;
@@ -5277,7 +5279,7 @@ button.deadline {
   [data-calm='on'] .app-text .write-top:has(.typo-pop) {
     opacity: 1;
     pointer-events: auto;
-    transform: translateY(64px);
+    transform: translateY(var(--header-height-with-inset));
   }
   [data-calm='on'] .app-text .passport-wrap {
     top: 0;
@@ -7587,6 +7589,7 @@ button.avatar {
   left: 0;
   right: 0;
   top: 0;
+  height: var(--header-height-with-inset);
   z-index: 50;
   opacity: 0;
   transform: translateY(-100%);
@@ -7606,7 +7609,7 @@ button.avatar {
 [data-focusrun='on'] .app-text.reveal .write-top {
   opacity: 1;
   pointer-events: auto;
-  transform: translateY(64px);
+  transform: translateY(var(--header-height-with-inset));
 }
 [data-focusrun='on'] .text-stats,
 [data-focusrun='on'] .resume,
@@ -8629,6 +8632,14 @@ button.avatar {
     visibility: hidden;
     pointer-events: none !important;
     transform: translateY(110%);
+  }
+}
+
+@media (max-width: 900px) and (pointer: coarse) {
+  /* Let WebKit scroll the caret past the upper bars as the keyboard opens. */
+  :root[data-keyboard='open']:not([data-focusrun='on']) .app-text :is(.app-header, .write-top) {
+    position: relative;
+    top: auto;
   }
 }
 

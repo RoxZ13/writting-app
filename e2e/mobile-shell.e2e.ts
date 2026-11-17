@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { startStory } from './helpers'
+import { startStory, waitTextInDb } from './helpers'
 
 test('the mobile shell behaves like an app surface', async ({ page }, info) => {
   test.skip(info.project.name === 'desktop', 'phone shell only')
@@ -21,6 +21,38 @@ test('the mobile shell behaves like an app surface', async ({ page }, info) => {
   await expect(tabs).toBeHidden()
   await page.evaluate(() => { document.documentElement.dataset.keyboard = 'closed' })
   await expect(tabs).toBeVisible()
+})
+
+test('the status-bar inset leaves room for the book title and the writer toolbar', async ({ page }, info) => {
+  test.skip(info.project.name === 'desktop', 'phone shell only')
+  const editor = await startStory(page)
+  // The emulated window has no physical status bar; give it the inset of a notched phone.
+  await page.evaluate(() => document.documentElement.style.setProperty('--app-safe-top', '62px'))
+  const header = page.locator('.app-header')
+  const bookTitle = header.locator('.project-name-mobile summary')
+  const toolbar = page.locator('.write-top')
+  await expect(header).toHaveCSS('height', '114px')
+
+  const assertBarsFit = async () => {
+    const geometry = await page.evaluate(() => {
+      const header = document.querySelector('.app-header')!.getBoundingClientRect()
+      const title = document.querySelector('.project-name-mobile summary')!.getBoundingClientRect()
+      const toolbar = document.querySelector('.write-top')!.getBoundingClientRect()
+      return { titleTop: title.top, titleBottom: title.bottom, headerBottom: header.bottom, toolbarTop: toolbar.top }
+    })
+    expect(geometry.titleTop).toBeGreaterThanOrEqual(62)
+    expect(geometry.titleBottom).toBeLessThanOrEqual(geometry.headerBottom)
+    expect(geometry.toolbarTop).toBeGreaterThanOrEqual(geometry.headerBottom)
+  }
+  await expect(bookTitle).toBeVisible()
+  await assertBarsFit()
+
+  await editor.fill('Проверка строки в редакторе.')
+  await page.evaluate(() => { document.documentElement.dataset.keyboard = 'open' })
+  await expect(header).toHaveCSS('position', 'relative')
+  await expect(toolbar).toHaveCSS('position', 'relative')
+  await assertBarsFit()
+  await waitTextInDb(page, 'Проверка строки в редакторе.')
 })
 
 test('chapter progress keeps plan controls in a separate sheet on phones', async ({ page }, info) => {
