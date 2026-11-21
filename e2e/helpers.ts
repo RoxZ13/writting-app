@@ -64,7 +64,6 @@ export async function openChapterPlan(page: Page) {
     await shortcut.click()
   } else {
     await page.locator('.write-top').getByRole('button', { name: 'Ещё', exact: true }).click()
-    await page.getByText('Ещё инструменты', { exact: true }).click()
     await page.getByRole('button', { name: 'О главе', exact: true }).click()
   }
   const plan = page.getByRole('region', { name: 'О главе', exact: true })
@@ -81,7 +80,6 @@ export async function openWorkspaceTab(page: Page, name: 'Текст' | 'Дос�
   const menu = page.locator('.write-menu')
   const more = page.locator('.write-top').getByRole('button', { name: 'Ещё', exact: true })
   await more.click()
-  await menu.getByText('Разделы книги', { exact: true }).click()
   await menu.getByRole('button', { name, exact: true }).click()
 }
 

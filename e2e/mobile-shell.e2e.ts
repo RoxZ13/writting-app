@@ -1,5 +1,16 @@
-import { expect, test } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import { aliveRows, openChapterProgress, openWorkspaceTab, setChapterMaximum, startStory, waitTextInDb } from './helpers'
+
+async function setKeyboardViewport(page: Page, open: boolean, offsetTop = 0) {
+  await page.evaluate(({ open, offsetTop }) => {
+    const viewport = window.visualViewport!
+    Object.defineProperties(viewport, {
+      height: { configurable: true, value: window.innerHeight - (open ? 290 : 0) },
+      offsetTop: { configurable: true, value: offsetTop },
+    })
+    viewport.dispatchEvent(new Event('resize'))
+  }, { open, offsetTop })
+}
 
 test('the mobile shell behaves like an app surface', async ({ page }, info) => {
   test.skip(info.project.name === 'desktop', 'phone shell only')
@@ -50,14 +61,17 @@ test('the status-bar inset leaves room for the book title and the writer toolbar
   await page.evaluate(() => document.documentElement.style.setProperty('--app-safe-top', '62px'))
   await expect(page.getByRole('button', { name: 'Продолжить', exact: true })).toBeHidden()
   await expect(meter.locator('.chapter-progress-track')).toBeVisible()
-  await page.evaluate(() => window.scrollTo(0, 480))
-  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100)
+  await expect(editor).toContainText('Проверка строки в редакторе.')
+  await expect.poll(() => page.evaluate(() => {
+    window.scrollTo({ top: 480, behavior: 'instant' })
+    return window.scrollY
+  })).toBeGreaterThan(100)
   await assertBarsFit()
   const toolbarBox = (await toolbar.boundingBox())!
   const meterBox = (await meter.boundingBox())!
   expect(meterBox.y).toBeGreaterThanOrEqual(toolbarBox.y + toolbarBox.height - 0.5)
 
-  await page.evaluate(() => { document.documentElement.dataset.keyboard = 'open' })
+  await setKeyboardViewport(page, true)
   await expect(header).toHaveCSS('position', 'relative')
   await expect(toolbar).toHaveCSS('position', 'relative')
   await expect(meter).toHaveCSS('position', 'relative')
@@ -66,7 +80,7 @@ test('the status-bar inset leaves room for the book title and the writer toolbar
   await assertBarsFit()
   await editor.focus()
   await expect(meter).toBeHidden()
-  await page.evaluate(() => { document.documentElement.dataset.keyboard = 'closed' })
+  await setKeyboardViewport(page, false)
   await expect(meter).toBeVisible()
 })
 
@@ -132,11 +146,11 @@ test('changing the manuscript font keeps paragraph spacing fixed and the redunda
   })
   const initial = await metrics()
   const font = await editor.evaluate((element) => getComputedStyle(element).fontFamily)
-  await page.getByRole('button', { name: 'Ещё', exact: true }).click()
-  await page.getByText('Ещё инструменты', { exact: true }).click()
-  await page.getByRole('button', { name: 'Шрифт и вид страницы' }).click()
+  const draftURL = page.url()
+  await page.goto('/#/settings')
   await page.getByRole('button', { name: 'С засечками', exact: true }).click()
-  await page.getByRole('button', { name: 'Закрыть настройки текста' }).click()
+  await page.goto(draftURL)
+  await expect(page.locator('.mobile-current-chapter')).toHaveText('Глава 1')
   await expect(heading).toBeHidden()
   await expect(paragraph).toHaveCSS('margin-bottom', initial.paragraphGap)
   await expect(editor).not.toHaveCSS('font-family', font)
@@ -223,14 +237,9 @@ test('rare page controls stay under More and the chapter panel speaks about the 
   await page.getByRole('button', { name: 'Ещё' }).click()
   await expect(page.getByRole('button', { name: 'Быстрая заметка' })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Найти и заменить' })).toBeVisible()
-  await expect(page.getByRole('button', { name: 'О главе', exact: true })).toBeHidden()
-  await page.getByText('Ещё инструменты', { exact: true }).click()
-  await page.getByRole('button', { name: 'Шрифт и вид страницы' }).click()
-  await expect(page.locator('.typo-pop').filter({ has: page.locator('.typo') })).toBeVisible()
-  await page.getByRole('button', { name: 'Закрыть настройки текста' }).click()
-
-  await page.getByRole('button', { name: 'Ещё' }).click()
-  await page.getByText('Ещё инструменты', { exact: true }).click()
+  await expect(page.getByRole('button', { name: 'Экспорт Word' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Шрифт и вид страницы' })).toHaveCount(0)
+  await expect(page.locator('.write-menu').getByRole('button', { name: 'Параметры книги' })).toHaveCount(0)
   await page.getByRole('button', { name: 'О главе', exact: true }).click()
   const chapterPanel = page.getByRole('region', { name: 'О главе' })
   await expect(chapterPanel).toBeVisible()
@@ -440,4 +449,52 @@ test('selection saves a hero and a continuity detail tied to its source', async 
   await page.getByText(/Встречается в 1 сцене/).click()
   await page.getByText('Абзацы с упоминанием', { exact: true }).click()
   await expect(page.locator('.wf-passages')).toContainText(sentence)
+})
+
+test('formatting stays within reach while scrolling a long draft with the keyboard open', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'phone keyboard layout')
+  const editor = await startStory(page)
+  await editor.fill('Длинный черновик. '.repeat(400))
+  await editor.blur()
+  const toolbar = page.locator('.write-top')
+  await toolbar.getByRole('button', { name: 'Писать', exact: true }).click()
+  await setKeyboardViewport(page, true, 24)
+  await page.evaluate(() => window.scrollTo(0, 600))
+  await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(300)
+  await expect(toolbar).toHaveCSS('position', 'sticky')
+  await expect.poll(async () => (await toolbar.boundingBox())?.y).toBeCloseTo(24, 0)
+  await expect(toolbar.getByRole('button', { name: 'Жирный' })).toBeInViewport()
+})
+
+test('Word export offers the current chapter and the whole manuscript', async ({ page }) => {
+  const editor = await startStory(page)
+  await editor.fill('Этот абзац должен попасть в Word.')
+  const menu = page.locator('.write-menu')
+  await page.getByRole('button', { name: 'Ещё', exact: true }).click()
+  await menu.getByRole('button', { name: 'Экспорт Word' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Экспорт Word' })
+  const downloadButton = dialog.getByRole('button', { name: 'Скачать .docx' })
+  const [chapterFile] = await Promise.all([page.waitForEvent('download'), downloadButton.click()])
+  expect(chapterFile.suggestedFilename()).toBe('Глава 1.docx')
+  await dialog.getByLabel('Что экспортировать').selectOption({ label: 'Вся книга' })
+  const [bookFile] = await Promise.all([page.waitForEvent('download'), downloadButton.click()])
+  expect(bookFile.suggestedFilename()).toBe('Без названия.docx')
+  const { extractRawText } = await import('mammoth')
+  const path = await bookFile.path()
+  expect((await extractRawText({ path: path! })).value).toContain('Этот абзац должен попасть в Word.')
+})
+
+test('the installed iPhone shell hands Word export to its share flow', async ({ page }, info) => {
+  test.skip(info.project.name !== 'iphone', 'native iPhone presentation')
+  await page.addInitScript(() => {
+    const userAgent = navigator.userAgent
+    Object.defineProperty(navigator, 'userAgent', { value: `${userAgent} ManuscriptIOS/3` })
+  })
+  const editor = await startStory(page)
+  await editor.fill('Документ для отправки.')
+  await page.getByRole('button', { name: 'Ещё', exact: true }).click()
+  await page.getByRole('button', { name: 'Экспорт Word', exact: true }).click()
+  const dialog = page.getByRole('dialog', { name: 'Экспорт Word' })
+  const [file] = await Promise.all([page.waitForEvent('download'), dialog.getByRole('button', { name: 'Поделиться' }).click()])
+  expect(file.suggestedFilename()).toBe('Глава 1.docx')
 })

@@ -1,31 +1,21 @@
 import { useState, type SyntheticEvent } from 'react'
-import { db, type Project } from '../db/db'
+import type { Project } from '../db/db'
 import { patch, remove } from '../db/repo'
 import { ImportPanel } from '../components/ImportPanel'
 import { LeftToWrite } from '../components/LeftToWrite'
 import { newEdition } from '../lib/edition'
 import { BookCover, CoverPicker } from '../components/BookCover'
-import { Essence } from '../components/Plot'
+import { EssenceFields } from '../components/Plot'
 import { DateChip } from '../components/DateChip'
 import { useCover } from '../lib/cover'
 import { LengthNorm, NumberField, PaceSection, PublishingSetup, PublishSection } from '../components/BookSections'
 import { chapterProgress } from '../lib/pace'
-import { chapterToFicbook, chapterToRich, download, exportDocx, type ExportChapter } from '../lib/exporter'
+import { chapterToFicbook, chapterToRich, download, exportDocx, loadChapters } from '../lib/exporter'
 import { platformOf } from '../lib/platforms'
 import type { ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { COVERS, STAGES } from '../lib/stories'
 import { InlineEdit, toast } from '../lib/ui'
-
-async function loadChapters(data: ProjectData, only?: string): Promise<ExportChapter[]> {
-  const out: ExportChapter[] = []
-  for (const { chapter, scenes } of data.outline) {
-    if (only && chapter.id !== only) continue
-    const texts = await db.texts.bulkGet(scenes.map((s) => s.id))
-    out.push({ chapter, scenes: scenes.map((s, i) => ({ ...s, content: texts[i]?.content })) })
-  }
-  return out
-}
 
 /** Everything about this one book: how it looks on the shelf, its deadline, getting text in and out. */
 export function BookView({ data }: { data: ProjectData }) {
@@ -40,7 +30,7 @@ export function BookView({ data }: { data: ProjectData }) {
   const [left, setLeft] = useState(false)
   const [paceSetup, setPaceSetup] = useState(false)
   const phone = typeof matchMedia !== 'undefined' && matchMedia('(max-width: 760px)').matches
-  const [openSection, setOpenSection] = useState<'plan' | 'description' | 'publishing' | 'identity' | 'files' | null>(null)
+  const [openSection, setOpenSection] = useState<'plan' | 'description' | 'publishing' | 'essence' | 'identity' | 'files' | null>(null)
   const fold = (id: NonNullable<typeof openSection>) => phone ? {
     open: openSection === id,
     onToggle: (event: SyntheticEvent<HTMLDetailsElement>) => {
@@ -87,7 +77,6 @@ export function BookView({ data }: { data: ProjectData }) {
         </div>
       </div>
 
-      <Essence project={p} embedded autoOpen={words === 0} />
       {left && <LeftToWrite data={data} onClose={() => setLeft(false)} />}
 
       {phone && openSection && <button className="book-section-backdrop" aria-label="Закрыть настройки книги" onClick={() => setOpenSection(null)} />}
@@ -128,6 +117,11 @@ export function BookView({ data }: { data: ProjectData }) {
             ))}
             {!early && <button className="link small" onClick={() => setLeft(true)}>Что осталось дописать</button>}
           </div>
+        </details>
+
+        <details className="settings-section book-fold" {...fold('essence')}>
+          <summary><span>Замысел</span></summary>
+          <div className="book-mobile-fields book-essence-fields"><EssenceFields project={p} /></div>
         </details>
 
         <details className="settings-section book-fold" {...fold('description')}>

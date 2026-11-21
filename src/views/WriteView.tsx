@@ -5,7 +5,7 @@ import { db, type Chapter, type Marker, type Note, type Project, type Scene, typ
 import { createMarker, createNote, createScene, patch, save, snapshotScene } from '../db/repo'
 import { SceneNow, ScenePlan, sceneMarkers } from '../components/ScenePlan'
 import { Icon } from '../components/Icon'
-import { TypoControls } from '../components/TypoControls'
+import { BookExport } from '../components/BookExport'
 import { MarkerCard } from '../components/MarkerCard'
 import { PlacePicker } from '../components/Refs'
 import { SceneEditor, type SelectionAction } from '../components/SceneEditor'
@@ -22,10 +22,10 @@ import { hotkey, session } from '../lib/session'
 import { clock, useSprint } from '../lib/sprint'
 import { endFocus, FocusStart } from '../components/Focus'
 import { sumChars } from '../lib/length'
-import { ChapterMeter, splitChapterHere } from '../components/ChapterMeter'
+import { ChapterMeter } from '../components/ChapterMeter'
 import { chapterProgress, dayKey, totalWords, wordsOn } from '../lib/pace'
 import { MARKER_STATES } from '../lib/status'
-import { docParagraphs, emptyDoc, formatWords, formatWordsOf, lastSentences, pluralRu, wordNoun } from '../lib/text'
+import { docParagraphs, emptyDoc, formatWords, lastSentences, pluralRu } from '../lib/text'
 import { loadTypo } from '../lib/typography'
 import { diffParagraphs } from '../lib/diff'
 import { InlineEdit, Modal, toast } from '../lib/ui'
@@ -112,8 +112,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   const [openComment, setOpenComment] = useState<string | null>(null)
   const [typing, setTyping] = useState(false)
   const [askRewrite, setAskRewrite] = useState(false)
-  const [finishing, setFinishing] = useState(false)
-  const [typoOpen, setTypoOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [chapterProgressOpen, setChapterProgressOpen] = useState(false)
   const [writingSession, setWritingSession] = useState(false)
@@ -310,7 +309,6 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   const enterWritingSession = () => {
     if (writingSession || savingSession) return
     setMenuOpen(false)
-    setTypoOpen(false)
     setFind(null)
     closeOverlays()
     setWritingSession(true)
@@ -362,24 +360,18 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
     ['bolt', 'Быстрая заметка', isMac ? '⌘J' : 'Ctrl+J', () => window.dispatchEvent(new Event('manuscript:capture'))],
     ['search', 'Найти и заменить', isMac ? '⌘⇧H' : 'Ctrl+H', () => setFind({ replace: true })],
   ]
-  const moreMenuTools: MenuTool[] = [
-    ['type', 'Шрифт и вид страницы', '', () => setTypoOpen(true)],
-    ['sidebar', `О ${wholeChapter ? 'главе' : 'сцене'}`, '', () => togglePanel('plan')],
-    ['spark', 'Маячок здесь', isMac ? '⌘M' : 'Ctrl+M', () => editor && setAction(selectionForMarker(editor))],
-    ...(chapter && !chapter.pool && !chapter.locked
-      ? [['cut', 'Новая глава с этого абзаца', '', () => void splitChapterHere(data.project, scene, editor)] as MenuTool]
-      : []),
+  const textTools: MenuTool[] = [
     ['type', 'Исправить типографику', '', typeset],
     ['focus', 'Фокус с таймером', '', () => setFocusOpen(true)],
-    ['check', 'Закончить на сегодня', '', () => setFinishing(true)],
-    ['help', 'Справка', '', () => go({ view: 'help' })],
   ]
-  const desktopMenuTools: MenuTool[] = [
-    quickMenuTools[0],
-    moreMenuTools[2],
-    ...(chapter && !chapter.pool && !chapter.locked ? [moreMenuTools[3]] : []),
-    quickMenuTools[1],
-    ...moreMenuTools.slice(chapter && !chapter.pool && !chapter.locked ? 4 : 3),
+  const showExport = async () => {
+    if (await saveNow.current()) setExportOpen(true)
+    else toast('Сначала нужно сохранить текст. Попробуй ещё раз.')
+  }
+  const sectionTools: MenuTool[] = [
+    ['plan', 'Доска', '', () => go({ view: 'board' })],
+    ['people', 'Герои', '', () => go({ view: 'characters' })],
+    ['inbox', 'Заметки', '', () => go({ view: 'inbox' })],
   ]
   const renderMenuTool = ([ico, label, keys, run]: MenuTool) => (
     <button
@@ -468,26 +460,6 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
             )}
             {due > 0 && <span className="tool-due" title="Здесь нужно раскрыть маячок" />}
           </button>
-          <div className="typo-anchor typo-font-anchor">
-            <button className={`tool ${typoOpen ? 'on' : ''}`} title="Шрифт, размер, ширина текста" onClick={() => setTypoOpen(!typoOpen)}>
-              <span className="aa">Aa</span>
-              <span className="tool-label">Шрифт</span>
-            </button>
-            {typoOpen && (
-              <>
-                <div className="typo-back" onClick={() => setTypoOpen(false)} />
-                <div className="typo-pop card">
-                  <div className="typo-pop-head">
-                    <strong>Вид текста</strong>
-                    <button className="icon-btn" aria-label="Закрыть настройки текста" onClick={() => setTypoOpen(false)}>
-                      <Icon name="close" size={16} />
-                    </button>
-                  </div>
-                  <TypoControls />
-                </div>
-              </>
-            )}
-          </div>
           <div className="typo-anchor">
             <button className={`tool ${menuOpen ? 'on' : ''}`} title="Режимы и прочее" aria-label="Ещё" onClick={() => setMenuOpen(!menuOpen)}>
               <Icon name="more" size={18} />
@@ -517,32 +489,15 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                       </button>
                     ))}
                   </div>
+                  {renderMenuTool(['note', 'Экспорт Word', '', () => void showExport()])}
                   {chapter && !chapter.pool && renderMenuTool(['target', 'Объём и готовность', '', () => setChapterProgressOpen(true)])}
-                  {compact ? (
-                    <>
-                      <details className="write-menu-more">
-                        <summary>Разделы книги</summary>
-                        <div>
-                          {renderMenuTool(['plan', 'Доска', '', () => go({ view: 'board' })])}
-                          {renderMenuTool(['people', 'Герои', '', () => go({ view: 'characters' })])}
-                          {renderMenuTool(['inbox', 'Заметки', '', () => go({ view: 'inbox' })])}
-                        </div>
-                      </details>
-                      {quickMenuTools.map(renderMenuTool)}
-                      <details className="write-menu-more">
-                        <summary>Ещё инструменты</summary>
-                        <div>
-                          {moreMenuTools.map(renderMenuTool)}
-                          {renderMenuTool(['pen', wholeChapter ? 'Переименовать главу' : 'Переименовать сцену', '', () => {
-                            const name = prompt('Название', wholeChapter ? chapter?.title : scene.title)?.trim()
-                            if (name && wholeChapter && chapter) void patch<Chapter>('chapters', chapter.id, { title: name })
-                            else if (name) void patch<Scene>('scenes', scene.id, { title: name })
-                          }])}
-                          {renderMenuTool(['settings', 'Параметры книги', '', () => go({ view: 'book' })])}
-                        </div>
-                      </details>
-                    </>
-                  ) : desktopMenuTools.map(renderMenuTool)}
+                  {quickMenuTools.map(renderMenuTool)}
+                  {compact && renderMenuTool(['sidebar', `О ${wholeChapter ? 'главе' : 'сцене'}`, '', () => togglePanel('plan')])}
+                  {textTools.map(renderMenuTool)}
+                  {compact && <div className="write-menu-sections">
+                    <span>Разделы книги</span>
+                    {sectionTools.map(renderMenuTool)}
+                  </div>}
                   {!compact && (
                     <button
                       className="menu-foot"
@@ -710,7 +665,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
           }}
         />
       )}
-      {finishing && <FinishSession project={data.project} onClose={() => setFinishing(false)} />}
+      {exportOpen && <BookExport data={data} chapterId={chapter && !chapter.pool ? chapter.id : undefined} onClose={() => setExportOpen(false)} />}
     </div>
   )
 }
@@ -984,51 +939,6 @@ function Resume({ note, doc, editor, onNoteSeen }: { note: string; doc: unknown;
         <Icon name="close" size={14} />
       </button>
     </div>
-  )
-}
-
-function FinishSession({ project, onClose }: { project: Project; onClose: () => void }) {
-  const [v, setV] = useState(project.nextStep ?? '')
-  const today = wordsOn(project, dayKey())
-  const goal = project.dailyGoal
-  const done = async () => {
-    await patch<Project>('projects', project.id, { nextStep: v.trim() })
-    sessionStorage.removeItem('manuscript.banner')
-    toast('Сохранено. Завтра начнёшь отсюда')
-    onClose()
-  }
-  return (
-    <Modal onClose={onClose} label="Закончить на сегодня">
-      <div className="stack">
-        <h2>На сегодня всё?</h2>
-        {today > 0 && (
-          <div className="day-total">
-            Сегодня <strong>+{today.toLocaleString('ru-RU')}</strong> {goal ? `из ${formatWordsOf(goal)}` : wordNoun(today)}
-            {goal && today >= goal ? ' — цель дня есть' : ''}
-          </div>
-        )}
-        <label>
-          <span className="field-label">Записка себе на следующий раз</span>
-          <textarea
-            className="textarea"
-            rows={3}
-            autoFocus
-            placeholder="Чем закончилось сегодня и что дальше — пара слов, чтобы завтра начать без раскачки"
-            value={v}
-            onChange={(e) => setV(e.target.value)}
-          />
-        </label>
-        <div className="row">
-          <span className="spacer" />
-          <button className="btn ghost" onClick={onClose}>
-            Отмена
-          </button>
-          <button className="btn primary" onClick={() => void done()}>
-            Сохранить
-          </button>
-        </div>
-      </div>
-    </Modal>
   )
 }
 

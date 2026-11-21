@@ -1,9 +1,20 @@
-import type { Chapter, Scene } from '../db/db'
+import { db, type Chapter, type Scene } from '../db/db'
+import type { ProjectData } from './hooks'
 import type { PMNode } from './text'
 
 export interface ExportChapter {
   chapter: Chapter
   scenes: (Scene & { content: unknown })[]
+}
+
+export async function loadChapters(data: ProjectData, only?: string): Promise<ExportChapter[]> {
+  const out: ExportChapter[] = []
+  for (const { chapter, scenes } of data.outline) {
+    if (only && chapter.id !== only) continue
+    const texts = await db.texts.bulkGet(scenes.map((s) => s.id))
+    out.push({ chapter, scenes: scenes.map((s, i) => ({ ...s, content: texts[i]?.content })) })
+  }
+  return out
 }
 
 type Mark = NonNullable<PMNode['marks']>[number]

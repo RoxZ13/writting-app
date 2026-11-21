@@ -5,7 +5,7 @@ test('storage diagnostics explain the active local database without exposing tex
   await startStory(page)
   await page.goto('/#/settings')
 
-  await page.getByText('Хранение и диагностика').click()
+  await page.getByText('Поддержка', { exact: true }).click()
   await expect(page.getByText('Истории / сцены / версии')).toBeVisible()
   await expect(page.getByText('1 / 1 / 0')).toBeVisible()
   await expect(page.getByText('Ждёт облако')).toBeVisible()

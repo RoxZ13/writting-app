@@ -1,14 +1,15 @@
+import { splitChapterHere } from './ChapterMeter'
 import type { Editor } from '@tiptap/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { db, uid, type Beat, type Marker, type Note, type Scene } from '../db/db'
+import { db, uid, type Beat, type Chapter, type Marker, type Note, type Scene } from '../db/db'
 import { createMarker, createNote, deleteScene, mergeSceneIntoPrevious, patch, snapshotScene } from '../db/repo'
 import { isLocked, markerPayoffChapter, markerStatus, unusedLines, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { MARKER_STATES, noteKind, STATUSES, timeAgo } from '../lib/status'
 import { hotkey } from '../lib/session'
 import { returnToText } from '../lib/stash'
-import { toast } from '../lib/ui'
+import { InlineEdit, toast } from '../lib/ui'
 import { toastUndo, undoable } from '../lib/undo'
 import { RefChips } from './Refs'
 import { loreForScene, type LoreReason } from '../lib/lore'
@@ -375,6 +376,7 @@ function More({ data, scene, editor, wholeChapter = false }: { data: ProjectData
         {chapter && (
           <div>
             <h4>{chapter.title}</h4>
+            {wholeChapter && <InlineEdit className="input" label="Название главы" value={chapter.title} onSave={(title) => { if (title.trim()) void patch<Chapter>('chapters', chapter.id, { title: title.trim() }) }} />}
             <div className="small muted">{chapter.goal || 'Цель главы не записана — её можно задать на доске.'}</div>
           </div>
         )}
@@ -388,7 +390,11 @@ function More({ data, scene, editor, wholeChapter = false }: { data: ProjectData
             ))}
           </select>
         </label>
+        {!wholeChapter && <InlineEdit className="input" label="Название сцены" value={scene.title} onSave={(title) => void patch<Scene>('scenes', scene.id, { title: title.trim() })} />}
         <Versions scene={scene} editor={editor} />
+        {editor && chapter && !chapter.pool && !chapter.locked && (
+          <button className="btn sm" onClick={() => void splitChapterHere(data.project, scene, editor)}>Новая глава с этого абзаца</button>
+        )}
         {isLocked(data, scene.chapterId) && (
           <div className="small muted">Глава зафиксирована: перемещение и склейка отключены.</div>
         )}

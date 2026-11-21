@@ -63,6 +63,7 @@ export function App() {
       // it jump into the editor, so keyboard-open is a separate state instead.
       const keyboardOpen = !!viewport && window.innerWidth <= 900 && (hiddenBottom > 120 || fullHeight - visibleHeight > 120)
       document.documentElement.dataset.keyboard = keyboardOpen ? 'open' : 'closed'
+      document.documentElement.style.setProperty('--visual-top-offset', `${keyboardOpen ? Math.max(0, viewport?.offsetTop ?? 0) : 0}px`)
       document.documentElement.style.setProperty('--visual-bottom-offset', `${keyboardOpen ? 0 : hiddenBottom}px`)
     }
     syncVisibleViewport()
@@ -76,6 +77,7 @@ export function App() {
       viewport?.removeEventListener('scroll', syncVisibleViewport)
       window.removeEventListener('resize', syncVisibleViewport)
       document.documentElement.style.removeProperty('--visual-bottom-offset')
+      document.documentElement.style.removeProperty('--visual-top-offset')
       delete document.documentElement.dataset.keyboard
     }
   }, [route.view])
@@ -249,7 +251,7 @@ export function App() {
 
   return (
     <div className={`app app-${route.view} ${reveal || (fresh && route.view === 'text') ? 'reveal' : ''}`}>
-      <AppHeader data={data} route={route} safety={safety} onSearch={() => setSearching('')} />
+      <AppHeader data={data} route={route} sceneId={textScene} safety={safety} onSearch={() => setSearching('')} />
       <BackupReminder />
       {route.view === 'text' && textScene && (
         <WriteView key={textScene} data={data} sceneId={textScene} onSearch={(q) => setSearching(q ?? '')} />
@@ -287,7 +289,9 @@ export function App() {
   )
 }
 
-function AppHeader({ data, route, safety, onSearch }: { data: ProjectData; route: Route; safety: DataSafetyStatus; onSearch: () => void }) {
+function AppHeader({ data, route, sceneId, safety, onSearch }: { data: ProjectData; route: Route; sceneId?: string; safety: DataSafetyStatus; onSearch: () => void }) {
+  const scene = sceneId ? data.sceneById.get(sceneId) : undefined
+  const chapterTitle = scene && data.chapterById.get(scene.chapterId)?.title
   const inbox = data.notes.filter((n) => !n.archived && !n.sceneId && !n.used && !(n.characterIds ?? []).length).length
   return (
     <>
@@ -313,6 +317,7 @@ function AppHeader({ data, route, safety, onSearch }: { data: ProjectData; route
             <span className="data-safety-label">{safety.label}</span>
           </button>
         </div>
+        {chapterTitle && <span className="mobile-current-chapter" title={chapterTitle}>{chapterTitle}</span>}
         <WorkspaceTabs className="tabs tabs-desktop" route={route} inbox={inbox} onSearch={onSearch} />
       </header>
       <WorkspaceTabs className="tabs tabs-mobile" route={route} inbox={inbox} onSearch={onSearch} />

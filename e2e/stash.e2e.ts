@@ -29,7 +29,6 @@ async function writeAndSelect(page: Page) {
 const addSelection = (page: Page) => page.locator('.bubble').getByRole('button', { name: 'Добавить…' })
 async function revealStash(page: Page) {
   await addSelection(page).click()
-  await page.getByRole('dialog', { name: 'Добавить из текста' }).getByText('Другие действия', { exact: true }).click()
 }
 const stashButton = (page: Page) => page.getByRole('button', { name: 'В запас' })
 const editorText = (page: Page) => page.locator('.ProseMirror').innerText()

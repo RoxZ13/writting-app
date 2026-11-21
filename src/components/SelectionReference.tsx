@@ -47,18 +47,13 @@ export function SelectionReference({ data, scene, text, onChoose, onClose }: {
     <Modal label="Добавить из текста" onClose={onClose} className="selection-reference">
       <h2>Добавить из текста</h2>
       <p className="selection-reference-quote">{text}</p>
-      {mode === 'menu' ? <div className="stack">
-        <button className="btn" onClick={() => onChoose('comment')}>Заметку на полях</button>
-        <button className="btn" onClick={() => setMode('hero')}>Героя</button>
-        {data.characters.length > 0 && <button className="btn" onClick={() => setMode('detail')}>Деталь о герое</button>}
-        <button className="btn" onClick={() => onChoose('setup')}>Маячок</button>
-        <details>
-          <summary>Другие действия</summary>
-          <div className="stack">
-            <button className="btn" onClick={() => onChoose('payoff')}>Отметить раскрытие</button>
-            <button className="btn" onClick={() => onChoose('stash')}>В запас</button>
-          </div>
-        </details>
+      {mode === 'menu' ? <div className="selection-reference-actions">
+        <button onClick={() => onChoose('comment')}>Заметку на полях</button>
+        <button onClick={() => setMode('hero')}>Героя</button>
+        {data.characters.length > 0 && <button onClick={() => setMode('detail')}>Деталь о герое</button>}
+        <button onClick={() => onChoose('setup')}>Маячок</button>
+        <button className="muted" onClick={() => onChoose('payoff')}>Отметить раскрытие</button>
+        <button className="muted" onClick={() => onChoose('stash')}>В запас</button>
       </div> : <form className="stack" onSubmit={(event) => { event.preventDefault(); void save() }}>
         {mode === 'hero'
           ? <label>Имя героя<input className="input" value={name} onChange={(event) => setName(event.target.value)} maxLength={100} /></label>

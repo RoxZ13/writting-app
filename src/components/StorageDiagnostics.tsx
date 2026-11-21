@@ -36,7 +36,6 @@ export function StorageDiagnostics({ sync }: { sync: SyncStatus }) {
   }
 
   useEffect(() => {
-    void refresh()
     return onFileSyncState(setFileSync)
   }, [])
 
@@ -49,10 +48,9 @@ export function StorageDiagnostics({ sync }: { sync: SyncStatus }) {
   }
 
   return (
-    <details className="card settings-section diagnostics-section">
+    <details className="card settings-section diagnostics-section" onToggle={(event) => { if (event.currentTarget.open && !data && !loading) void refresh() }}>
       <summary>
-        <span>Хранение и диагностика</span>
-        <span className="small muted">без текста книг</span>
+        <span>Поддержка</span>
       </summary>
       {data ? (
         <div className="stack diagnostics-body small">

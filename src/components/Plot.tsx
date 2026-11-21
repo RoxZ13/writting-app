@@ -49,23 +49,39 @@ export function Arc({ scenes, isNode }: { scenes: Scene[]; isNode: (s: Scene) =>
   )
 }
 
+/** What the story is about, how it ends and what drives it. */
+export function EssenceFields({ project }: { project: Project }) {
+  const set = (changes: Partial<Project>) => void patch<Project>('projects', project.id, changes)
+  return (
+    <>
+      <label>
+        <span className="field-label">О чём история</span>
+        <InlineEdit className="input" multiline value={project.premise ?? ''} onSave={(premise) => set({ premise })} />
+      </label>
+      <label>
+        <span className="field-label">Чем закончится</span>
+        <InlineEdit className="input" multiline value={project.ending ?? ''} onSave={(ending) => set({ ending })} />
+      </label>
+      <label>
+        <span className="field-label">Что движет героями</span>
+        <InlineEdit className="input" multiline value={project.drive ?? ''} onSave={(drive) => set({ drive })} />
+      </label>
+    </>
+  )
+}
+
 const ESSENCE_KEY = 'manuscript.essence'
 
 /** What the story is about, how it ends and what drives it — kept in sight above the board. */
-export function Essence({ project, embedded, autoOpen }: { project: Project; embedded?: boolean; autoOpen?: boolean }) {
+export function Essence({ project }: { project: Project }) {
   const filled = !!(project.premise || project.ending || project.drive)
   const [open, setOpenState] = useState(() => {
-    // A blank premise deserves the whole canvas only at the very beginning. Once
-    // there is a manuscript, opening «Книга» should show the book instead of a
-    // form the author deliberately skipped.
-    if (embedded && autoOpen && !filled) return true
     try {
       return localStorage.getItem(ESSENCE_KEY) === '1'
     } catch {
       return false
     }
   })
-  const [secondaryOpen, setSecondaryOpen] = useState(() => Boolean(project.ending || project.drive))
   const setOpen = (v: boolean) => {
     setOpenState(v)
     try {
@@ -76,71 +92,36 @@ export function Essence({ project, embedded, autoOpen }: { project: Project; emb
   }
   const set = (changes: Partial<Project>) => void patch<Project>('projects', project.id, changes)
 
-  // On the board only as a reminder once filled in; it is written on «Книга» (embedded).
-  if (!embedded && !filled) return null
+  // The board previews the premise once it has been filled in.
+  if (!filled) return null
   if (!open) {
     return (
-      <button className={`${embedded ? 'essence-book-bar' : 'essence-bar'} ${filled ? '' : 'empty'}`} onClick={() => setOpen(true)}>
-        {embedded && <strong>Замысел</strong>}
-        {filled ? (
+      <button className="essence-bar" onClick={() => setOpen(true)}>
+        {project.premise && (
           <>
-            {project.premise && (
-              <>
-                <span className="essence-k">О чём</span>
-                <span className="essence-v">{project.premise}</span>
-              </>
-            )}
-            {project.ending && (
-              <>
-                <span className="essence-k">Финал</span>
-                <span className="essence-v">{project.ending}</span>
-              </>
-            )}
-            {!project.premise && !project.ending && (
-              <>
-                <span className="essence-k">Что движет</span>
-                <span className="essence-v">{project.drive}</span>
-              </>
-            )}
+            <span className="essence-k">О чём</span>
+            <span className="essence-v">{project.premise}</span>
           </>
-        ) : (
-          embedded ? <span>Добавить главное об истории</span> : '+ О чём история — можно одной строкой, можно позже'
+        )}
+        {project.ending && (
+          <>
+            <span className="essence-k">Финал</span>
+            <span className="essence-v">{project.ending}</span>
+          </>
+        )}
+        {!project.premise && !project.ending && (
+          <>
+            <span className="essence-k">Что движет</span>
+            <span className="essence-v">{project.drive}</span>
+          </>
         )}
       </button>
-    )
-  }
-  if (embedded) {
-    return (
-      <section className="essence card essence-book-editor">
-        <div className="essence-head">
-          <span className="essence-title">Замысел</span>
-          <span className="spacer" />
-          <button className="link small" onClick={() => setOpen(false)}>готово</button>
-        </div>
-        <label className="essence-primary">
-          <span className="essence-k">О чём история</span>
-          <InlineEdit multiline value={project.premise ?? ''} placeholder="Суть истории в одной-двух фразах" onSave={(premise) => set({ premise })} />
-        </label>
-        <details className="essence-secondary" open={secondaryOpen} onToggle={(event) => setSecondaryOpen(event.currentTarget.open)}>
-          <summary>Финал и движущая сила</summary>
-          <div className="essence-secondary-fields">
-            <label>
-              <span className="essence-k">Чем закончится</span>
-              <InlineEdit multiline value={project.ending ?? ''} placeholder="Если уже знаешь" onSave={(ending) => set({ ending })} />
-            </label>
-            <label>
-              <span className="essence-k">Что движет героями</span>
-              <InlineEdit multiline value={project.drive ?? ''} placeholder="Мотивы, страхи, цели" onSave={(drive) => set({ drive })} />
-            </label>
-          </div>
-        </details>
-      </section>
     )
   }
   return (
     <section className="essence card">
       <div className="essence-head">
-        <span className={embedded ? 'essence-title' : 'eyebrow'}>Замысел</span>
+        <span className="eyebrow">Замысел</span>
         <span className="spacer" />
         <button className="link small" onClick={() => setOpen(false)}>готово</button>
       </div>

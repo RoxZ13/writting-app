@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { aliveRows, allTexts, setChapterMaximum, startStory, waitSaveTick } from './helpers'
+import { aliveRows, allTexts, openChapterPlan, setChapterMaximum, startStory, waitSaveTick } from './helpers'
 
 // Set QUIET_SHOTS to a folder to also save screenshots of the chapter meter in every theme.
 const SHOTS = process.env.QUIET_SHOTS
@@ -38,15 +38,14 @@ test.describe('quiet chapter meter', () => {
     await expect(message).toHaveText(/Сверх ориентира на \d+ знаков/)
   })
 
-  test('«Новая глава с этого абзаца» lives in the «⋯» menu and splits the chapter without losing text', async ({ page }) => {
+  test('«Новая глава с этого абзаца» lives in the chapter panel and splits the chapter without losing text', async ({ page }) => {
     await overTheNorm(page)
     const chaptersBefore = (await aliveRows<any>(page, 'chapters')).length
     // Cursor into the second paragraph.
     await page.locator('.ProseMirror p', { hasText: 'Второй абзац' }).click()
-    await page.getByRole('button', { name: 'Ещё' }).click()
-    const more = page.getByText('Ещё инструменты', { exact: true })
-    if (await more.isVisible()) await more.click()
-    const item = page.locator('.write-menu .menu-item', { hasText: 'Новая глава с этого абзаца' })
+    const plan = await openChapterPlan(page)
+    await plan.locator('.pp-more > summary').click()
+    const item = plan.getByRole('button', { name: 'Новая глава с этого абзаца' })
     await expect(item).toBeVisible()
     await item.click()
 
@@ -79,9 +78,8 @@ test.describe('quiet chapter meter', () => {
     await button.click()
     const menu = page.locator('.write-menu')
     await expect(menu).toBeVisible()
-    await menu.getByText('Ещё инструменты', { exact: true }).click()
-    // The scene's chapter is not locked: the split item is there.
-    await expect(menu.locator('.menu-item', { hasText: 'Новая глава с этого абзаца' })).toBeVisible()
+    await expect(menu.getByRole('button', { name: 'Экспорт Word' })).toBeVisible()
+    await expect(menu.getByRole('button', { name: 'Новая глава с этого абзаца' })).toHaveCount(0)
 
     const vp = page.viewportSize()!
     const b = (await button.boundingBox())!
