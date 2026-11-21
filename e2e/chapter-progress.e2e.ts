@@ -13,6 +13,7 @@ test('a manuscript opts into one counter and can change goals without entering t
   await counter.click()
   const details = page.getByRole('dialog', { name: 'Объём текста' })
   await expect(details).toContainText('Авторские листы')
+  await expect(details.locator('dd', { hasText: '≈ 1 мин' })).toBeVisible()
   await details.getByRole('button', { name: 'Отметить главу готовой' }).click()
   await expect(details.getByRole('button', { name: 'Вернуть главу в работу' })).toBeVisible()
   await expect.poll(async () => (await aliveRows<any>(page, 'scenes'))[0].status).toBe('done')

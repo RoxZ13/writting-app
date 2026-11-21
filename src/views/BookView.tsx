@@ -89,10 +89,10 @@ export function BookView({ data }: { data: ProjectData }) {
             {planPeek && <span className="muted small book-fold-peek">{planPeek}</span>}
           </summary>
           <div className="book-mobile-fields">
-            <label>
+            <div>
               <span className="field-label">Дедлайн</span>
               <DateChip value={p.deadline} empty="Поставить дату" onChange={(deadline) => set({ deadline })} />
-            </label>
+            </div>
             <label>
               <span className="field-label">Количество глав</span>
               <NumberField value={p.targetChapters || undefined} placeholder="Не задано" onSave={(targetChapters) => set({ targetChapters })} />

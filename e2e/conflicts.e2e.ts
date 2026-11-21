@@ -21,8 +21,8 @@ test('an archived metadata conflict can be reviewed and restored', async ({ page
               table: 'projects',
               recordId: project.id,
               projectId: project.id,
-              losing: { ...project, title: 'Название с телефона' },
-              winning: { ...project, title: 'Новая история' },
+              losing: { ...project, title: 'Название с телефона', lastSceneId: 'previous-scene', progress: { '2026-01-01': 123 } },
+              winning: { ...project, title: 'Новая история', lastSceneId: 'working-scene' },
               reason: 'Одновременная правка на разных устройствах',
               createdAt: now,
               updatedAt: now,
@@ -42,6 +42,8 @@ test('an archived metadata conflict can be reviewed and restored', async ({ page
   await expect(page.getByRole('heading', { name: 'Остальные правки' })).toBeVisible()
   await page.getByText('История: Новая история').click()
   await expect(page.getByText('Название с телефона')).toBeVisible()
+  await expect(page.getByText('lastSceneId', { exact: true })).toHaveCount(0)
+  await expect(page.getByText('progress', { exact: true })).toHaveCount(0)
 
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'Вернуть сохранённый вариант' }).click()

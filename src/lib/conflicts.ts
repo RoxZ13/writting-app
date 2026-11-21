@@ -5,6 +5,7 @@ import { makeExcerpt } from './importer'
 import { docCharCount, docParagraphs, docWordCount } from './text'
 
 const DERIVED_SCENE_FIELDS = new Set(['charCount', 'wordCount', 'excerpt', 'lastPos'])
+const DERIVED_PROJECT_FIELDS = new Set(['lastSceneId', 'progress'])
 const INTERNAL_FIELDS = new Set(['id', 'projectId', 'createdAt', 'updatedAt', 'syncRev', 'syncVersion'])
 
 const same = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b)
@@ -19,8 +20,9 @@ export interface ConflictChange {
 export function conflictChanges(conflict: Pick<SyncConflict, 'losing' | 'winning'> & { table?: string }): ConflictChange[] {
   const losing = conflict.losing as unknown as Record<string, unknown>
   const winning = conflict.winning as unknown as Record<string, unknown>
+  const derived = conflict.table === 'scenes' ? DERIVED_SCENE_FIELDS : conflict.table === 'projects' ? DERIVED_PROJECT_FIELDS : undefined
   return [...new Set([...Object.keys(losing), ...Object.keys(winning)])]
-    .filter((field) => !INTERNAL_FIELDS.has(field) && !(conflict.table === 'scenes' && DERIVED_SCENE_FIELDS.has(field)) && !same(losing[field], winning[field]))
+    .filter((field) => !INTERNAL_FIELDS.has(field) && !derived?.has(field) && !same(losing[field], winning[field]))
     .map((field) => ({ field, losing: losing[field], winning: winning[field] }))
 }
 

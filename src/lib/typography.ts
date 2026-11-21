@@ -1,8 +1,11 @@
 /** How the manuscript text looks. Per device: a phone and a big monitor want different settings. */
+export const PAGE_SCALES = [100, 115, 130, 150] as const
+
 export interface Typo {
   /** «Лёгкий» — Onest: wide, open letters, easier on tired eyes. */
   font: 'serif' | 'sans' | 'easy' | 'mono'
   size: number
+  pageScale: typeof PAGE_SCALES[number]
   width: 'narrow' | 'medium' | 'wide'
   leading: 'tight' | 'normal' | 'loose'
   para: 'gap' | 'indent'
@@ -14,11 +17,9 @@ export interface Typo {
   focusPara: 'off' | 'on'
   /** The browser's spelling underlines: always, only in «Самопроверка», or never. */
   spell: 'always' | 'edit' | 'never'
-  /** On opening a scene: a quiet plate with the last note and the last two sentences. */
-  resume: 'on' | 'off'
 }
 
-export const DEFAULT_TYPO: Typo = { font: 'sans', size: 16, width: 'medium', leading: 'normal', para: 'gap', typewriter: 'off', calm: 'off', focusPara: 'off', spell: 'edit', resume: 'on' }
+export const DEFAULT_TYPO: Typo = { font: 'sans', size: 16, pageScale: 115, width: 'medium', leading: 'normal', para: 'gap', typewriter: 'off', calm: 'off', focusPara: 'off', spell: 'edit' }
 
 const KEY = 'manuscript.typo'
 const CALM_DEFAULT_KEY = 'manuscript.calmDefault2'
@@ -45,6 +46,7 @@ export function applyTypo(t: Typo, { persist = true } = {}) {
   const root = document.documentElement.style
   root.setProperty('--text-font', FONT[t.font])
   root.setProperty('--text-size', `${t.size}px`)
+  root.setProperty('--page-scale', String(t.pageScale / 100))
   root.setProperty('--measure', WIDTH[t.width])
   root.setProperty('--leading', LEADING[t.leading])
   document.documentElement.dataset.para = t.para

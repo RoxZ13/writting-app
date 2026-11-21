@@ -25,8 +25,8 @@ import { ChapterVolumeIndicator, VolumeCounter } from '../components/VolumeCount
 import { chapterWritingProgress, showManuscriptVolume } from '../lib/writing-progress'
 import { chapterProgress } from '../lib/pace'
 import { MARKER_STATES } from '../lib/status'
-import { docParagraphs, emptyDoc, lastSentences, pluralRu } from '../lib/text'
-import { loadTypo } from '../lib/typography'
+import { docParagraphs, emptyDoc, pluralRu } from '../lib/text'
+import { applyTypo, loadTypo, PAGE_SCALES, type Typo } from '../lib/typography'
 import { diffParagraphs } from '../lib/diff'
 import { Modal, toast } from '../lib/ui'
 import { FindBar } from '../components/FindBar'
@@ -111,6 +111,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   const [typing, setTyping] = useState(false)
   const [askRewrite, setAskRewrite] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
+  const [pageScale, setPageScale] = useState<Typo['pageScale'] | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [chapterProgressOpen, setChapterProgressOpen] = useState(false)
   const [writingSession, setWritingSession] = useState(false)
@@ -175,7 +176,6 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
       /* ignore */
     }
   }
-  const [bannerHidden, setBannerHidden] = useState(() => sessionStorage.getItem('manuscript.banner') === '1')
 
   // While typing, everything around the text fades out; moving the mouse or touching brings it back.
   useEffect(() => {
@@ -488,6 +488,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                   {quickMenuTools.map(renderMenuTool)}
                   {compact && renderMenuTool(['sidebar', `О ${wholeChapter ? 'главе' : 'сцене'}`, '', () => togglePanel('plan')])}
                   {textTools.map(renderMenuTool)}
+                  {!compact && renderMenuTool(['type', 'Масштаб листа', '', () => setPageScale(loadTypo().pageScale)])}
                   {compact && <div className="write-menu-sections">
                     <span>Разделы книги</span>
                     {sectionTools.map(renderMenuTool)}
@@ -544,24 +545,22 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
             {text && !rewriting && <MarginNotes key={`notes-${scene.id}`} data={data} editor={editor} onOpen={setOpenComment} />}
           </div>
         </div>
-        {text && editor && !rewriting && !compact && (
-          <Resume
-            key={scene.id}
-            note={bannerHidden ? '' : (data.project.nextStep ?? '')}
-            doc={text.content}
-            editor={editor}
-            onNoteSeen={() => {
-              sessionStorage.setItem('manuscript.banner', '1')
-              setBannerHidden(true)
-            }}
-          />
-        )}
       </div>
 
       <VolumeCounter project={data.project} chapter={chapter?.pool ? undefined : chapter}
         scene={scene} scenes={chapterScenes} bookScenes={data.scenes} chapters={data.chapters}
         liveChars={liveChars} wholeChapter={wholeChapter} open={chapterProgressOpen} setOpen={setChapterProgressOpen}
         hidden={compact && writingSession} />
+      {pageScale !== null && <Modal label="Масштаб листа" onClose={() => setPageScale(null)} className="page-scale-dialog stack">
+        <h2>Масштаб листа</h2>
+        <div className="seg" role="group" aria-label="Размер листа">
+          {PAGE_SCALES.map((scale) => <button key={scale} type="button" aria-pressed={scale === pageScale} onClick={() => {
+            applyTypo({ ...loadTypo(), pageScale: scale })
+            setPageScale(scale)
+          }}>{scale}%</button>)}
+        </div>
+        <button type="button" className="btn" onClick={() => setPageScale(null)}>Готово</button>
+      </Modal>}
       {keysOpen && <Shortcuts onClose={() => setKeysOpen(false)} />}
 
       <aside className="write-brief" aria-label={`О ${wholeChapter ? 'главе' : 'сцене'}`}>
@@ -836,61 +835,6 @@ function StartRewrite({ scene, editor, onClose, onStarted }: { scene: Scene; edi
         </button>
       </div>
     </Modal>
-  )
-}
-
-/**
- * «Подхватить мысль»: on opening a scene, the note left last time and the last two sentences,
- * so the way back into the text is one tap. Goes away with the first typed letter.
- */
-function Resume({ note, doc, editor, onNoteSeen }: { note: string; doc: unknown; editor: Editor; onNoteSeen: () => void }) {
-  const [tail] = useState(() => lastSentences(doc, 2))
-  const [open, setOpen] = useState(() => loadTypo().resume === 'on' && Boolean(note || tail))
-  const close = useCallback(() => {
-    setOpen(false)
-    if (note) onNoteSeen()
-  }, [note, onNoteSeen])
-  useEffect(() => {
-    if (!open) return
-    const onUpdate = ({ transaction }: { transaction: { docChanged: boolean } }) => {
-      if (transaction.docChanged) close()
-    }
-    editor.on('update', onUpdate)
-    // Scrolling by hand puts it away too: the author is already moving through the text.
-    window.addEventListener('wheel', close, { passive: true })
-    window.addEventListener('touchmove', close, { passive: true })
-    return () => {
-      editor.off('update', onUpdate)
-      window.removeEventListener('wheel', close)
-      window.removeEventListener('touchmove', close)
-    }
-  }, [open, editor, close])
-  if (!open) return null
-  const resume = () => {
-    close()
-    editor.chain().focus('end', { scrollIntoView: true }).run()
-  }
-  // One quiet line, not a card over the text: what was there last time, and a way back in.
-  return (
-    <div className="resume" role="note">
-      <span className="resume-text">
-        {note ? (
-          <>
-            <span className="muted">В прошлый раз:</span> {note}
-          </>
-        ) : (
-          <>…{tail}</>
-        )}
-      </span>
-      {tail && (
-        <button className="resume-go" onClick={resume}>
-          Продолжить
-        </button>
-      )}
-      <button className="icon-btn" aria-label="Скрыть" onClick={close}>
-        <Icon name="close" size={14} />
-      </button>
-    </div>
   )
 }
 

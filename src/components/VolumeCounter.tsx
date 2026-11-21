@@ -43,6 +43,7 @@ export function VolumeCounter({ project, chapter, scene, scenes, bookScenes, cha
   if (hidden || (!enabled && !open && !goals)) return null
   const book = open ? bookWritingProgress(project, chapters, bookScenes.map((item) => item.id === scene.id ? { ...item, charCount: liveChars } : item)) : undefined
   const firstCount = chapter ? progress.chars : liveChars
+  const words = chapter ? scenes.reduce((sum, item) => sum + item.wordCount, 0) : scene.wordCount
   const chapterAmount = amount(firstCount, chapter ? progress.target : undefined)
   return (
     <div className="volume-counter" ref={root}>
@@ -54,6 +55,7 @@ export function VolumeCounter({ project, chapter, scene, scenes, bookScenes, cha
         <dl>
           <dt>{chapter ? 'Текущая глава' : 'Текущая сцена'}</dt><dd>{chapterAmount}</dd>
           {chapter && progress.min !== undefined && <><dt>Ориентир главы</dt><dd>{progress.max ? `${number(progress.min)}–${formatChars(progress.max)}` : `от ${formatChars(progress.min)}`}</dd></>}
+          {words > 0 && <><dt>Время чтения</dt><dd>≈ {Math.max(1, Math.round(words / 180))} мин</dd></>}
           <dt>Вся рукопись</dt><dd>{amount(book.chars, book.target)}</dd>
           {book.target && <><dt>{book.chars > book.target ? 'Сверх плана' : 'Осталось по плану'}</dt><dd>{amount(Math.abs(book.target - book.chars))}</dd></>}
           <dt>Авторские листы</dt><dd>{sheets(book.sheets)}{book.targetSheets !== undefined ? ` из ${sheets(book.targetSheets)}` : ''}</dd>

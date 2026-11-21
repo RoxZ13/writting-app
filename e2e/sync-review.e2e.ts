@@ -23,6 +23,12 @@ test('a saved sync version can be compared and restored from the cloud notice', 
           createdAt: now, updatedAt: now, reason: 'Одновременная правка',
           losing: { ...scene, charCount: 480 }, winning: { ...scene, charCount: 474 },
         })
+        transaction.objectStore('conflicts').put({
+          id: 'sample-project-activity', table: 'projects', recordId: scene.projectId, projectId: scene.projectId,
+          createdAt: now, updatedAt: now, reason: 'Одновременная правка',
+          losing: { id: scene.projectId, updatedAt: now, lastSceneId: 'a', progress: { '2026-01-01': 30 } },
+          winning: { id: scene.projectId, updatedAt: now, lastSceneId: 'b', progress: { '2026-01-01': 40 } },
+        })
         transaction.objectStore('snapshots').put({
           id: 'sample-alternate', sceneId, projectId: scene.projectId, createdAt: now, updatedAt: now, wordCount: 4,
           reason: 'Версия с другого устройства (конфликт синхронизации)',

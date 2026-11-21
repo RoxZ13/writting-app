@@ -140,7 +140,7 @@ test('screenshots of the chapter over its norm', async ({ page }, info) => {
   // The «⋯» menu over the resume bar.
   await page.evaluate(() => localStorage.setItem('manuscript.theme', 'light'))
   await page.reload()
-  if (info.project.name === 'desktop') await expect(page.locator('.resume')).toBeVisible()
+  await expect(page.locator('.resume')).toBeHidden()
   await page.getByRole('button', { name: 'Ещё' }).click()
   await page.waitForTimeout(400)
   await page.screenshot({ path: `${SHOTS}/${info.project.name}-light-menu.png` })

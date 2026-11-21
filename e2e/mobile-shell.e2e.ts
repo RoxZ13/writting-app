@@ -288,7 +288,11 @@ test('a fresh visit opens the library with the next step and readiness under its
     return [date.getFullYear(), date.getMonth() + 1, date.getDate()]
       .map((part) => String(part).padStart(2, '0')).join('-')
   })
-  await menu.locator('input[type=date]').fill(date)
+  await menu.getByRole('button', { name: /поставить дату/ }).click()
+  const calendar = menu.getByRole('region', { name: 'Календарь' })
+  const day = calendar.locator(`[data-date="${date}"]`)
+  if (!(await day.count())) await calendar.getByRole('button', { name: 'Следующий месяц' }).click()
+  await day.click()
   await page.keyboard.press('Escape')
   await expect(story.locator('.story-due')).toContainText(/Финал · через 5 дн\./)
   await story.getByRole('button', { name: /Перечитать первую главу/ }).click()

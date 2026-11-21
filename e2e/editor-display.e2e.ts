@@ -1,0 +1,43 @@
+import { expect, test } from '@playwright/test'
+import { aliveRows, startStory, waitTextInDb } from './helpers'
+
+test('the desktop sheet zoom persists and the draft has no duplicate resume plate', async ({ page }, info) => {
+  test.skip(info.project.name !== 'desktop', 'desktop sheet controls')
+  const editor = await startStory(page)
+  await editor.fill('Я возвращаюсь к тексту.')
+  await waitTextInDb(page, 'Я возвращаюсь к тексту.')
+  await page.reload()
+  await expect(editor).toHaveText('Я возвращаюсь к тексту.')
+  await expect(page.getByRole('button', { name: 'Продолжить', exact: true })).toHaveCount(0)
+  const pageBox = () => page.locator('.editor-wrap').boundingBox()
+  const before = (await pageBox())!.width
+  await page.getByRole('button', { name: 'Ещё', exact: true }).click()
+  await page.getByRole('button', { name: 'Масштаб листа', exact: true }).click()
+  const scale = page.getByRole('dialog', { name: 'Масштаб листа' })
+  await expect(scale.getByRole('button', { name: '115%' })).toHaveAttribute('aria-pressed', 'true')
+  await scale.getByRole('button', { name: '150%' }).click()
+  await scale.getByRole('button', { name: 'Готово' }).click()
+  await expect(editor).toHaveCSS('font-size', '24px')
+  expect((await pageBox())!.width).toBeGreaterThan(before)
+  await page.reload()
+  await expect(editor).toHaveCSS('font-size', '24px')
+})
+
+test('the mobile story settings open a tappable calendar and retain the chosen date', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'phone date selection')
+  await page.clock.setFixedTime(new Date('2026-11-21T12:00:00'))
+  await startStory(page)
+  await page.goto('/#/library')
+  await page.locator('.story-title').first().press('Shift+F10')
+  const settings = page.getByRole('dialog', { name: /^Настройки «/ })
+  await settings.getByRole('button', { name: /поставить дату/ }).tap()
+  const calendar = settings.getByRole('region', { name: 'Календарь' })
+  await expect(calendar).toBeVisible()
+  await calendar.getByRole('button', { name: 'Следующий месяц' }).tap()
+  await calendar.locator('[data-date="2026-12-05"]').tap()
+  await expect(calendar).toBeHidden()
+  await expect.poll(async () => (await aliveRows<any>(page, 'projects'))[0].deadline).toBe('2026-12-05')
+  await page.keyboard.press('Escape')
+  await page.reload()
+  await expect(page.locator('.story-due')).toContainText('5 дек.')
+})

@@ -2772,47 +2772,6 @@ main.page {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.resume {
-  /* Pinned to the bottom of the screen: the editor may open scrolled to where the author stopped. */
-  position: fixed;
-  z-index: var(--z-float);
-  left: 50%;
-  bottom: 24px;
-  transform: translateX(-50%);
-  width: min(var(--measure, 660px), calc(100% - 32px));
-  box-shadow: var(--shadow), 0 0 0 1px var(--line);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 14px 14px 10px 18px;
-  border-radius: var(--r-lg);
-  background: var(--surface);
-  font-size: var(--fs-md);
-  animation: resume-in 0.25s ease-out;
-}
-.resume-note {
-  color: var(--ink-2);
-}
-.resume-tail {
-  font-family: var(--text-font);
-  font-size: calc(var(--text-size) - 3px);
-  line-height: 1.55;
-  color: var(--ink-2);
-  font-style: italic;
-}
-.resume .row {
-  align-items: center;
-}
-.resume .icon-btn {
-  width: 28px;
-  height: 28px;
-}
-@keyframes resume-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, 6px);
-  }
-}
 .editor-area {
   display: flex;
   align-items: flex-start;
@@ -5203,23 +5162,57 @@ main.page {
 .tl-chapter.pool.is-empty .tl-title {
   font-weight: 500;
 }
-.date-chip {
-  position: relative;
-  display: inline-flex;
+.date-chip-row {
+  display: flex;
   align-items: center;
   gap: 2px;
 }
-.date-chip .btn.late {
-  color: var(--danger-ink);
+.date-chip .btn.late { color: var(--danger-ink); }
+.date-calendar {
+  width: min(100%, 352px);
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 6px;
 }
-.date-chip-input {
-  position: absolute;
-  left: 0;
-  bottom: 0;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
+.date-calendar-month {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+  padding-bottom: 4px;
+}
+.date-calendar-month .icon-btn { min-height: 40px; }
+.date-calendar-month strong {
+  font-size: var(--fs-md);
+  white-space: nowrap;
+}
+.date-prev svg { transform: rotate(180deg); }
+.date-calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 2px;
+  text-align: center;
+}
+.date-calendar-grid > span {
+  color: var(--ink-3);
+  font-size: var(--fs-sm);
+  padding-block: 3px;
+}
+.date-calendar-grid button {
+  min-width: 0;
+  min-height: 39px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  padding: 2px;
+}
+.date-calendar-grid button:hover { background: var(--fill); }
+.date-calendar-grid button[aria-current='date'] { box-shadow: inset 0 0 0 1px var(--line-2); }
+.date-calendar-grid button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--surface);
 }
 
 /* Typewriter mode: room below the last line so it can reach the middle of the screen. */
@@ -5502,11 +5495,6 @@ button.deadline {
   text-decoration: none;
   color: var(--ink);
   border-bottom: 1.5px solid var(--line-2);
-}
-@media (max-width: 760px) {
-  .resume {
-    bottom: calc(env(safe-area-inset-bottom) + 76px);
-  }
 }
 
 /* =====================================================================
@@ -5892,10 +5880,6 @@ button.deadline {
   border-left: 1px solid var(--line-2);
   font-size: var(--fs-ui);
 }
-/* The resume plate sits above it. */
-.resume {
-  bottom: 84px;
-}
 .write.typing .passport-wrap {
   opacity: 0;
   pointer-events: none;
@@ -5914,9 +5898,6 @@ button.deadline {
   .now-line .pp-due {
     border-left: 0;
     padding-left: 0;
-  }
-  .resume {
-    bottom: calc(env(safe-area-inset-bottom) + 150px);
   }
 }
 /* A little room under the text, so its last lines never sit under the pill. */
@@ -7264,7 +7245,7 @@ button.avatar {
 .menu-modes button {
   padding: 6px 8px;
 }
-/* On a phone the «⋯» menu opens right under its button (the shared popover rule pins it to the bottom, under the resume bar). */
+/* On a phone the «⋯» menu opens right under its button. */
 @media (max-width: 600px) {
   .typo-pop.write-menu {
     position: absolute;
@@ -7282,41 +7263,6 @@ button.avatar {
   z-index: var(--z-menu);
 }
 
-/* «В прошлый раз»: one line at the bottom, gone with the first letter or scroll. */
-.resume {
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 6px 6px 16px;
-  border-radius: var(--r-md);
-  box-shadow: var(--shadow-2);
-  font-size: var(--fs-ui);
-  max-width: min(var(--measure, 660px), calc(100% - 32px));
-}
-.resume-text {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--ink-2);
-  font-family: var(--text-font);
-  font-style: italic;
-}
-.resume-text .muted {
-  font-family: var(--sans);
-  font-style: normal;
-}
-.resume-go {
-  flex: none;
-  border: 0;
-  background: var(--ink);
-  color: var(--bg);
-  border-radius: var(--r-sm);
-  padding: 6px 12px;
-  font-size: var(--fs-ui);
-  font-weight: 500;
-}
 
 /* Empty optional fields on a hero card stay out of sight until the card is hovered or the field is focused. */
 .person .aliases:placeholder-shown:not(:focus) {
@@ -7420,22 +7366,6 @@ button.avatar {
   }
 }
 
-/* «В прошлый раз» sits at the end of the text column and sticks to the bottom of the screen, centred on the text. */
-.resume {
-  position: sticky;
-  left: auto;
-  transform: none;
-  bottom: calc(env(safe-area-inset-bottom) + 20px);
-  margin: 0 auto;
-  width: min(calc(var(--measure) + 32px), calc(100% - 32px));
-  max-width: none;
-  animation: none;
-}
-@media (max-width: 760px) {
-  .resume {
-    bottom: calc(env(safe-area-inset-bottom) + 84px);
-  }
-}
 
 /* =====================================================================
    Lightness: the page is for writing. Controls are icons, quiet until needed.
@@ -7509,7 +7439,6 @@ button.avatar {
   transform: translateY(var(--header-height-with-inset));
 }
 [data-focusrun='on'] .volume-counter,
-[data-focusrun='on'] .resume,
 [data-focusrun='on'] .fab {
   display: none;
 }
@@ -7697,16 +7626,30 @@ button.avatar {
   .editor-area {
     padding: 8px 24px 0;
   }
-  .editor-wrap {
+  .editor-area .editor-wrap {
     background: var(--sheet);
-    width: min(calc(var(--measure) + 160px), 100%);
-    padding: 64px 80px 45vh;
+    width: min(calc(var(--measure) * var(--page-scale, 1.15) + 144px), 100%);
+    padding: 46px clamp(18px, 5vw, 72px) 45vh;
     margin: 0 auto;
     border-radius: 6px 6px 0 0;
     box-shadow: 0 0 0 1px var(--line), 0 1px 3px rgba(0, 0, 0, 0.04), 0 12px 40px rgba(0, 0, 0, 0.04);
     min-height: calc(100dvh - 120px);
   }
+  .editor-wrap .ProseMirror {
+    font-size: calc(var(--text-size) * var(--page-scale, 1.15));
+  }
 }
+
+@media (min-width: 601px) and (max-width: 760px) {
+  .editor-wrap .ProseMirror {
+    font-size: calc(var(--text-size) * var(--page-scale, 1.15));
+  }
+}
+
+.page-scale-dialog {
+  width: min(380px, 100%);
+}
+.page-scale-dialog .seg button { flex: 1; }
 
 /* The font choice shows itself: a sample line of prose in the chosen font and size. */
 .typo-sample {
@@ -7979,7 +7922,6 @@ button.avatar {
      and masquerade as part of the editor. */
   :root[data-keyboard='open'] .tabs-mobile,
   :root[data-keyboard='open'] .write .passport-wrap,
-  :root[data-keyboard='open'] .write .resume,
   :root[data-keyboard='open'] .fab {
     opacity: 0 !important;
     visibility: hidden;
@@ -8438,7 +8380,7 @@ button.avatar {
     font-weight: 650;
   }
   .app-text:has(.writing-session) > :is(.app-header, .tabs-mobile),
-  .write.writing-session :is(.passport-wrap, .resume, .find-bar, .old-text),
+  .write.writing-session :is(.passport-wrap, .find-bar, .old-text),
   .write.writing-session .write-top > :not(.writing-session-toggle, .text-format) {
     display: none;
   }

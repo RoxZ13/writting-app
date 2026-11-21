@@ -133,16 +133,6 @@ export function TypoControls() {
             ]}
           />
           <Choice
-            label="Вход в сцену"
-            k="resume"
-            t={t}
-            set={set}
-            options={[
-              ['on', 'Подхватить мысль'],
-              ['off', 'Сразу текст'],
-            ]}
-          />
-          <Choice
             label="Строка"
             k="typewriter"
             t={t}
