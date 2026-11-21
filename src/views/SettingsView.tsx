@@ -23,6 +23,7 @@ import { StorageDiagnostics } from '../components/StorageDiagnostics'
 
 /** Settings of the app itself (not of a book): look, devices, installing, backup. */
 export function SettingsView({ sync }: { sync: SyncStatus }) {
+  const iosBuild = navigator.userAgent.match(/\bManuscriptIOS\/([\d.]+)(?:\s|$)/)?.[1]
   const [theme, setTheme] = useState<Theme>(getTheme)
   const [board, setBoard] = useState<BoardLayout>(getBoardLayout)
   const [accent, setAccent] = useState<Accent>(getAccent)
@@ -177,6 +178,7 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
       <div className="small muted app-version">
         {__PREVIEW__ ? 'Тестовая версия · облако отключено · ' : ''}
         Версия от {new Date(__BUILD__).toLocaleString('ru-RU', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}
+        {iosBuild && <div>Сборка iOS {iosBuild}</div>}
       </div>
     </div>
   )

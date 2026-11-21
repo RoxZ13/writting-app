@@ -8665,6 +8665,9 @@ button.avatar {
 }
 
 @media (max-width: 900px) and (pointer: coarse) {
+  :root[data-keyboard='open'] .write:has(.ProseMirror:focus) .chapter-meter:not(:has(.chapter-progress-panel)) {
+    display: none;
+  }
   /* Let WebKit scroll the caret past the upper bars as the keyboard opens. */
   :root[data-keyboard='open']:not([data-focusrun='on']) .app-text :is(.app-header, .write-top, .chapter-meter) {
     position: relative;

@@ -16,6 +16,7 @@ final class ManuscriptViewController: UIViewController, WKNavigationDelegate, WK
         web.navigationDelegate = self
         web.uiDelegate = self
         web.scrollView.contentInsetAdjustmentBehavior = .never
+        web.scrollView.keyboardDismissMode = .interactive
         view.addSubview(web)
         NSLayoutConstraint.activate([
             web.topAnchor.constraint(equalTo: view.topAnchor),

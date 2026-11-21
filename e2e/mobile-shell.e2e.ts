@@ -68,6 +68,22 @@ test('the status-bar inset leaves room for the book title and the writer toolbar
   await expect(page.locator('.resume')).toBeHidden()
   await page.evaluate(() => window.scrollTo(0, 0))
   await assertBarsFit()
+  await editor.focus()
+  await expect(meter).toBeHidden()
+  await page.evaluate(() => { document.documentElement.dataset.keyboard = 'closed' })
+  await expect(meter).toBeVisible()
+})
+
+test('settings distinguishes the installed iOS build from the web version', async ({ page }, info) => {
+  test.skip(info.project.name !== 'iphone', 'iOS wrapper user agent')
+  await page.addInitScript(() => {
+    const userAgent = navigator.userAgent
+    Object.defineProperty(navigator, 'userAgent', { value: `${userAgent} ManuscriptIOS/3` })
+  })
+  await startStory(page)
+  await page.goto('/#/settings')
+  await expect(page.locator('.app-version')).toContainText('Версия от')
+  await expect(page.locator('.app-version')).toContainText('Сборка iOS 3')
 })
 
 test('chapter progress keeps plan controls in a separate sheet on phones', async ({ page }, info) => {
