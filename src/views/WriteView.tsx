@@ -112,6 +112,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   const [finishing, setFinishing] = useState(false)
   const [typoOpen, setTypoOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [chapterProgressOpen, setChapterProgressOpen] = useState(false)
   const [writingSession, setWritingSession] = useState(false)
   const [savingSession, setSavingSession] = useState(false)
   const saveNow = useRef<() => Promise<boolean>>(() => Promise.resolve(true))
@@ -507,6 +508,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                       </button>
                     ))}
                   </div>
+                  {chapter && !chapter.pool && renderMenuTool(['target', 'Объём и готовность', '', () => setChapterProgressOpen(true)])}
                   {compact ? (
                     <>
                       {renderMenuTool(['panel', wholeChapter ? 'Перейти к главе' : 'Перейти к сцене', '', () => togglePanel('nav')])}
@@ -561,6 +563,8 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
             bookScenes={data.scenes}
             chapters={data.chapters}
             wholeChapter={wholeChapter}
+            open={chapterProgressOpen}
+            setOpen={setChapterProgressOpen}
           />
         )}
 

@@ -72,6 +72,25 @@ export async function openChapterPlan(page: Page) {
   return plan
 }
 
+export async function openChapterProgress(page: Page) {
+  await page.locator('.write-top').getByRole('button', { name: 'Ещё', exact: true }).click()
+  await page.getByRole('button', { name: 'Объём и готовность', exact: true }).click()
+  const panel = page.getByRole('dialog', { name: /Прогресс главы/ })
+  await expect(panel).toBeVisible()
+  return panel
+}
+
+export async function setChapterMaximum(page: Page, max?: number) {
+  const panel = await openChapterProgress(page)
+  await panel.getByRole('button', { name: 'Цели', exact: true }).click()
+  const goals = page.getByRole('dialog', { name: 'Цели книги и главы' })
+  const field = goals.locator('.goal-settings-group', { hasText: 'Общий объём главы' }).getByLabel('Максимум, знаков')
+  await field.fill(max === undefined ? '' : String(max))
+  await field.blur()
+  await goals.getByRole('button', { name: 'Закрыть цели' }).click()
+  await panel.getByRole('button', { name: 'Закрыть', exact: true }).click()
+}
+
 /** Click into the editor and type with the real keyboard. */
 export async function typeInEditor(page: Page, text: string, opts: { end?: boolean } = {}) {
   const editor = page.locator('.ProseMirror')

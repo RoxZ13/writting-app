@@ -634,16 +634,15 @@ function AskLock({ data }: { data: ProjectData }) {
 
 function BoardChapterProgress({ data, chapter, scenes, singleChapter = false }: { data: ProjectData; chapter: Chapter; scenes: Scene[]; singleChapter?: boolean }) {
   const progress = chapterWritingProgress(data.project, scenes, undefined, chapter)
-  if (!scenes.length && !progress.target) return null
+  if (!progress.target && !progress.written && !progress.ready) return null
   if (singleChapter && !progress.target && !progress.ready) return null
   const number = (value: number) => Math.round(value).toLocaleString('ru-RU')
-  const ratio = progress.target ? progress.ratio : progress.total ? progress.ready / progress.total : 0
   return (
     <div className="board-chapter-progress" title={progress.target ? `Лимит главы: ${number(progress.target)} знаков` : 'Готовность сцен главы'}>
-      <div className="board-chapter-track">
-        <span style={{ width: `${Math.min(100, ratio * 100)}%` }} />
+      {progress.target && <div className="board-chapter-track">
+        <span style={{ width: `${Math.min(100, progress.ratio * 100)}%` }} />
         {!singleChapter && scenes.map((scene, index) => <i key={scene.id} className={sceneProgressState(scene)} style={{ left: `${((index + 1) / scenes.length) * 100}%` }} />)}
-      </div>
+      </div>}
       <div className="board-chapter-progress-copy">
         {progress.target
           ? <span>{number(progress.chars)} зн. · цель {progress.min && progress.max ? `${number(progress.min)}–${number(progress.max)}` : number(progress.target)}</span>

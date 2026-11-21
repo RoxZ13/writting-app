@@ -236,19 +236,7 @@ export function PublishSection({ data, onCopy }: { data: ProjectData; onCopy: (c
 export function PublishingSetup({ project }: { project: Project }) {
   const site = platformOf(project)
   const select = (id: PlatformId) => {
-    const next = PLATFORMS.find((item) => item.id === id)
-    const changes: Partial<Project> = { platform: id, stage: project.stage === 'idea' ? 'writing' : project.stage }
-    // Recommendations fill an empty chapter norm once; changing a site never
-    // overwrites a limit the author set deliberately.
-    if (next?.recommended && !hasNorm(project)) {
-      const range = next.recommended
-      const cpw = bookCharsPerWord()
-      const chars = (value?: number) => value ? Math.round(range.unit === 'words' ? value * cpw : value) : undefined
-      changes.lengthUnit = range.unit === 'words' ? 'words' : 'chars'
-      changes.chapterMin = chars(range.min)
-      changes.chapterMax = chars(range.max ?? range.target)
-    }
-    void patch<Project>('projects', project.id, changes)
+    void patch<Project>('projects', project.id, { platform: id, stage: project.stage === 'idea' ? 'writing' : project.stage })
   }
   return (
     <div className="publish-setup">

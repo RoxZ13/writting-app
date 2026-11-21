@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test'
+import { openChapterProgress } from './helpers'
 
 test('a new story opens a page you can type into, with typography', async ({ page }) => {
   await page.goto('/')
@@ -14,8 +15,9 @@ test('a new story opens a page you can type into, with typography', async ({ pag
   await editor.click()
   await page.keyboard.type('- Привет... "Тест" -- проверка')
   await expect(page.locator('.chapter-progress-percent')).toHaveCount(0)
-  await page.locator('.chapter-progress-trigger').click()
-  const progress = page.getByRole('dialog', { name: /Прогресс главы/ })
+  await expect(page.locator('.chapter-progress-trigger')).toHaveCount(0)
+  const progress = await openChapterProgress(page)
+  await expect(progress.locator('.chapter-range-scale')).toHaveCount(0)
   await expect(progress.locator('.chapter-progress-scenes')).toHaveCount(0)
   await expect(progress.getByRole('button', { name: 'Отметить главу готовой' })).toBeVisible()
   await progress.getByRole('button', { name: 'Закрыть', exact: true }).click()

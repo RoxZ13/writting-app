@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { aliveRows, allTexts, startStory, waitSaveTick } from './helpers'
+import { aliveRows, allTexts, setChapterMaximum, startStory, waitSaveTick } from './helpers'
 
 // Set QUIET_SHOTS to a folder to also save screenshots of the chapter meter in every theme.
 const SHOTS = process.env.QUIET_SHOTS
@@ -8,26 +8,13 @@ const A = 'Первый абзац главы. '.repeat(5).trim()
 const B = 'Второй абзац главы. '.repeat(5).trim()
 const C = 'Третий абзац главы. '.repeat(8).trim()
 
-async function setNorm(page: Page, max: number) {
-  await page.locator('.chapter-progress-trigger').click()
-  const meter = page.getByRole('dialog', { name: /Прогресс главы/ })
-  await meter.getByRole('button', { name: 'Цели' }).click()
-  const goals = page.getByRole('dialog', { name: 'Цели книги и главы' })
-  const maxField = goals.locator('.goal-settings-group', { hasText: 'Общий диапазон главы' }).getByLabel('До')
-  await maxField.fill(String(max))
-  await maxField.blur()
-  await expect(maxField).toHaveValue(String(max))
-  await goals.getByRole('button', { name: 'Закрыть цели' }).click()
-  await meter.getByRole('button', { name: 'Закрыть', exact: true }).click()
-}
-
 /** A story whose first chapter has a norm of 300 characters and three paragraphs, ~360 characters: past the norm. */
 async function overTheNorm(page: Page) {
   const editor = await startStory(page)
   await editor.click()
   await page.keyboard.type('Начало.')
   await waitSaveTick(page)
-  await setNorm(page, 300)
+  await setChapterMaximum(page, 300)
   await expect(page.locator('.ProseMirror')).toBeVisible()
   await page.locator('.ProseMirror').click()
   await page.keyboard.press('Control+End')
@@ -48,7 +35,7 @@ test.describe('quiet chapter meter', () => {
     await expect(page.locator('.ProseMirror')).toBeEditable()
     await meter.locator('.chapter-progress-trigger').click()
     const message = page.getByRole('dialog', { name: /Прогресс главы/ }).locator('.chapter-progress-message')
-    await expect(message).toHaveText(/Глава длиннее диапазона на \d+ знаков/)
+    await expect(message).toHaveText(/Сверх ориентира на \d+ знаков/)
   })
 
   test('«Новая глава с этого абзаца» lives in the «⋯» menu and splits the chapter without losing text', async ({ page }) => {

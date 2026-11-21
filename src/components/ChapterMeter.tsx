@@ -63,12 +63,7 @@ export async function splitChapterHere(project: Project, scene: Scene, editor: E
   go({ view: 'text', sceneId: next.id })
 }
 
-/**
- * The chapter's length against the norm: a thin line across the top of the page that fills up.
- * The bar is the indicator. Its words (how much is left, by how much the norm is passed) are small,
- * neutral, shown only on a wide screen and only while the author is not typing. Nothing at all when
- * the author has set no norm. Starting the next chapter from the cursor is in the «⋯» menu.
- */
+/** Only a configured target gets a meter. The editor menu opens the same details without a target. */
 export function ChapterMeter({
   project,
   chars,
@@ -78,6 +73,8 @@ export function ChapterMeter({
   bookScenes,
   chapters,
   wholeChapter = false,
+  open,
+  setOpen,
 }: {
   project: Project
   chars: number
@@ -87,68 +84,75 @@ export function ChapterMeter({
   bookScenes: Scene[]
   chapters: Chapter[]
   wholeChapter?: boolean
+  open: boolean
+  setOpen: (open: boolean) => void
 }) {
-  const [open, setOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [bookOpen, setBookOpen] = useState(() => typeof matchMedia !== 'undefined' && matchMedia('(min-width: 761px)').matches)
+  const [bookOpen, setBookOpen] = useState(false)
   useEffect(() => {
     if (!open) return
-    const close = (event: KeyboardEvent) => event.key === 'Escape' && setOpen(false)
+    const close = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return
+      if (settingsOpen) setSettingsOpen(false)
+      else setOpen(false)
+    }
     addEventListener('keydown', close)
     return () => removeEventListener('keydown', close)
-  }, [open])
+  }, [open, settingsOpen, setOpen])
 
   const liveMine = Math.max(0, chars - scenes.filter((item) => item.id !== scene.id).reduce((sum, item) => sum + (item.charCount ?? 0), 0))
   const progress = chapterWritingProgress(project, scenes, { sceneId: scene.id, chars: liveMine }, chapter)
-  const readyBook = bookReadyProgress(bookScenes, chapters.filter((item) => !item.pool).map((item) => item.id))
-  const liveBookScenes = bookScenes.map((item) => item.id === scene.id ? { ...item, charCount: liveMine } : item)
-  const book = bookWritingProgress(project, chapters, liveBookScenes)
+  if (!progress.target && !open) return null
+
+  const readyBook = open ? bookReadyProgress(bookScenes, chapters.filter((item) => !item.pool).map((item) => item.id)) : null
+  const book = open ? bookWritingProgress(project, chapters, bookScenes.map((item) =>
+    item.id === scene.id ? { ...item, charCount: liveMine } : item,
+  )) : null
   const complete = progress.total > 0 && progress.ready === progress.total
   const number = (value: number) => Math.round(value).toLocaleString('ru-RU')
   const inRange = !!progress.min && progress.chars >= progress.min && (!progress.max || progress.chars <= progress.max)
-  const tone = progress.over ? 'over' : inRange ? 'done' : 'calm'
+  const over = progress.max !== undefined && progress.chars > progress.max
+  const tone = over ? 'over' : inRange ? 'done' : 'calm'
   const range = rangeLabel(progress.min, progress.max, number)
-  const scaleMax = Math.max((progress.max || progress.min || progress.chars || 1) * 1.25, progress.chars)
+  const maxOnly = progress.min === undefined ? progress.max : undefined
+  const scaleMax = maxOnly || Math.max((progress.max || progress.min || progress.chars || 1) * 1.25, progress.chars)
   const bandStart = progress.min ? (progress.min / scaleMax) * 100 : 0
   const bandEnd = progress.max ? (progress.max / scaleMax) * 100 : progress.min ? (progress.min / scaleMax) * 100 : 0
   const marker = Math.min(100, (progress.chars / scaleMax) * 100)
+  const scale = maxOnly
+    ? <span className="chapter-progress-fill" style={{ width: `${marker}%` }} />
+    : <span className="chapter-target-band" style={{ left: `${bandStart}%`, width: `${Math.max(2, bandEnd - bandStart)}%` }} />
   const sheets = (value: number) => value > 0 && value < 0.01 ? '<0,01' : (Math.round(value * 100) / 100).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
-  const chapterMessage = !progress.target
-    ? 'Диапазон не задан — объём пока только измеряется.'
-    : progress.min && progress.chars < progress.min
+  const chapterMessage = progress.min && progress.chars < progress.min
       ? `До целевого диапазона осталось ${number(progress.min - progress.chars)} знаков.`
       : progress.max && progress.chars > progress.max
-        ? `Глава длиннее диапазона на ${number(progress.chars - progress.max)} знаков. Это ориентир, не ошибка.`
-        : 'Объём находится в целевом диапазоне.'
+        ? `Сверх ориентира на ${number(progress.chars - progress.max)} знаков.`
+        : !progress.min && progress.max
+          ? `До максимума ${number(progress.max - progress.chars)} знаков.`
+          : 'Объём соответствует ориентиру.'
   const close = () => {
     setSettingsOpen(false)
     setOpen(false)
   }
 
-  // A blank page should invite the first sentence, not report zeroes. The meter
-  // appears after writing starts, or immediately when the author already set a range.
-  if (!progress.target && progress.chars === 0) return null
-
   return (
-    <div className={`chapter-meter ${tone}`}>
-      <button className="chapter-progress-trigger" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}>
+    <div className={`chapter-meter ${tone}${progress.target ? '' : ' chapter-meter-dialog-only'}`}>
+      {progress.target && <button className="chapter-progress-trigger" onClick={() => setOpen(true)} aria-haspopup="dialog" aria-expanded={open}>
         <span className="chapter-progress-label">{chapter.title}</span>
         <span className="chapter-progress-summary chapter-progress-summary-desktop">
-          {number(progress.chars)} зн.{range ? ` · цель ${range}` : ' · задать диапазон'}
+          {number(progress.chars)} зн. · {range}
         </span>
         <span className="chapter-progress-summary chapter-progress-summary-mobile">
-          {number(progress.chars)}{range ? ` из ${range} зн.` : ' зн. · без цели'}
+          {number(progress.chars)} · {range} зн.
         </span>
         {!wholeChapter && <span className="chapter-progress-percent">{progress.ready}/{progress.total} сцен</span>}
-        {progress.target && (
-          <span className="chapter-progress-track range" aria-hidden="true">
-            <span className="chapter-target-band" style={{ left: `${bandStart}%`, width: `${Math.max(2, bandEnd - bandStart)}%` }} />
-            <span className="chapter-current-marker" style={{ left: `${marker}%` }} />
-          </span>
-        )}
-      </button>
+        <span className="chapter-progress-track range" aria-hidden="true">
+          {scale}
+          {!maxOnly && <span className="chapter-current-marker" style={{ left: `${marker}%` }} />}
+        </span>
+      </button>}
 
-      {open && (
+      {open && book && readyBook && (
         <>
           <button className="chapter-progress-backdrop" aria-label="Закрыть прогресс главы" onClick={close} />
           <section className="chapter-progress-panel card" role="dialog" aria-modal="true" aria-label={`Прогресс главы «${chapter.title}»`}>
@@ -167,13 +171,15 @@ export function ChapterMeter({
               <div className="chapter-progress-number">
                 <strong>{number(progress.chars)}</strong><span>знаков написано</span>
               </div>
-              <div className="chapter-range-scale">
-                {progress.target && <span className="chapter-target-band" style={{ left: `${bandStart}%`, width: `${Math.max(2, bandEnd - bandStart)}%` }} />}
-                <span className="chapter-current-marker" style={{ left: `${marker}%` }} />
-              </div>
-              <div className="chapter-range-labels"><span>0</span>{progress.min && <span style={{ left: `${bandStart}%` }}>{number(progress.min)}</span>}{progress.max && <span style={{ left: `${bandEnd}%` }}>{number(progress.max)}</span>}</div>
-              <div className="chapter-progress-message">{chapterMessage}</div>
-              {complete && <div className="chapter-scenes-complete">{wholeChapter ? 'Глава отмечена готовой.' : 'Все сцены готовы. Решение о длине остаётся за тобой.'}</div>}
+              {progress.target && <>
+                <div className="chapter-range-scale">
+                  {scale}
+                  {!maxOnly && <span className="chapter-current-marker" style={{ left: `${marker}%` }} />}
+                </div>
+                <div className="chapter-range-labels"><span>0</span>{progress.min && <span style={{ left: `${bandStart}%` }}>{number(progress.min)}</span>}{progress.max && <span style={{ left: `${bandEnd}%` }}>{number(progress.max)}</span>}</div>
+                <div className="chapter-progress-message">{chapterMessage}</div>
+              </>}
+              {complete && <div className="chapter-scenes-complete">{wholeChapter ? 'Глава отмечена готовой.' : 'Все сцены готовы.'}</div>}
             </div>
 
             {!wholeChapter && <div className="chapter-progress-scenes">
@@ -220,7 +226,7 @@ export function ChapterMeter({
               </summary>
               <div className="book-progress-details">
                 <div className="book-progress-primary">
-                  {book.target ? <><strong>{number(book.chars)} / {number(book.target)} знаков</strong><span>{Math.round(book.ratio * 100)}%</span></> : <><strong>{number(book.chars)} знаков</strong><span>план не задан</span></>}
+                  {book.target ? <><strong>{number(book.chars)} / {number(book.target)} знаков</strong><span>{Math.round(book.ratio * 100)}%</span></> : <strong>{number(book.chars)} знаков</strong>}
                 </div>
                 <div className="book-progress-sheets">{sheets(book.sheets)}{book.targetSheets !== undefined ? ` / ${sheets(book.targetSheets)}` : ''} авторских листов</div>
                 {book.forecast && <div className={`book-progress-forecast ${book.target && book.forecast > book.target ? 'growing' : ''}`}>
@@ -269,30 +275,35 @@ function GoalNumber({ label, value, placeholder, onSave }: { label: string; valu
 
 function GoalSettings({ project, chapter }: { project: Project; chapter: Chapter }) {
   const custom = chapter.targetMin !== undefined || chapter.targetMax !== undefined
-  const setProject = (changes: Partial<Project>) => void patch<Project>('projects', project.id, { ...changes, lengthUnit: 'chars' })
+  const setProject = (changes: Partial<Project>) => void patch<Project>('projects', project.id, changes)
   const setChapter = (changes: Partial<Chapter>) => void patch<Chapter>('chapters', chapter.id, changes)
   return (
     <div className="chapter-goal-settings">
       <div className="chapter-goal-settings-body">
         <div className="goal-settings-group">
-          <strong>Книга</strong>
+          <strong>Общий объём главы</strong>
+          <GoalNumber label="Максимум, знаков" value={project.chapterMax} placeholder="Без ограничения" onSave={(chapterMax) => setProject({ chapterMax })} />
+          <details open={project.chapterMin ? true : undefined}>
+            <summary>Добавить минимум</summary>
+            <GoalNumber label="Минимум, знаков" value={project.chapterMin} placeholder="Без минимума" onSave={(chapterMin) => setProject({ chapterMin })} />
+          </details>
+        </div>
+        <details className="goal-settings-group chapter-override-settings" open={custom || undefined}>
+          <summary>Отдельный объём для этой главы</summary>
+          <div className="goal-settings-grid">
+            <GoalNumber label="Минимум, знаков" value={chapter.targetMin} placeholder="Без минимума" onSave={(targetMin) => setChapter({ targetMin })} />
+            <GoalNumber label="Максимум, знаков" value={chapter.targetMax} placeholder="Без ограничения" onSave={(targetMax) => setChapter({ targetMax })} />
+          </div>
+          {custom && <button className="btn sm ghost" onClick={() => setChapter({ targetMin: undefined, targetMax: undefined })}>Вернуть общий объём</button>}
+        </details>
+        <details className="goal-settings-group">
+          <summary>План книги</summary>
           <div className="goal-settings-grid">
             <GoalNumber label="Объём, знаков" value={project.targetChars} placeholder="400 000" onSave={(targetChars) => setProject({ targetChars })} />
             <GoalNumber label="Глав" value={project.targetChapters || undefined} placeholder="28" onSave={(targetChapters) => setProject({ targetChapters })} />
           </div>
           {project.targetChars && project.targetChapters ? <span className="chapter-goal-hint">Средний ориентир: {Math.round(project.targetChars / project.targetChapters).toLocaleString('ru-RU')} знаков на главу.</span> : null}
-        </div>
-        <div className="goal-settings-group">
-          <strong>Общий диапазон главы</strong>
-          <div className="goal-settings-grid">
-            <GoalNumber label="От" value={project.chapterMin} placeholder="12 000" onSave={(chapterMin) => setProject({ chapterMin })} />
-            <GoalNumber label="До" value={project.chapterMax} placeholder="18 000" onSave={(chapterMax) => setProject({ chapterMax })} />
-          </div>
-        </div>
-        <div className="goal-settings-group chapter-override-settings">
-          <label><input type="checkbox" checked={custom} onChange={(event) => setChapter(event.target.checked ? { targetMin: project.chapterMin, targetMax: project.chapterMax } : { targetMin: undefined, targetMax: undefined })} /> Свой диапазон для «{chapter.title}»</label>
-          {custom && <div className="goal-settings-grid"><GoalNumber label="От" value={chapter.targetMin} placeholder="8 000" onSave={(targetMin) => setChapter({ targetMin })} /><GoalNumber label="До" value={chapter.targetMax} placeholder="12 000" onSave={(targetMax) => setChapter({ targetMax })} /></div>}
-        </div>
+        </details>
       </div>
     </div>
   )

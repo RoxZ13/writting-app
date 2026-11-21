@@ -3135,7 +3135,7 @@ main.page {
   hyphens: manual;
 }
 .ProseMirror p {
-  margin: 0 0 0.85em;
+  margin: 0 0 0.75rem;
 }
 :root[data-para='indent'] .ProseMirror p {
   margin: 0;
@@ -7479,7 +7479,7 @@ button.avatar {
 
 /* The scene's heading on the page: where I am, said once, quietly. The name is edited right here. */
 .scene-head {
-  margin: 8px 0 28px;
+  margin: 8px 0 20px;
 }
 .scene-head-chapter {
   font-family: var(--sans);
@@ -7489,10 +7489,11 @@ button.avatar {
 }
 .scene-head .scene-head-title {
   width: 100%;
-  font-family: var(--text-font);
-  font-size: calc(var(--text-size) * 1.45);
+  padding: 0;
+  font-family: var(--sans);
+  font-size: 24px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 32px;
   letter-spacing: -0.01em;
   color: var(--ink);
 }
@@ -7588,7 +7589,9 @@ button.avatar {
 }
 /* A new story: its name is a quiet line above the text, not a poster. */
 .title-page .tp-title {
-  font-size: calc(var(--text-size) * 1.45);
+  font-family: var(--sans);
+  font-size: 24px;
+  line-height: 32px;
   font-weight: 600;
   margin-bottom: 20px;
 }
@@ -7722,6 +7725,10 @@ button.avatar {
   /* The dialog is a child of this sticky stacking context; lift the context
      itself above the phone navigation while the sheet is open. */
   z-index: var(--z-modal);
+}
+.chapter-meter.chapter-meter-dialog-only {
+  height: 0;
+  padding: 0;
 }
 .chapter-progress-trigger {
   width: min(760px, 100%);
@@ -8141,9 +8148,14 @@ button.avatar {
   border-radius: 12px;
   background: var(--fill);
 }
-.chapter-override-settings > label {
+.goal-settings-group summary {
   color: var(--ink-2);
   font-size: var(--fs-sm);
+  cursor: pointer;
+}
+.goal-settings-group details[open] > summary,
+.goal-settings-group[open] > summary {
+  margin-bottom: 8px;
 }
 .chapter-goal-backdrop {
   position: fixed;

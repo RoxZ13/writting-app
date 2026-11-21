@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { aliveRows, startStory, waitTextInDb } from './helpers'
+import { aliveRows, openChapterProgress, setChapterMaximum, startStory, waitTextInDb } from './helpers'
 
 test('the mobile shell behaves like an app surface', async ({ page }, info) => {
   test.skip(info.project.name === 'desktop', 'phone shell only')
@@ -50,10 +50,12 @@ test('the status-bar inset leaves room for the book title and the writer toolbar
 
   await editor.fill('Проверка строки в редакторе. '.repeat(100))
   await waitTextInDb(page, 'Проверка строки в редакторе.')
+  await expect(meter).toHaveCount(0)
+  await setChapterMaximum(page, 4_000)
   await page.reload()
   await page.evaluate(() => document.documentElement.style.setProperty('--app-safe-top', '62px'))
   await expect(page.locator('.resume')).toBeVisible()
-  await expect(meter.locator('.chapter-progress-track')).toHaveCount(0)
+  await expect(meter.locator('.chapter-progress-track')).toBeVisible()
   await page.evaluate(() => window.scrollTo(0, 480))
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100)
   await assertBarsFit()
@@ -90,6 +92,7 @@ test('writing mode keeps the text and Done, saves, then restores navigation', as
   test.skip(!isMobile, 'mobile writing mode')
   const editor = await startStory(page)
   await expect(editor).toHaveCSS('font-size', '16px')
+  await setChapterMaximum(page, 10_000)
   const toolbar = page.locator('.write-top')
   await toolbar.getByRole('button', { name: 'Писать', exact: true }).click()
   await expect(editor).toBeFocused()
@@ -119,14 +122,43 @@ test('notes open with a short list and a separate composer', async ({ page }) =>
   await expect.poll(async () => (await aliveRows<any>(page, 'notes')).some((note) => note.text === 'Уточнённая мысль')).toBe(true)
 })
 
+test('changing the manuscript font keeps the heading and paragraph spacing fixed', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'phone typography')
+  const editor = await startStory(page)
+  await editor.fill('Первый абзац.')
+  const heading = page.locator('.scene-head-title')
+  const paragraph = editor.locator('p').first()
+  const metrics = () => page.evaluate(() => {
+    const title = document.querySelector('.scene-head-title')!
+    const body = document.querySelector('.ProseMirror')!
+    const line = body.querySelector('p')!
+    return {
+      titleHeight: title.getBoundingClientRect().height,
+      gap: body.getBoundingClientRect().top - title.getBoundingClientRect().bottom,
+      leading: getComputedStyle(body).lineHeight,
+      paragraphGap: getComputedStyle(line).marginBottom,
+    }
+  })
+  const initial = await metrics()
+  const font = await editor.evaluate((element) => getComputedStyle(element).fontFamily)
+  await page.getByRole('button', { name: 'Ещё', exact: true }).click()
+  await page.getByText('Ещё инструменты', { exact: true }).click()
+  await page.getByRole('button', { name: 'Шрифт и вид страницы' }).click()
+  await page.getByRole('button', { name: 'С засечками', exact: true }).click()
+  await page.getByRole('button', { name: 'Закрыть настройки текста' }).click()
+  await expect(heading).toHaveCSS('line-height', '32px')
+  await expect(paragraph).toHaveCSS('margin-bottom', initial.paragraphGap)
+  await expect(editor).not.toHaveCSS('font-family', font)
+  expect(await metrics()).toEqual(initial)
+})
+
 test('chapter progress keeps plan controls in a separate sheet on phones', async ({ page }, info) => {
   test.skip(info.project.name === 'desktop', 'phone hierarchy only')
   await startStory(page)
   await page.locator('.ProseMirror').click()
   await page.keyboard.type('Первая фраза')
-  await page.locator('.chapter-progress-trigger').click()
-
-  const progress = page.getByRole('dialog', { name: /Прогресс главы/ })
+  await expect(page.locator('.chapter-progress-trigger')).toHaveCount(0)
+  const progress = await openChapterProgress(page)
   await expect(progress).toBeVisible()
   await expect(progress.locator('.chapter-goal-settings')).toHaveCount(0)
   await expect(progress.locator('.chapter-progress-book')).not.toHaveAttribute('open', '')
@@ -134,8 +166,9 @@ test('chapter progress keeps plan controls in a separate sheet on phones', async
   await progress.getByRole('button', { name: 'Цели' }).click()
   const goals = page.getByRole('dialog', { name: 'Цели книги и главы' })
   await expect(goals).toBeVisible()
-  await expect(goals.getByText('Книга', { exact: true })).toBeVisible()
-  await expect(goals.getByText('Общий диапазон главы', { exact: true })).toBeVisible()
+  await expect(goals.getByLabel('Максимум, знаков', { exact: true }).filter({ visible: true })).toBeVisible()
+  await expect(goals.getByText('План книги', { exact: true })).toBeVisible()
+  await expect(goals.getByLabel('Объём, знаков')).toBeHidden()
 })
 
 test('the phone board starts with the next writing action, not repeated headings', async ({ page }, info) => {
