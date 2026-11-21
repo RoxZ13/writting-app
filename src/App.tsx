@@ -145,10 +145,11 @@ export function App() {
   }, [projectId])
 
   // A story opens where it was left: the text, or the board for someone who plans first.
-  const selectProject = useCallback((id: string, view?: 'text' | 'board' | 'book') => {
+  const selectProject = useCallback((id: string, view?: 'text' | 'board' | 'book', sceneId?: string) => {
     setProjectId(id)
     setCurrentProjectId(id)
-    go({ view: view ?? lastView(id) })
+    const target = view ?? lastView(id)
+    go(target === 'text' ? { view: 'text', sceneId } : { view: target })
   }, [])
   // Another page can open a story (a new edition, for one) without knowing how stories are switched.
   useEffect(() => {

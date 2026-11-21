@@ -1,11 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { chapterProgress } from '../lib/pace'
+import { storyPlan } from '../lib/writing-progress'
 import { useState } from 'react'
 import { db, type Project } from '../db/db'
 import { alive, patch, remove } from '../db/repo'
 import { COVERS, createStory, deadlineText } from '../lib/stories'
-import { timeAgo } from '../lib/status'
-import { formatWords } from '../lib/text'
 import { FilePick, toast } from '../lib/ui'
 import { BookCover, CoverPicker } from '../components/BookCover'
 import { useCover } from '../lib/cover'
@@ -23,7 +21,7 @@ export function LibraryView({
 }: {
   projects: Project[]
   currentId: string
-  onOpen: (id: string, view?: 'text' | 'board' | 'book') => void
+  onOpen: (id: string, view?: 'text' | 'board' | 'book', sceneId?: string) => void
 }) {
   const [busy, setBusy] = useState(false)
   const [choosing, setChoosing] = useState(false)
@@ -40,18 +38,13 @@ export function LibraryView({
     }
   }
   const stats = useLiveQuery(async () => {
-    const scenes = alive(await db.scenes.toArray())
-    const chapters = alive(await db.chapters.toArray())
-    const by: Record<string, { words: number; scenes: number; chapters: number; written: number; total: number; of: string }> = {}
-    for (const p of projects) {
-      const own = chapters.filter((c) => c.projectId === p.id)
-      const ownScenes = scenes.filter((s) => s.projectId === p.id)
-      const cp = chapterProgress(p, own, ownScenes)
-      by[p.id] = { words: 0, scenes: 0, chapters: own.filter((c) => !c.pool).length, written: cp.written, total: cp.total, of: cp.of }
-    }
-    for (const s of scenes) if (by[s.projectId]) (by[s.projectId].words += s.wordCount), by[s.projectId].scenes++
-    return by
-  }, [projects.map((p) => p.id).join()])
+    const [scenes, chapters] = await Promise.all([db.scenes.toArray().then(alive), db.chapters.toArray().then(alive)])
+    return new Map(projects.map((project) => [project.id, storyPlan(
+      project,
+      chapters.filter((chapter) => chapter.projectId === project.id),
+      scenes.filter((scene) => scene.projectId === project.id),
+    )]))
+  }, [projects])
   const groups = [...projects.reduce((all, project) => {
     const key = project.workId ?? project.id
     const group = all.get(key) ?? []
@@ -76,7 +69,7 @@ export function LibraryView({
 
       <div className="library">
         {groups.map(([workId, editions]) => editions.length === 1 ? (
-          <StoryCard key={editions[0].id} p={editions[0]} current={editions[0].id === currentId} stats={stats?.[editions[0].id]} onOpen={(view) => onOpen(editions[0].id, view)} />
+          <StoryCard key={editions[0].id} p={editions[0]} current={editions[0].id === currentId} plan={stats?.get(editions[0].id)} onOpen={(view, sceneId) => onOpen(editions[0].id, view, sceneId)} />
         ) : (
           <section className="story-group" key={workId}>
             <div className="story-group-head">
@@ -85,7 +78,7 @@ export function LibraryView({
             </div>
             <div className="story-group-grid">
               {[...editions].sort((a, b) => (b.editionNumber ?? 1) - (a.editionNumber ?? 1)).map((p) => (
-                <StoryCard key={p.id} p={p} current={p.id === currentId} stats={stats?.[p.id]} onOpen={(view) => onOpen(p.id, view)} />
+                <StoryCard key={p.id} p={p} current={p.id === currentId} plan={stats?.get(p.id)} onOpen={(view, sceneId) => onOpen(p.id, view, sceneId)} />
               ))}
             </div>
           </section>
@@ -115,15 +108,18 @@ export function LibraryView({
 function StoryCard({
   p,
   current,
-  stats,
+  plan,
   onOpen,
 }: {
   p: Project
   current: boolean
-  stats?: { words: number; scenes: number; chapters: number; written: number; total: number; of: string }
-  onOpen: (view?: 'text' | 'board' | 'book') => void
+  plan?: ReturnType<typeof storyPlan>
+  onOpen: (view?: 'text' | 'board' | 'book', sceneId?: string) => void
 }) {
-  const dl = deadlineText(p.deadline)
+  const nextStep = p.nextStep?.trim()
+  const nextChapter = plan?.next
+  const chapterDeadline = !nextStep && nextChapter?.deadline ? nextChapter.deadline : undefined
+  const deadline = deadlineText(chapterDeadline ?? p.deadline)
   const color = p.color ?? '#0b0b0c'
   const cover = useCover(p.id)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -154,6 +150,15 @@ function StoryCard({
                   className="input"
                   defaultValue={p.title}
                   onBlur={(e) => e.target.value.trim() && e.target.value !== p.title && void patch<Project>('projects', p.id, { title: e.target.value.trim() })}
+                />
+              </label>
+              <label className="menu-field">
+                <span>Следующий шаг</span>
+                <input className="input" defaultValue={p.nextStep ?? ''} placeholder="Например, дописать финал"
+                  onBlur={(event) => {
+                    const value = event.target.value.trim()
+                    if (value !== (nextStep ?? '')) void patch<Project>('projects', p.id, { nextStep: value || undefined })
+                  }}
                 />
               </label>
               <div className="menu-field">
@@ -190,16 +195,23 @@ function StoryCard({
             </div>
           )}
         </div>
-        {p.genre && <div className="story-meta">{p.genre}</div>}
-        <div className="story-meta">
-          {stats ? `${stats.written} из ${stats.of} гл. · ${formatWords(stats.words)}` : '…'}
-          {' · '}
-          {timeAgo(p.updatedAt)}
-        </div>
-        {dl && <div className={`deadline ${dl.late ? 'late' : ''}`}><Icon name="clock" size={13} /> {dl.text}</div>}
-        <button className="btn sm story-continue" onClick={() => onOpen('text')}>
-          Продолжить
-        </button>
+        {!!plan?.total && <div className="story-progress">
+          Главы · готово {plan.ready} из {plan.total}
+          {plan.ready < plan.total && <> · осталось {plan.total - plan.ready}</>}
+        </div>}
+        {(nextStep || nextChapter || deadline) && <div className="story-plan">
+          {(nextStep || nextChapter) && (
+            <button className="story-next" onClick={() => nextStep
+              ? onOpen('text')
+              : plan?.sceneId ? onOpen('text', plan.sceneId) : onOpen('board')}>
+              <span><span className="story-next-label">Дальше · </span>{nextStep || nextChapter?.title}</span>
+              <Icon name="right" size={15} />
+            </button>
+          )}
+          {deadline && <div className="story-due">
+            <Icon name="clock" size={13} /> {chapterDeadline ? 'Срок главы' : 'Финал'} · {deadline.text}
+          </div>}
+        </div>}
       </div>
     </article>
   )

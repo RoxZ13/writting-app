@@ -271,6 +271,38 @@ test('the phone library is a compact picker and opens a story from its title', a
   await expect.poll(() => page.evaluate(() => location.hash)).toMatch(/#\/text/)
 })
 
+test('a fresh visit opens the library with the next step and readiness under its book', async ({ page }) => {
+  const editor = await startStory(page)
+  await editor.fill('Текст первой главы.')
+  await waitTextInDb(page, 'Текст первой главы.')
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Истории' })).toBeVisible()
+  const story = page.locator('.story').first()
+  await expect(story.locator('.story-progress')).toContainText('готово 0 из 1 · осталось 1')
+  await story.locator('.story-settings').click()
+  const menu = story.locator('.story-menu')
+  await menu.getByLabel('Название').fill('Недоля')
+  await menu.getByLabel('Следующий шаг').fill('Перечитать первую главу')
+  await menu.getByLabel('Следующий шаг').blur()
+  const date = await page.evaluate(() => {
+    const date = new Date()
+    date.setDate(date.getDate() + 5)
+    return [date.getFullYear(), date.getMonth() + 1, date.getDate()]
+      .map((part) => String(part).padStart(2, '0')).join('-')
+  })
+  await menu.locator('input[type=date]').fill(date)
+  await story.locator('.story-settings').click()
+  await expect(story.locator('.story-due')).toContainText(/Финал · через 5 дн\./)
+  await story.getByRole('button', { name: /Перечитать первую главу/ }).click()
+  await expect(editor).toHaveText('Текст первой главы.')
+  const progress = await openChapterProgress(page)
+  await progress.getByRole('button', { name: 'Отметить главу готовой' }).click()
+  await expect(progress).toContainText('Глава отмечена готовой')
+  await page.goto('/')
+  await expect(story.locator('.story-progress')).toContainText('готово 1 из 1')
+  await expect(story.getByRole('button', { name: /Перечитать первую главу/ })).toBeVisible()
+})
+
 test('library actions and story controls fit at phone and desktop widths', async ({ page, isMobile }) => {
   const title = 'Очень длинное название новой редакции моей первой рукописи'
   await page.goto('/')

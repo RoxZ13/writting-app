@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bookReadyProgress, bookWritingProgress, chapterWritingProgress, sceneProgressState } from '../lib/writing-progress'
+import { bookReadyProgress, bookWritingProgress, chapterWritingProgress, sceneProgressState, storyPlan } from '../lib/writing-progress'
 
 const scene = (id: string, status: any, chars = 0, chapterId = 'c') => ({ id, chapterId, status, charCount: chars, wordCount: Math.round(chars / 6) })
 
@@ -22,6 +22,26 @@ describe('writing progress', () => {
 
   it('counts a chapter ready only when every scene is ready', () => {
     expect(bookReadyProgress([scene('1', 'done', 100, 'a'), scene('2', 'done', 100, 'a'), scene('3', 'draft', 100, 'b')], ['a', 'b'])).toEqual({ ready: 1, total: 2 })
+  })
+
+  it('keeps scheduled chapters and the remaining count tied to the same story plan', () => {
+    const chapters = [
+      { id: 'a', title: 'Начало', order: 0, deadline: '2026-12-01' },
+      { id: 'b', title: 'Середина', order: 1 },
+      { id: 'c', title: 'Финал', order: 2, deadline: '2026-12-02' },
+      { id: 'pool', title: 'Пока без места', order: 3, pool: true },
+    ]
+    const scenes = [
+      { id: '1', chapterId: 'a', status: 'done', order: 0 },
+      { id: '2', chapterId: 'b', status: 'written', order: 0 },
+      { id: '3', chapterId: 'c', status: 'done', order: 0 },
+      { id: '4', chapterId: 'c', status: 'draft', order: 1 },
+      { id: '5', chapterId: 'pool', status: 'done', order: 0 },
+    ] as const
+    expect(storyPlan({ targetChapters: 2 }, chapters, [...scenes])).toMatchObject({
+      ready: 1, total: 3, next: { id: 'c' }, sceneId: '4',
+    })
+    expect(storyPlan({ targetChapters: 8 }, chapters, [...scenes]).total).toBe(8)
   })
 
   it('uses a chapter-specific range without changing the common range', () => {

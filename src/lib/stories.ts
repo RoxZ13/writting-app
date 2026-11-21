@@ -41,9 +41,10 @@ export async function createStory(opts: { title?: string; file?: File; book?: Im
 /** "через 12 дн. · 15 окт" — calm wording, no alarms. */
 export function deadlineText(date: string | undefined): { text: string; late: boolean } | null {
   if (!date) return null
-  const d = new Date(date + 'T23:59:59')
+  const d = new Date(date + 'T12:00:00')
   if (Number.isNaN(d.getTime())) return null
-  const days = Math.ceil((d.getTime() - Date.now()) / 86400000)
+  const calendarDay = (value: Date) => Date.UTC(value.getFullYear(), value.getMonth(), value.getDate())
+  const days = (calendarDay(d) - calendarDay(new Date())) / 86400000
   const when = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
   if (days < 0) return { text: `${when} · прошло ${-days} дн.`, late: true }
   if (days === 0) return { text: `сегодня · ${when}`, late: false }

@@ -15,7 +15,7 @@ export function parseHash(hash: string): Route {
   const [, view, id] = hash.replace(/^#/, '').split('/')
   if (view === 'write' || view === 'text') return { view: 'text', sceneId: id || undefined }
   if (view === 'board' || view === 'characters' || view === 'lore' || view === 'inbox' || view === 'settings' || view === 'library' || view === 'book' || view === 'help') return { view }
-  return { view: 'text' }
+  return { view: 'library' }
 }
 
 /** Back-compat: old code paths ask for { view: 'write', sceneId }. */

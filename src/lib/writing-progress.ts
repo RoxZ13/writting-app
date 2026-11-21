@@ -56,11 +56,36 @@ export function chapterWritingProgress(
 }
 
 export function bookReadyProgress(scenes: Pick<Scene, 'chapterId' | 'status'>[], chapterIds: string[]) {
-  const ready = chapterIds.filter((id) => {
-    const inChapter = scenes.filter((scene) => scene.chapterId === id)
-    return inChapter.length > 0 && inChapter.every((scene) => scene.status === 'done')
-  }).length
+  const readiness = chapterReadiness(scenes)
+  const ready = chapterIds.filter((id) => readiness.get(id)).length
   return { ready, total: chapterIds.length }
+}
+
+function chapterReadiness(scenes: Pick<Scene, 'chapterId' | 'status'>[]) {
+  const readiness = new Map<string, boolean>()
+  for (const scene of scenes) {
+    readiness.set(scene.chapterId, readiness.get(scene.chapterId) !== false && scene.status === 'done')
+  }
+  return readiness
+}
+
+export function storyPlan(
+  project: Pick<Project, 'targetChapters'>,
+  chapters: Pick<Chapter, 'id' | 'title' | 'order' | 'deadline' | 'pool'>[],
+  scenes: Pick<Scene, 'id' | 'chapterId' | 'status' | 'order'>[],
+) {
+  const real = chapters.filter((chapter) => !chapter.pool).sort((a, b) => a.order - b.order)
+  const readiness = chapterReadiness(scenes)
+  const ready = real.filter((chapter) => readiness.get(chapter.id)).length
+  const total = Math.max(real.length, project.targetChapters || 0)
+  const pending = real.filter((chapter) => !readiness.get(chapter.id))
+  const next = pending.reduce<(typeof pending)[number] | undefined>((first, chapter) => {
+    if (!chapter.deadline) return first
+    return !first?.deadline || chapter.deadline < first.deadline ? chapter : first
+  }, undefined) ?? pending[0]
+  const nextScene = next && scenes.filter((scene) => scene.chapterId === next.id && scene.status !== 'done')
+    .sort((a, b) => a.order - b.order)[0]
+  return { ready, total, next, sceneId: nextScene?.id }
 }
 
 export interface BookWritingProgress {
