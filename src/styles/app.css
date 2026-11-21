@@ -7398,6 +7398,8 @@ button.avatar {
     top: 40px;
     bottom: auto;
     width: min(270px, calc(100vw - 24px));
+    max-height: calc(100dvh - var(--header-h) - var(--write-toolbar-height) - env(safe-area-inset-bottom) - 12px);
+    overscroll-behavior: contain;
   }
 }
 /* A toolbar with an open menu rises over the bars at the bottom of the screen. */

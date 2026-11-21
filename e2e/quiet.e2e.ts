@@ -106,20 +106,12 @@ test.describe('quiet chapter meter', () => {
     expect(m.y - (b.y + b.height)).toBeLessThan(24)
     expect(Math.abs(m.x + m.width - (b.x + b.width))).toBeLessThan(24)
 
-    // Every item answers a tap at its centre: nothing (the resume bar, the tab bar) lies over it.
+    // Every item answers a tap after scrolling it into view inside the menu.
     const items = menu.locator('.menu-item:visible, .menu-modes button')
     const n = await items.count()
     expect(n).toBeGreaterThan(5)
     for (let i = 0; i < n; i++) {
-      const box = (await items.nth(i).boundingBox())!
-      const covered = await page.evaluate(
-        ({ x, y }) => {
-          const hit = document.elementFromPoint(x, y)
-          return !hit?.closest('.write-menu')
-        },
-        { x: box.x + box.width / 2, y: box.y + box.height / 2 },
-      )
-      expect(covered, `menu item ${i} is covered`).toBe(false)
+      await items.nth(i).click({ trial: true, timeout: 3_000 })
     }
   })
 
