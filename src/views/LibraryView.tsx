@@ -4,13 +4,14 @@ import { useState } from 'react'
 import { db, type Project } from '../db/db'
 import { alive, patch, remove } from '../db/repo'
 import { COVERS, createStory, deadlineText } from '../lib/stories'
-import { FilePick, toast } from '../lib/ui'
+import { FilePick, Modal, toast } from '../lib/ui'
 import { BookCover, CoverPicker } from '../components/BookCover'
 import { useCover } from '../lib/cover'
 import { DateChip } from '../components/DateChip'
 import { Icon } from '../components/Icon'
 import { StartStoryChoice } from '../components/StartStoryChoice'
 import { NewStoryImport } from '../components/NewStoryImport'
+import { GestureActionButton } from '../components/SceneActions'
 import type { ImportedBook } from '../lib/importer'
 
 /** All stories side by side — authors rarely write just one. */
@@ -123,27 +124,21 @@ function StoryCard({
   const color = p.color ?? '#0b0b0c'
   const cover = useCover(p.id)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const openSettings = () => setSettingsOpen(true)
+  const showStep = nextStep || (chapterDeadline && nextChapter?.title)
   return (
     <article className={`story ${current ? 'current' : ''}`}>
-      <BookCover project={p} onClick={() => onOpen()} />
+      <BookCover project={p} onClick={() => onOpen('text')} onActions={openSettings} />
       <div className="story-body">
         <div className="story-heading">
-          <button className="story-title" onClick={() => onOpen()}>
+          <GestureActionButton className="story-title" onOpen={() => onOpen('text')} onActions={openSettings}
+            ariaDescription="Зажми или нажми правой кнопкой для настроек истории" ariaExpanded={settingsOpen} swipe={false}>
             <span>{p.title}</span>
-          </button>
-          <button
-            type="button"
-            className="btn sm ghost story-settings"
-            aria-label={`Настроить «${p.title}»`}
-            aria-expanded={settingsOpen}
-            title="Настроить историю"
-            onClick={() => setSettingsOpen(!settingsOpen)}
-          >
-            <Icon name="settings" size={18} />
-          </button>
+          </GestureActionButton>
           {settingsOpen && (
-            <div className="menu-list card story-menu">
-              <button onClick={() => onOpen('book')}>Параметры книги</button>
+            <Modal className="story-menu" label={`Настройки «${p.title}»`} onClose={() => setSettingsOpen(false)}>
+              <h2>Настройки истории</h2>
+              <button className="btn" onClick={() => onOpen('book')}>Параметры книги</button>
               <label className="menu-field">
                 <span>Название</span>
                 <input
@@ -183,7 +178,7 @@ function StoryCard({
                 )}
               </div>
               <button
-                className="danger"
+                className="btn ghost danger"
                 onClick={async () => {
                   if (!confirm(`Удалить историю «${p.title}» со всеми главами и заметками?`)) return
                   await remove('projects', p.id)
@@ -192,19 +187,19 @@ function StoryCard({
               >
                 Удалить историю
               </button>
-            </div>
+            </Modal>
           )}
         </div>
         {!!plan?.total && <div className="story-progress">
           Главы · готово {plan.ready} из {plan.total}
           {plan.ready < plan.total && <> · осталось {plan.total - plan.ready}</>}
         </div>}
-        {(nextStep || nextChapter || deadline) && <div className="story-plan">
-          {(nextStep || nextChapter) && (
+        {(showStep || deadline) && <div className="story-plan">
+          {showStep && (
             <button className="story-next" onClick={() => nextStep
               ? onOpen('text')
               : plan?.sceneId ? onOpen('text', plan.sceneId) : onOpen('board')}>
-              <span><span className="story-next-label">Дальше · </span>{nextStep || nextChapter?.title}</span>
+              <span><span className="story-next-label">Дальше · </span>{showStep}</span>
               <Icon name="right" size={15} />
             </button>
           )}

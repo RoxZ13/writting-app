@@ -1,7 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
-import { aliveRows, startStory, waitSaveTick } from './helpers'
-
-const openTab = (page: Page, name: 'Доска' | 'Герои') => page.locator('.tabs-mobile > button', { hasText: name }).click()
+import { aliveRows, openWorkspaceTab as openTab, startStory, waitSaveTick } from './helpers'
 
 async function hold(locator: Locator) {
   await locator.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 180, clientY: 300 })
@@ -47,7 +45,7 @@ test.describe('mobile actions stay reachable', () => {
     await page.getByRole('button', { name: 'Добавить', exact: true }).click()
     await page.locator('.hero-row').filter({ hasText: 'Арина' }).click()
     const found = page.locator('.hero-profile .where-found')
-    await found.locator('summary').click()
+    await found.locator(':scope > summary').click()
     await expect(found.locator('.wf-title')).toHaveText('Глава 1')
     await found.getByRole('button', { name: 'Добавить в состав сцены' }).click()
     await expect(found.getByText('В составе сцены')).toBeVisible()
@@ -191,7 +189,7 @@ test.describe('mobile actions stay reachable', () => {
     await expect(page.locator('.tabs').getByText('История', { exact: true })).toHaveCount(0)
     await page.getByRole('button', { name: /^Все истории ·/ }).click()
     await expect(page.getByRole('heading', { name: 'Истории' })).toBeVisible()
-    await page.locator('.story-settings').first().click()
+    await hold(page.locator('.story-title').first())
     await page.getByRole('button', { name: 'Параметры книги' }).click()
     await expect(page.locator('.book-page')).toBeVisible()
     await expect(page.locator('.book-hero')).toBeHidden()
@@ -220,8 +218,7 @@ test.describe('mobile actions stay reachable', () => {
     await startStory(page)
     const sheet = page.locator('.write-side')
     await expect(sheet).toBeHidden()
-    await page.getByRole('button', { name: 'Ещё', exact: true }).click()
-    await page.getByRole('button', { name: 'Перейти к главе' }).click()
+    await page.getByRole('button', { name: 'Главы', exact: true }).click()
     await expect(sheet).toBeVisible()
     const box = await sheet.boundingBox()
     expect(box).not.toBeNull()

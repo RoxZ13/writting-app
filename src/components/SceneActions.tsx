@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react'
 import type { Scene } from '../db/db'
 import { deleteScene, duplicateScene, ensurePool, moveScene } from '../db/repo'
 import { isLocked, sceneName, type ProjectData } from '../lib/hooks'
@@ -11,6 +11,9 @@ export function GestureActionButton({
   onActions,
   ariaDescription,
   ariaExpanded,
+  ariaLabel,
+  style,
+  swipe = true,
   children,
 }: {
   className?: string
@@ -18,6 +21,9 @@ export function GestureActionButton({
   onActions: () => void
   ariaDescription: string
   ariaExpanded?: boolean
+  ariaLabel?: string
+  style?: CSSProperties
+  swipe?: boolean
   children: ReactNode
 }) {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -60,7 +66,7 @@ export function GestureActionButton({
     if (start.current) {
       const dx = event.clientX - start.current.x
       const dy = event.clientY - start.current.y
-      if (dx < -56 && Math.abs(dx) > Math.abs(dy) * 1.25) actions(true)
+      if (swipe && dx < -56 && Math.abs(dx) > Math.abs(dy) * 1.25) actions(true)
     }
     start.current = null
   }
@@ -69,7 +75,9 @@ export function GestureActionButton({
       type="button"
       className={`${className ?? ''} gesture-scene ${pressing ? 'gesture-pressing' : ''}`}
       aria-description={ariaDescription}
+      aria-label={ariaLabel}
       aria-expanded={ariaExpanded}
+      style={style}
       onPointerDown={down}
       onPointerMove={move}
       onPointerUp={up}

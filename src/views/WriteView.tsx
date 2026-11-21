@@ -9,6 +9,9 @@ import { TypoControls } from '../components/TypoControls'
 import { MarkerCard } from '../components/MarkerCard'
 import { PlacePicker } from '../components/Refs'
 import { SceneEditor, type SelectionAction } from '../components/SceneEditor'
+import { SelectionReference } from '../components/SelectionReference'
+import { TextFormat } from '../components/TextFormat'
+import { stashSelection } from '../lib/stash'
 import { TitlePage } from '../components/TitlePage'
 import { MarginNotes } from '../components/MarginNotes'
 import { editHintsKey } from '../components/EditHints'
@@ -304,14 +307,19 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
     setEditor(ed)
   }, [])
 
+  const enterWritingSession = () => {
+    if (writingSession || savingSession) return
+    setMenuOpen(false)
+    setTypoOpen(false)
+    setFind(null)
+    closeOverlays()
+    setWritingSession(true)
+  }
+
   const toggleWritingSession = async () => {
     if (!editor) return
     if (!writingSession) {
-      setMenuOpen(false)
-      setTypoOpen(false)
-      setFind(null)
-      closeOverlays()
-      setWritingSession(true)
+      enterWritingSession()
       editor.view.focus()
       return
     }
@@ -398,12 +406,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
 
       <div className="write-center">
         <div className="write-top">
-          {compact && (
-            <button type="button" className="tool writing-session-toggle" disabled={!editor || savingSession} onClick={() => void toggleWritingSession()}>
-              <Icon name={writingSession ? 'check' : 'pen'} size={18} />
-              {savingSession ? 'Сохраняю…' : writingSession ? 'Готово' : 'Писать'}
-            </button>
-          )}
+          {compact && writingSession && editor && <TextFormat editor={editor} />}
           <button
             className={`tool scene-nav-tool ${panels.nav ? 'on' : ''}`}
             title={panels.nav ? `Скрыть ${wholeChapter ? 'главы' : 'сцены'}` : `Показать ${wholeChapter ? 'главы' : 'сцены'}`}
@@ -413,6 +416,12 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
             <Icon name="panel" size={17} />
             <span className="tool-label">{wholeChapter ? 'Главы' : 'Сцены'}</span>
           </button>
+          {compact && (
+            <button type="button" className="tool writing-session-toggle" disabled={!editor || savingSession} onClick={() => void toggleWritingSession()}>
+              <Icon name={writingSession ? 'check' : 'pen'} size={18} />
+              {savingSession ? 'Сохраняю…' : writingSession ? 'Готово' : 'Писать'}
+            </button>
+          )}
           <div className="crumbs">
             {!wholeChapter && <span className="hide-sm" style={{ whiteSpace: 'nowrap' }}>{chapter?.title} ›</span>}
             <span className="crumb-scene">{wholeChapter ? chapter?.title : sceneName(data, scene)}</span>
@@ -511,12 +520,24 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                   {chapter && !chapter.pool && renderMenuTool(['target', 'Объём и готовность', '', () => setChapterProgressOpen(true)])}
                   {compact ? (
                     <>
-                      {renderMenuTool(['panel', wholeChapter ? 'Перейти к главе' : 'Перейти к сцене', '', () => togglePanel('nav')])}
+                      <details className="write-menu-more">
+                        <summary>Разделы книги</summary>
+                        <div>
+                          {renderMenuTool(['plan', 'Доска', '', () => go({ view: 'board' })])}
+                          {renderMenuTool(['people', 'Герои', '', () => go({ view: 'characters' })])}
+                          {renderMenuTool(['inbox', 'Заметки', '', () => go({ view: 'inbox' })])}
+                        </div>
+                      </details>
                       {quickMenuTools.map(renderMenuTool)}
                       <details className="write-menu-more">
                         <summary>Ещё инструменты</summary>
                         <div>
                           {moreMenuTools.map(renderMenuTool)}
+                          {renderMenuTool(['pen', wholeChapter ? 'Переименовать главу' : 'Переименовать сцену', '', () => {
+                            const name = prompt('Название', wholeChapter ? chapter?.title : scene.title)?.trim()
+                            if (name && wholeChapter && chapter) void patch<Chapter>('chapters', chapter.id, { title: name })
+                            else if (name) void patch<Scene>('scenes', scene.id, { title: name })
+                          }])}
                           {renderMenuTool(['settings', 'Параметры книги', '', () => go({ view: 'book' })])}
                         </div>
                       </details>
@@ -600,6 +621,8 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                 onWords={onWords}
                 onSaved={setSaved}
                 onSelectionAction={setAction}
+                onTextTap={compact ? enterWritingSession : undefined}
+                showSelectionFormat={!compact || !writingSession}
                 onMarkerClick={setOpenMarker}
                 onCommentClick={setOpenComment}
               />
@@ -607,7 +630,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
             {text && !rewriting && <MarginNotes key={`notes-${scene.id}`} data={data} editor={editor} onOpen={setOpenComment} />}
           </div>
         </div>
-        {text && editor && !rewriting && (
+        {text && editor && !rewriting && !compact && (
           <Resume
             key={scene.id}
             note={bannerHidden ? '' : (data.project.nextStep ?? '')}
@@ -645,11 +668,20 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
 
       <div className="write-backdrop" onClick={closeOverlays} />
 
+      {action?.kind === 'reference' && editor && (
+        <SelectionReference data={data} scene={scene} text={action.text} onClose={() => setAction(null)} onChoose={(choice) => {
+          if (choice === 'stash') {
+            editor.commands.setTextSelection({ from: action.from, to: action.to })
+            void stashSelection(editor, scene)
+            setAction(null)
+          } else setAction({ ...action, kind: choice })
+        }} />
+      )}
       {action && editor && action.kind === 'comment' && (
         <CommentDialog data={data} scene={scene} action={action} editor={editor} onClose={() => setAction(null)} />
       )}
       {openComment && <CommentPopup data={data} noteId={openComment} editor={editor} onClose={() => setOpenComment(null)} />}
-      {action && editor && action.kind !== 'comment' && <MarkerFromSelection data={data} scene={scene} action={action} editor={editor} onClose={() => setAction(null)} />}
+      {action && editor && (action.kind === 'setup' || action.kind === 'payoff') && <MarkerFromSelection data={data} scene={scene} action={action} editor={editor} onClose={() => setAction(null)} />}
       {openMarker && <MarkerPopup data={data} markerId={openMarker} editor={editor} onClose={() => setOpenMarker(null)} />}
       {askRewrite && (
         <StartRewrite

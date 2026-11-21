@@ -72,6 +72,19 @@ export async function openChapterPlan(page: Page) {
   return plan
 }
 
+export async function openWorkspaceTab(page: Page, name: 'Текст' | 'Доска' | 'Герои' | 'Заметки') {
+  const button = page.locator('.tabs:visible').getByRole('button', { name: new RegExp(`^${name}(?:$|[0-9 ])`) })
+  if (await button.isVisible()) {
+    await button.click()
+    return
+  }
+  const menu = page.locator('.write-menu')
+  const more = page.locator('.write-top').getByRole('button', { name: 'Ещё', exact: true })
+  await more.click()
+  await menu.getByText('Разделы книги', { exact: true }).click()
+  await menu.getByRole('button', { name, exact: true }).click()
+}
+
 export async function openChapterProgress(page: Page) {
   await page.locator('.write-top').getByRole('button', { name: 'Ещё', exact: true }).click()
   await page.getByRole('button', { name: 'Объём и готовность', exact: true }).click()

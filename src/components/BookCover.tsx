@@ -3,20 +3,17 @@ import { stageLabel } from '../lib/stories'
 import { formatWords } from '../lib/text'
 import { coverFromClipboard, coverFromUrl, imageToCover, setCover, useCover } from '../lib/cover'
 import { FilePick, toast } from '../lib/ui'
+import { GestureActionButton } from './SceneActions'
 
 /** A book on the shelf: spine, stage tag, title, genre. */
-export function BookCover({ project, words, onClick }: { project: Project; words?: number; onClick?: () => void }) {
+export function BookCover({ project, words, onClick, onActions }: { project: Project; words?: number; onClick?: () => void; onActions?: () => void }) {
   const color = project.color ?? '#0b0b0c'
   const cover = useCover(project.id)
   const visibleLabel = [stageLabel(project.stage), project.title, project.genre, words === undefined ? undefined : formatWords(words)].filter(Boolean).join(' ')
-  return (
-    <button
-      className={`book ${cover ? 'has-image' : ''}`}
-      style={{ '--cover': color } as React.CSSProperties}
-      onClick={onClick}
-      tabIndex={onClick ? 0 : -1}
-      aria-label={`${visibleLabel}${onClick ? '. Открыть' : ''}`}
-    >
+  const className = `book ${cover ? 'has-image' : ''}`
+  const style = { '--cover': color } as React.CSSProperties
+  const label = `${visibleLabel}${onClick ? '. Открыть' : ''}`
+  const content = <>
       {/* The author's own cover already carries the title; only the stage and length go on top of it. */}
       {cover && <img className="book-image" src={cover} alt="" loading="lazy" />}
       {cover && <span className="sr-only">{project.title}</span>}
@@ -27,8 +24,11 @@ export function BookCover({ project, words, onClick }: { project: Project; words
         {!cover && project.genre && <><span className="book-genre-tag">{project.genre}</span>{' '}</>}
         {words !== undefined && <span className="book-words">{formatWords(words)}</span>}
       </span>
-    </button>
-  )
+  </>
+  return onClick && onActions
+    ? <GestureActionButton className={className} style={style} ariaLabel={label} ariaDescription="Зажми для настроек истории"
+      onOpen={onClick} onActions={onActions} swipe={false}>{content}</GestureActionButton>
+    : <button className={className} style={style} onClick={onClick} tabIndex={onClick ? 0 : -1} aria-label={label}>{content}</button>
 }
 
 /** Ways to put a picture on a book: a file, a copied image, or a link. */

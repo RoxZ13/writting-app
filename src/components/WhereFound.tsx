@@ -1,9 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { db } from '../db/db'
 import { alive } from '../db/repo'
 import { sceneName, type ProjectData } from '../lib/hooks'
-import { whereFound, type Found } from '../lib/mentions'
+import { heroPatterns, whereFound, type Found } from '../lib/mentions'
 import { go } from '../lib/router'
 import { docParagraphs } from '../lib/text'
 import { Icon } from './Icon'
@@ -24,7 +24,8 @@ export function useWhereFound(data: ProjectData): Map<string, Found[]> | undefin
  * «Где встречается»: the scenes of a hero or a lore entry, grouped by chapter. A tap opens the scene;
  * «×» on a scene found only by its name means «не то» — it will not show up there again.
  */
-export function WhereFound({ data, found, onNotThis, onInclude }: { data: ProjectData; found?: Found[]; onNotThis: (sceneId: string) => void; onInclude?: (sceneId: string) => Promise<void> }) {
+export function WhereFound({ data, found, onNotThis, onInclude, heroId }: { data: ProjectData; found?: Found[]; onNotThis: (sceneId: string) => void; onInclude?: (sceneId: string) => Promise<void>; heroId?: string }) {
+  const heroPattern = useMemo(() => heroId ? heroPatterns(data.characters).get(heroId) : undefined, [data.characters, heroId])
   if (found === undefined) return null
   if (!found.length) return <div className="where-found muted small">Пока нигде в тексте</div>
   const byChapter = new Map<string, Found[]>()
@@ -44,25 +45,45 @@ export function WhereFound({ data, found, onNotThis, onInclude }: { data: Projec
           {list.map((f) => {
             const s = data.sceneById.get(f.sceneId)!
             return (
-              <span key={f.sceneId} className="wf-scene">
-                <button className="link-plain" title={s.goal || s.excerpt || ''} onClick={() => go({ view: 'text', sceneId: s.id })}>
-                  {sceneName(data, s).replace(/^Сцена /, 'сц. ')}
-                </button>
-                {onInclude && (f.manual
-                  ? <span className="small muted">В составе сцены</span>
-                  : <button className="btn sm ghost" onClick={() => void onInclude(s.id)}>Добавить в состав сцены</button>)}
-                {!f.manual && (
-                  <button className="wf-not" title="Не то — здесь это имя о другом" aria-label="Не то" onClick={() => onNotThis(s.id)}>
-                    <Icon name="close" size={15} />
+              <div key={f.sceneId} className="wf-scene-entry">
+                <div className="wf-scene">
+                  <button className="link-plain" title={s.goal || s.excerpt || ''} onClick={() => go({ view: 'text', sceneId: s.id })}>
+                    {sceneName(data, s).replace(/^Сцена /, 'сц. ')}
                   </button>
-                )}
-              </span>
+                  {onInclude && (f.manual
+                    ? <span className="small muted">В составе сцены</span>
+                    : <button className="btn sm ghost" onClick={() => void onInclude(s.id)}>Добавить в состав сцены</button>)}
+                  {!f.manual && (
+                    <button className="wf-not" title="Не то — здесь это имя о другом" aria-label="Не то" onClick={() => onNotThis(s.id)}>
+                      <Icon name="close" size={15} />
+                    </button>
+                  )}
+                </div>
+                {heroPattern && <HeroPassages sceneId={s.id} pattern={heroPattern} />}
+              </div>
             )
           })}
         </div>
       ))}
     </details>
   )
+}
+
+function HeroPassages({ sceneId, pattern }: { sceneId: string; pattern: RegExp }) {
+  const [open, setOpen] = useState(false)
+  const passages = useLiveQuery(async () => {
+    if (!open) return undefined
+    const text = await db.texts.get(sceneId)
+    return text && !text.deleted
+      ? docParagraphs(text.content).filter((paragraph) => paragraph.search(pattern) >= 0)
+      : []
+  }, [sceneId, open, pattern])
+  return <details className="wf-passages" onToggle={(event) => setOpen(event.currentTarget.open)}>
+    <summary>Абзацы с упоминанием</summary>
+    {open && (passages?.length
+      ? passages.map((paragraph, index) => <p key={index}>{paragraph}</p>)
+      : <p className="small muted">{passages ? 'Имя в тексте сцены не найдено' : 'Открываю…'}</p>)}
+  </details>
 }
 
 function plural(n: number, one: string, few: string, many: string) {

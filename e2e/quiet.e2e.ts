@@ -44,7 +44,7 @@ test.describe('quiet chapter meter', () => {
     // Cursor into the second paragraph.
     await page.locator('.ProseMirror p', { hasText: 'Второй абзац' }).click()
     await page.getByRole('button', { name: 'Ещё' }).click()
-    const more = page.locator('.write-menu-more > summary')
+    const more = page.getByText('Ещё инструменты', { exact: true })
     if (await more.isVisible()) await more.click()
     const item = page.locator('.write-menu .menu-item', { hasText: 'Новая глава с этого абзаца' })
     await expect(item).toBeVisible()
@@ -69,12 +69,12 @@ test.describe('quiet chapter meter', () => {
     expect(tail).not.toContain('Первый абзац')
   })
 
-  test('on a phone the «⋯» menu sits at its button, fully on screen and above the resume bar', async ({ page, isMobile }) => {
+  test('on a phone the «⋯» menu sits at its button, fully on screen with its tools reachable', async ({ page, isMobile }) => {
     test.skip(!isMobile, 'phone layout')
     await overTheNorm(page)
     await page.reload()
     await expect(page.locator('.ProseMirror')).toBeVisible()
-    await expect(page.locator('.resume')).toBeVisible()
+    await expect(page.locator('.resume')).toBeHidden()
     const button = page.getByRole('button', { name: 'Ещё' })
     await button.click()
     const menu = page.locator('.write-menu')
@@ -143,7 +143,7 @@ test('screenshots of the chapter over its norm', async ({ page }, info) => {
   // The «⋯» menu over the resume bar.
   await page.evaluate(() => localStorage.setItem('manuscript.theme', 'light'))
   await page.reload()
-  await expect(page.locator('.resume')).toBeVisible()
+  if (info.project.name === 'desktop') await expect(page.locator('.resume')).toBeVisible()
   await page.getByRole('button', { name: 'Ещё' }).click()
   await page.waitForTimeout(400)
   await page.screenshot({ path: `${SHOTS}/${info.project.name}-light-menu.png` })

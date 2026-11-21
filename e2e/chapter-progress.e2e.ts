@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { openChapterProgress, setChapterMaximum, startStory, typeInEditor, waitSaveTick, waitTextInDb } from './helpers'
+import { openChapterProgress, openWorkspaceTab, setChapterMaximum, startStory, typeInEditor, waitSaveTick, waitTextInDb } from './helpers'
 
 const SHOTS = process.env.PROGRESS_SHOTS
 
@@ -62,7 +62,7 @@ test('the board shows a whole chapter’s volume goal without extra navigation',
   await typeInEditor(page, 'Первый черновик сцены.')
   await waitSaveTick(page)
   await setChapterRangeHere(page, 3_000, 5_000)
-  await page.locator('.tabs-mobile:visible > button, .tabs-desktop:visible > button').filter({ hasText: 'Доска' }).click()
+  await openWorkspaceTab(page, 'Доска')
   await expect(page.locator('.board, .timeline')).toBeVisible()
   const progress = page.locator('.board-chapter-progress').first()
   await expect(progress).toBeVisible()

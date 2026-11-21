@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import fs from 'node:fs'
-import { aliveRows, allTexts, dbAll, docText, firstSceneId, openChapterPlan, startStory, typeInEditor, waitSaveTick, waitTextInDb, wordsIn } from './helpers'
+import { aliveRows, allTexts, dbAll, docText, firstSceneId, openChapterPlan, openWorkspaceTab, startStory, typeInEditor, waitSaveTick, waitTextInDb, wordsIn } from './helpers'
 
 test.setTimeout(45_000)
 
@@ -10,8 +10,7 @@ test.setTimeout(45_000)
  */
 const knownBug = (note: string) => test.fail(!process.env.E2E_SHOW_BUGS, note)
 
-/** Open the visible top-level navigation (header on desktop, bottom bar on a phone). */
-const openTab = (page: Page, name: 'Текст' | 'Доска') => page.locator('.tabs:visible > button').filter({ hasText: name }).click()
+const openTab = openWorkspaceTab
 
 const board = (page: Page) => openTab(page, 'Доска')
 
@@ -351,9 +350,8 @@ async function newStoryFromLibrary(page: Page) {
 
 async function deleteStoryInLibrary(page: Page, which: string) {
   const card = page.locator(`.story${which}`).first()
-  const actions = card.getByRole('button', { name: /^Настроить «/ })
-  const del = card.getByRole('button', { name: 'Удалить историю' })
-  await actions.click()
+  await card.locator('.story-title').press('Shift+F10')
+  const del = page.getByRole('dialog', { name: /^Настройки «/ }).getByRole('button', { name: 'Удалить историю' })
   await del.click()
 }
 

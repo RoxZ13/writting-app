@@ -20,10 +20,11 @@ import { InlineNote } from './InlineNote'
 import { toast } from '../lib/ui'
 import { findInEditor } from '../lib/search'
 import { createSaver } from '../lib/saver'
-import { applyPendingRestore, stashSelection } from '../lib/stash'
+import { applyPendingRestore } from '../lib/stash'
+import { TextFormat } from './TextFormat'
 
 export interface SelectionAction {
-  kind: 'setup' | 'payoff' | 'comment'
+  kind: 'setup' | 'payoff' | 'comment' | 'reference'
   from: number
   to: number
   text: string
@@ -42,10 +43,14 @@ export function SceneEditor({
   onSelectionAction,
   onMarkerClick,
   onCommentClick,
+  onTextTap,
+  showSelectionFormat,
 }: {
   scene: Scene
   initial: SceneText
   onReady: (editor: Editor, saveNow: () => Promise<boolean>) => void
+  onTextTap?: () => void
+  showSelectionFormat: boolean
   onWords: (n: number, chars: number) => void
   /** False while there are unsaved changes, true once they are on the device. */
   onSaved?: (saved: boolean) => void
@@ -62,6 +67,7 @@ export function SceneEditor({
     live.current = { scene, initial, onWords, onSaved }
   })
   const errorShown = useRef(false)
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
 
   const [saver] = useState(() =>
     createSaver<Editor['state']>({
@@ -132,6 +138,12 @@ export function SceneEditor({
       // Spelling underlines follow the setting: while writing they only distract.
       attributes: () => ({ spellcheck: spellOn() ? 'true' : 'false', lang: 'ru', 'aria-label': 'Текст сцены' }),
       handleClickOn: (_view, _pos, _node, _nodePos, event) => {
+        const tap = touchStart.current
+        if (tap && Math.hypot(tap.x - event.clientX, tap.y - event.clientY) < 12 && onTextTap) {
+          touchStart.current = null
+          onTextTap()
+          return false
+        }
         const target = event.target as HTMLElement
         const note = target.closest('[data-comment]')
         if (note) {
@@ -230,30 +242,19 @@ export function SceneEditor({
       <BubbleMenu
         editor={editor}
         shouldShow={({ state }) => !state.selection.empty}
-        options={{ placement: 'top' }}
+        options={{ placement: onTextTap ? 'bottom' : 'top', offset: 8, flip: true, shift: { padding: 8 } }}
       >
         <div className="bubble">
-          <button className={editor.isActive('italic') ? 'on' : ''} onClick={() => editor.chain().focus().toggleItalic().run()}>
-            <i>К</i>
-          </button>
-          <button className={editor.isActive('bold') ? 'on' : ''} onClick={() => editor.chain().focus().toggleBold().run()}>
-            <b>Ж</b>
-          </button>
-          <button onClick={() => act('setup')} title="Посеять маячок в этом месте">
-            ✦ Маячок
-          </button>
-          <button onClick={() => act('payoff')} title="Отметить, что здесь раскрывается маячок">
-            ◎ Раскрытие
-          </button>
-          <button onClick={() => act('comment')} title="Заметка на полях к этому месту">
-            ✎ Заметка
-          </button>
-          <button onClick={() => stashSelection(editor, scene)} title="Убрать выделенное в запас — в заметку к этой сцене">
-            В запас
-          </button>
+          {showSelectionFormat && <TextFormat editor={editor} />}
+          <button type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => act('reference')}>Добавить…</button>
         </div>
       </BubbleMenu>
-      <EditorContent editor={editor} />
+      <EditorContent editor={editor} onPointerDown={(event) => {
+        touchStart.current = event.pointerType === 'touch' ? { x: event.clientX, y: event.clientY } : null
+      }} onPointerMove={(event) => {
+        const tap = touchStart.current
+        if (tap && Math.hypot(tap.x - event.clientX, tap.y - event.clientY) >= 12) touchStart.current = null
+      }} onPointerCancel={() => { touchStart.current = null }} />
     </>
   )
 }

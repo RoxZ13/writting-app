@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { aliveRows, openChapterProgress, setChapterMaximum, startStory, waitTextInDb } from './helpers'
+import { aliveRows, openChapterProgress, openWorkspaceTab, setChapterMaximum, startStory, waitTextInDb } from './helpers'
 
 test('the mobile shell behaves like an app surface', async ({ page }, info) => {
   test.skip(info.project.name === 'desktop', 'phone shell only')
@@ -11,16 +11,10 @@ test('the mobile shell behaves like an app surface', async ({ page }, info) => {
 
   await startStory(page)
   const tabs = page.locator('.tabs-mobile')
-  await expect(tabs).toBeVisible()
-  await expect(tabs.getByText('Текст', { exact: true })).toBeVisible()
-  await expect(tabs.getByText('Доска', { exact: true })).toBeVisible()
-  await expect(tabs.getByText('Герои', { exact: true })).toBeVisible()
-  await expect(tabs.getByText('Заметки', { exact: true })).toBeVisible()
-
-  await page.evaluate(() => { document.documentElement.dataset.keyboard = 'open' })
   await expect(tabs).toBeHidden()
-  await page.evaluate(() => { document.documentElement.dataset.keyboard = 'closed' })
+  await openWorkspaceTab(page, 'Доска')
   await expect(tabs).toBeVisible()
+  await expect(tabs.getByText('Заметки', { exact: true })).toBeVisible()
 })
 
 test('the status-bar inset leaves room for the book title and the writer toolbar', async ({ page }, info) => {
@@ -54,7 +48,7 @@ test('the status-bar inset leaves room for the book title and the writer toolbar
   await setChapterMaximum(page, 4_000)
   await page.reload()
   await page.evaluate(() => document.documentElement.style.setProperty('--app-safe-top', '62px'))
-  await expect(page.locator('.resume')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Продолжить', exact: true })).toBeHidden()
   await expect(meter.locator('.chapter-progress-track')).toBeVisible()
   await page.evaluate(() => window.scrollTo(0, 480))
   await expect.poll(() => page.evaluate(() => window.scrollY)).toBeGreaterThan(100)
@@ -101,7 +95,7 @@ test('writing mode keeps the text and Done, saves, then restores navigation', as
   await page.keyboard.insertText('Чистая страница для новой главы.')
   await expect(page.locator('.chapter-meter')).toBeHidden()
   await toolbar.getByRole('button', { name: 'Готово' }).click()
-  await expect(page.locator('.tabs-mobile')).toBeVisible()
+  await expect(page.locator('.tabs-mobile')).toBeHidden()
   await expect(toolbar.getByRole('button', { name: 'Ещё' })).toBeVisible()
   await waitTextInDb(page, 'Чистая страница для новой главы.')
 })
@@ -122,19 +116,16 @@ test('notes open with a short list and a separate composer', async ({ page }) =>
   await expect.poll(async () => (await aliveRows<any>(page, 'notes')).some((note) => note.text === 'Уточнённая мысль')).toBe(true)
 })
 
-test('changing the manuscript font keeps the heading and paragraph spacing fixed', async ({ page, isMobile }) => {
+test('changing the manuscript font keeps paragraph spacing fixed and the redundant title hidden', async ({ page, isMobile }) => {
   test.skip(!isMobile, 'phone typography')
   const editor = await startStory(page)
   await editor.fill('Первый абзац.')
   const heading = page.locator('.scene-head-title')
   const paragraph = editor.locator('p').first()
   const metrics = () => page.evaluate(() => {
-    const title = document.querySelector('.scene-head-title')!
     const body = document.querySelector('.ProseMirror')!
     const line = body.querySelector('p')!
     return {
-      titleHeight: title.getBoundingClientRect().height,
-      gap: body.getBoundingClientRect().top - title.getBoundingClientRect().bottom,
       leading: getComputedStyle(body).lineHeight,
       paragraphGap: getComputedStyle(line).marginBottom,
     }
@@ -146,7 +137,7 @@ test('changing the manuscript font keeps the heading and paragraph spacing fixed
   await page.getByRole('button', { name: 'Шрифт и вид страницы' }).click()
   await page.getByRole('button', { name: 'С засечками', exact: true }).click()
   await page.getByRole('button', { name: 'Закрыть настройки текста' }).click()
-  await expect(heading).toHaveCSS('line-height', '32px')
+  await expect(heading).toBeHidden()
   await expect(paragraph).toHaveCSS('margin-bottom', initial.paragraphGap)
   await expect(editor).not.toHaveCSS('font-family', font)
   expect(await metrics()).toEqual(initial)
@@ -174,7 +165,7 @@ test('chapter progress keeps plan controls in a separate sheet on phones', async
 test('the phone board starts with the next writing action, not repeated headings', async ({ page }, info) => {
   test.skip(info.project.name === 'desktop', 'phone hierarchy only')
   await startStory(page)
-  await page.locator('.tabs-mobile > button').filter({ hasText: 'Доска' }).click()
+  await openWorkspaceTab(page, 'Доска')
 
   const resume = page.locator('.continue-card')
   const structure = page.locator('.timeline')
@@ -191,7 +182,7 @@ test('the phone board starts with the next writing action, not repeated headings
 test('a chapter with one text opens the editor in one tap', async ({ page }, info) => {
   test.skip(info.project.name === 'desktop', 'phone navigation only')
   await startStory(page)
-  await page.locator('.tabs-mobile > button').filter({ hasText: 'Доска' }).click()
+  await openWorkspaceTab(page, 'Доска')
   const add = page.getByPlaceholder('Новая сцена').first()
   await add.fill('Цельная глава')
   await add.press('Enter')
@@ -207,8 +198,7 @@ test('a chapter with one text opens the editor in one tap', async ({ page }, inf
 test('the chapter navigator does not add a scene level to a whole chapter', async ({ page }, info) => {
   test.skip(info.project.name === 'desktop', 'phone navigator only')
   await startStory(page)
-  await page.getByRole('button', { name: 'Ещё', exact: true }).click()
-  await page.getByRole('button', { name: 'Перейти к главе' }).click()
+  await page.getByRole('button', { name: 'Главы', exact: true }).click()
 
   const navigator = page.locator('.write-side')
   await expect(navigator).toBeVisible()
@@ -279,8 +269,8 @@ test('a fresh visit opens the library with the next step and readiness under its
   await expect(page.getByRole('heading', { name: 'Истории' })).toBeVisible()
   const story = page.locator('.story').first()
   await expect(story.locator('.story-progress')).toContainText('готово 0 из 1 · осталось 1')
-  await story.locator('.story-settings').click()
-  const menu = story.locator('.story-menu')
+  await story.locator('.story-title').press('Shift+F10')
+  const menu = page.getByRole('dialog', { name: /^Настройки «/ })
   await menu.getByLabel('Название').fill('Недоля')
   await menu.getByLabel('Следующий шаг').fill('Перечитать первую главу')
   await menu.getByLabel('Следующий шаг').blur()
@@ -291,7 +281,7 @@ test('a fresh visit opens the library with the next step and readiness under its
       .map((part) => String(part).padStart(2, '0')).join('-')
   })
   await menu.locator('input[type=date]').fill(date)
-  await story.locator('.story-settings').click()
+  await page.keyboard.press('Escape')
   await expect(story.locator('.story-due')).toContainText(/Финал · через 5 дн\./)
   await story.getByRole('button', { name: /Перечитать первую главу/ }).click()
   await expect(editor).toHaveText('Текст первой главы.')
@@ -338,9 +328,8 @@ test('library actions and story controls fit at phone and desktop widths', async
 
   if (isMobile) await page.setViewportSize({ width: 320, height: 700 })
   const story = page.locator('.story').first()
-  const settings = story.getByRole('button', { name: /Настроить «/ })
-  await settings.click()
-  const menu = story.locator('.story-menu')
+  await story.locator('.story-title').press('Shift+F10')
+  const menu = page.getByRole('dialog', { name: /^Настройки «/ })
   const box = (await menu.boundingBox())!
   expect(box.x).toBeGreaterThanOrEqual(0)
   expect(box.x + box.width).toBeLessThanOrEqual(page.viewportSize()!.width)
@@ -348,7 +337,7 @@ test('library actions and story controls fit at phone and desktop widths', async
   await menu.getByLabel('Название').blur()
   await expect(page.locator('.lib-back')).toHaveText(`←${title}`)
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(page.viewportSize()!.width)
-  await settings.click()
+  await page.keyboard.press('Escape')
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(page.viewportSize()!.width)
 
   await create.click()
@@ -361,7 +350,7 @@ test('opening chapter actions from the keyboard does not swallow the next Enter'
   const editor = await startStory(page)
   await editor.fill('Текст для проверки навигации.')
   await waitTextInDb(page, 'Текст для проверки навигации.')
-  await page.locator('.tabs-mobile').getByRole('button', { name: 'Доска' }).click()
+  await openWorkspaceTab(page, 'Доска')
   const chapter = page.locator('.timeline .tl-head').filter({ hasText: 'Глава 1' })
   await chapter.press('Shift+F10')
   const actions = page.getByRole('dialog', { name: /Действия с главой/ })
@@ -369,4 +358,86 @@ test('opening chapter actions from the keyboard does not swallow the next Enter'
   await actions.getByRole('button', { name: /Закрыть/ }).click()
   await chapter.press('Enter')
   await expect(editor).toBeVisible()
+})
+
+test('touching text enters writing with three working format controls', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'phone writing gesture')
+  const editor = await startStory(page)
+  await editor.fill('Иван остался у моста.')
+  await editor.blur()
+  const toolbar = page.locator('.write-top')
+  const paragraph = editor.locator('p').first()
+  await paragraph.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 10, clientY: 100 })
+  await paragraph.dispatchEvent('pointermove', { pointerType: 'touch', clientX: 10, clientY: 180 })
+  await paragraph.dispatchEvent('pointercancel', { pointerType: 'touch' })
+  await expect(toolbar.getByRole('button', { name: 'Писать', exact: true })).toBeVisible()
+
+  await paragraph.tap()
+  await expect(toolbar.getByRole('button', { name: 'Готово' })).toBeVisible()
+  await expect(toolbar.getByRole('button', { name: 'Ещё' })).toBeHidden()
+  await page.keyboard.press('End')
+  for (const [label, tag, word] of [
+    ['Жирный', 'strong', 'Жирный'],
+    ['Курсив', 'em', 'Курсив'],
+    ['Подчеркнуть', 'u', 'Подчёркнутый'],
+  ]) {
+    const button = toolbar.getByRole('button', { name: label, exact: true })
+    await button.tap()
+    await expect(button).toHaveAttribute('aria-pressed', 'true')
+    await page.keyboard.insertText(' ' + word)
+    await expect(editor.locator(tag)).toContainText(word)
+    await button.tap()
+  }
+  await toolbar.getByRole('button', { name: 'Готово' }).tap()
+  await waitTextInDb(page, 'Подчёркнутый')
+  await page.reload()
+  await expect(editor.locator('u')).toHaveText('Подчёркнутый', { useInnerText: true })
+})
+
+test('selection saves a hero and a continuity detail tied to its source', async ({ page }) => {
+  const editor = await startStory(page)
+  const sentence = 'Иван носил синий кафтан.'
+  await editor.fill(sentence)
+  await waitTextInDb(page, sentence)
+  const addFromText = async (phrase: string) => {
+    await editor.evaluate((element, phrase) => {
+      const textEditor = element as HTMLElement
+      textEditor.focus()
+      const node = element.querySelector('p')!.firstChild!
+      const start = node.textContent!.indexOf(phrase)
+      const range = document.createRange()
+      range.setStart(node, start)
+      range.setEnd(node, start + phrase.length)
+      const selection = window.getSelection()!
+      selection.removeAllRanges()
+      selection.addRange(range)
+    }, phrase)
+    await page.locator('.bubble').getByRole('button', { name: 'Добавить…' }).click()
+    return page.getByRole('dialog', { name: 'Добавить из текста' })
+  }
+  const hero = await addFromText('Иван')
+  await hero.getByRole('button', { name: 'Героя', exact: true }).click()
+  await expect(hero.getByLabel('Имя героя')).toHaveValue('Иван')
+  await hero.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(hero).toBeHidden()
+  const [character] = await aliveRows<any>(page, 'characters')
+  expect(character.name).toBe('Иван')
+  expect((await aliveRows<any>(page, 'scenes'))[0].characterIds).toContain(character.id)
+
+  const detail = await addFromText('синий кафтан')
+  await detail.getByRole('button', { name: 'Деталь о герое' }).click()
+  await detail.getByLabel('Чья это деталь').selectOption({ label: 'Иван' })
+  await detail.getByRole('button', { name: 'Сохранить' }).click()
+  await expect(detail).toBeHidden()
+  const [note] = await aliveRows<any>(page, 'notes')
+  expect(note).toMatchObject({ text: 'синий кафтан', characterIds: [character.id] })
+
+  await openWorkspaceTab(page, 'Герои')
+  await page.locator('.hero-row').getByText('Иван', { exact: true }).click()
+  await page.getByText('Детали героя', { exact: true }).click()
+  const fact = page.locator('.hero-detail-note').filter({ hasText: 'синий кафтан' })
+  await expect(fact.getByRole('button')).toBeVisible()
+  await page.getByText(/Встречается в 1 сцене/).click()
+  await page.getByText('Абзацы с упоминанием', { exact: true }).click()
+  await expect(page.locator('.wf-passages')).toContainText(sentence)
 })

@@ -26,6 +26,11 @@ async function writeAndSelect(page: Page) {
   for (let i = 0; i < PIECE_LEN; i++) await page.keyboard.press('Shift+ArrowLeft')
 }
 
+const addSelection = (page: Page) => page.locator('.bubble').getByRole('button', { name: 'Добавить…' })
+async function revealStash(page: Page) {
+  await addSelection(page).click()
+  await page.getByRole('dialog', { name: 'Добавить из текста' }).getByText('Другие действия', { exact: true }).click()
+}
 const stashButton = (page: Page) => page.getByRole('button', { name: 'В запас' })
 const editorText = (page: Page) => page.locator('.ProseMirror').innerText()
 const stashNotes = async (page: Page) => (await dbAll<any>(page, 'notes')).filter((n) => n.content)
@@ -38,6 +43,7 @@ async function sceneText(page: Page) {
 
 /** Stash the selection and wait until the text is gone from the editor and the note is written. */
 async function stash(page: Page) {
+  await revealStash(page)
   await expect(stashButton(page)).toBeVisible()
   await stashButton(page).click()
   await expect(page.locator('.toast')).toContainText('Убрано в запас')
@@ -212,11 +218,13 @@ ${P2}`)
     const box = (await page.locator('.ProseMirror').boundingBox())!
     await page.touchscreen.tap(box.x + 8, box.y + 8)
     for (let i = 0; i < 5; i++) await page.keyboard.press('Shift+ArrowRight')
-    await expect(stashButton(page)).toBeVisible()
-    const b = (await stashButton(page).boundingBox())!
+    await expect(addSelection(page)).toBeVisible()
+    await expect(stashButton(page)).toBeHidden()
+    const b = (await addSelection(page).boundingBox())!
     const vw = page.viewportSize()!.width
     expect(b.x).toBeGreaterThanOrEqual(0)
     expect(b.x + b.width).toBeLessThanOrEqual(vw)
+    await revealStash(page)
     await stashButton(page).tap()
     await expect.poll(async () => (await stashNotes(page)).length).toBe(1)
     expect(await editorText(page)).not.toContain('Он ждал')

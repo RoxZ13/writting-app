@@ -3,7 +3,7 @@ import { appendFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, test, type Page } from '@playwright/test'
-import { startStory } from './helpers'
+import { openWorkspaceTab, startStory } from './helpers'
 import { asFile, smallBook } from './volume-helpers'
 
 /**
@@ -39,8 +39,7 @@ async function seedStory(page: Page, { extras }: { extras?: boolean } = {}) {
   if (extras) {
     // Navigate through the visible mobile/desktop shell after the import has settled.
     // A direct hash written while the import refresh finishes can be replaced by lastSceneId.
-    const charactersTab = page.locator('.tabs-mobile:visible > button, .tabs-desktop:visible > button').filter({ hasText: 'Герои' })
-    await charactersTab.click()
+    await openWorkspaceTab(page, 'Герои')
     await expect(page.locator('.characters-layout')).toBeVisible()
     const addHero = page.getByRole('button', { name: 'Добавить героя' })
     await expect(addHero).toBeVisible()
@@ -64,7 +63,7 @@ async function seedStory(page: Page, { extras }: { extras?: boolean } = {}) {
 
 async function ensureBoard(page: Page) {
   if (!(await page.locator('.board:visible, .timeline:visible').count())) {
-    await page.locator('.tabs-mobile:visible > button, .tabs-desktop:visible > button').filter({ hasText: 'Доска' }).click()
+    await openWorkspaceTab(page, 'Доска')
   }
   await expect(page.locator('.board:visible, .timeline:visible')).toBeVisible()
 }

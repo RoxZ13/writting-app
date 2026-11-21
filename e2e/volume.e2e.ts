@@ -15,6 +15,7 @@ import {
   type DbDump,
   type GenBook,
 } from './volume-helpers'
+import { openWorkspaceTab } from './helpers'
 
 /**
  * Real-volume checks: a Ficbook-style export of ~110 scenes / ~124k words goes in through the welcome
@@ -303,7 +304,7 @@ for (const rate of [1, 4]) {
     await page.getByRole('dialog', { name: 'Импорт истории' }).getByRole('button', { name: 'Импортировать' }).click()
     await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 600_000 })
     await page.waitForURL(/#\/text(?:\/|$)/)
-    await page.locator('.tabs-mobile:visible, .tabs-desktop:visible').getByRole('button', { name: 'Доска', exact: true }).click()
+    await openWorkspaceTab(page, 'Доска')
     await (phone ? expect(page.locator('.tl-chapter')).toHaveCount(18, { timeout: 600_000 }) : expect(page.locator(DESKTOP_COLUMNS)).toHaveCount(17, { timeout: 600_000 }))
     result.importToBoardMs = Date.now() - t0
     result.importLongTasks = await longTasksSince(page, l0)

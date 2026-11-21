@@ -124,6 +124,7 @@ function Person({ data, c, found, onDeleted }: { data: ProjectData; c: Character
   const [quote, setQuote] = useState('')
   const line = data.lines.find((l) => l.name === c.name)
   const lines = data.notes.filter((n) => (n.kind === 'quote' || n.kind === 'dialogue') && n.characterIds?.includes(c.id) && !n.archived)
+  const details = data.notes.filter((n) => n.kind === 'note' && n.characterIds?.includes(c.id) && !n.archived)
   const set = (changes: Partial<Character>) => void patch<Character>('characters', c.id, changes)
   // Scenes and quotes stay; they just no longer name this hero.
   const delHero = async () => {
@@ -166,7 +167,7 @@ function Person({ data, c, found, onDeleted }: { data: ProjectData; c: Character
       <section className="hero-in-story">
         <div className="hero-section-label">В истории</div>
         {line && <div className="hero-story-facts" style={{ color: line.color }}>● линия «{line.name}»</div>}
-        <WhereFound data={data} found={found}
+        <WhereFound data={data} found={found} heroId={c.id}
           onNotThis={(sid) => set({ ignoreSceneIds: [...(c.ignoreSceneIds ?? []), sid] })}
           onInclude={async (sid) => {
             await db.transaction('rw', db.scenes, db.outbox, db.meta, async () => {
@@ -177,6 +178,16 @@ function Person({ data, c, found, onDeleted }: { data: ProjectData; c: Character
           }}
         />
       </section>
+      {details.length > 0 && <details className="hero-fold">
+        <summary>Детали героя</summary>
+        <div className="hero-fold-body stack">
+          {details.map((note) => <div key={note.id} className="hero-detail-note">
+            <span>{note.text}</span>
+            {note.sceneId && data.sceneById.has(note.sceneId) && <button className="link small"
+              onClick={() => go({ view: 'text', sceneId: note.sceneId })}>Открыть сцену</button>}
+          </div>)}
+        </div>
+      </details>}
       <details className="hero-fold">
         <summary><span>Имена и реплики</span><span className="small muted">{lines.length || ''}</span></summary>
         <div className="hero-fold-body">
