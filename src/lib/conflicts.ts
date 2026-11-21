@@ -40,17 +40,25 @@ function originalTable(conflict: SyncConflict): SyncedTable {
  * Restore only fields that differed in the archived conflict. Unrelated edits made after the conflict
  * stay intact. The conflict itself becomes a synced tombstone, so it disappears on every device.
  */
-export async function restoreConflict(conflict: SyncConflict): Promise<void> {
+export async function restoreConflict(conflict: SyncConflict, expectedCurrent?: Base): Promise<void> {
   const table = originalTable(conflict)
   if (!isReviewableConflict(conflict)) return
   await db.transaction('rw', db.table(table), db.conflicts, db.outbox, db.meta, async () => {
     const pending = await db.conflicts.get(conflict.id)
     if (!pending || pending.deleted) throw new Error('Эту правку уже разобрали.')
     const current = (await db.table(table).get(conflict.recordId)) as Base | undefined
+    const changes = conflictChanges(conflict)
+    if (expectedCurrent) {
+      const actual = current as unknown as Record<string, unknown> | undefined
+      const expected = expectedCurrent as unknown as Record<string, unknown>
+      if (!actual || current?.deleted !== expectedCurrent.deleted || changes.some(({ field }) => !same(actual[field], expected[field]))) {
+        throw new Error('Настройки изменились. Сравни значения ещё раз.')
+      }
+    }
     if (current) {
       const next = { ...current } as unknown as Record<string, unknown>
       const losing = conflict.losing as unknown as Record<string, unknown>
-      for (const { field } of conflictChanges(conflict)) {
+      for (const { field } of changes) {
         if (field in losing) next[field] = losing[field]
         else delete next[field]
       }

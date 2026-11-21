@@ -41,7 +41,7 @@ test('a saved sync version can be compared and restored from the cloud notice', 
   await page.getByRole('button', { name: /^Разобрать версии/ }).click()
   await expect(page).toHaveURL(/#\/settings\/versions$/)
   const review = page.getByRole('region', { name: 'Разобрать версии' })
-  await expect(review.getByText('Остальные правки')).toHaveCount(0)
+  await expect(review.getByText('Настройки и другие правки')).toHaveCount(0)
   await review.locator('summary').click()
   await expect(review).toContainText('Текст, который был в редакторе.')
   await expect(review).toContainText('Текст с другого устройства.')

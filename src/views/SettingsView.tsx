@@ -17,8 +17,9 @@ import { timeAgo } from '../lib/status'
 import { remoteSyncAllowed } from '../lib/environment'
 import { getYandexToken } from '../lib/yandex'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { db, type SyncConflict } from '../db/db'
-import { conflictChanges, dismissConflict, isReviewableConflict, isUnreviewedSyncVersion, restoreConflict } from '../lib/conflicts'
+import { db } from '../db/db'
+import { isReviewableConflict, isUnreviewedSyncVersion } from '../lib/conflicts'
+import { SyncSettingsReview } from '../components/SyncSettingsReview'
 import { SyncTextReview } from '../components/SyncTextReview'
 import { StorageDiagnostics } from '../components/StorageDiagnostics'
 
@@ -158,7 +159,7 @@ export function SettingsView({ sync, showVersions }: { sync: SyncStatus; showVer
           <h3>Разобрать версии</h3>
           {!conflicts.length && !versions.length && <p className="small muted">Нет сохранённых версий для сравнения. Изменения счётчиков текста проверять не нужно.</p>}
           {versions.length > 0 && <SyncTextReview versions={versions} />}
-          {conflicts.length > 0 && <ConflictSection conflicts={conflicts} />}
+          {conflicts.length > 0 && <SyncSettingsReview conflicts={conflicts} />}
         </section>
       )}
 
@@ -201,116 +202,6 @@ export function SettingsView({ sync, showVersions }: { sync: SyncStatus; showVer
         {macBuild && <div>Сборка macOS {macBuild}</div>}
       </div>
     </div>
-  )
-}
-
-const TABLE_NAMES: Record<string, string> = {
-  projects: 'История',
-  chapters: 'Глава',
-  scenes: 'Сцена',
-  markers: 'Маячок',
-  notes: 'Заметка',
-  lines: 'Сюжетная линия',
-  characters: 'Персонаж',
-}
-
-const FIELD_NAMES: Record<string, string> = {
-  title: 'Название',
-  name: 'Имя',
-  text: 'Текст',
-  description: 'Описание',
-  goal: 'Цель',
-  order: 'Порядок',
-  chapterId: 'Глава',
-  status: 'Статус',
-  beats: 'Пункты сцены',
-  note: 'Пояснение',
-  resolved: 'Состояние',
-  archived: 'Архив',
-  about: 'О персонаже',
-  aliases: 'Другие имена',
-  deleted: 'Удаление',
-}
-
-function rowName(conflict: SyncConflict) {
-  const rows = [conflict.winning, conflict.losing] as unknown as Array<Record<string, unknown>>
-  for (const row of rows) {
-    for (const field of ['title', 'name', 'text']) {
-      if (typeof row[field] === 'string' && row[field]) return String(row[field]).slice(0, 80)
-    }
-  }
-  return conflict.recordId.slice(0, 8)
-}
-
-function valueText(value: unknown): string {
-  if (value === undefined || value === null || value === '') return 'не задано'
-  if (typeof value === 'boolean') return value ? 'да' : 'нет'
-  if (typeof value === 'string' || typeof value === 'number') return String(value)
-  if (Array.isArray(value)) return value.length ? `${value.length} ${value.length === 1 ? 'элемент' : 'элемента'}` : 'пусто'
-  return 'изменено'
-}
-
-function ConflictSection({ conflicts }: { conflicts: SyncConflict[] }) {
-  const [busy, setBusy] = useState<string | null>(null)
-  const act = async (conflict: SyncConflict, restore: boolean) => {
-    const question = restore
-      ? 'Вернуть сохранённый вариант? Заменятся только поля, которые конфликтовали; более поздние правки остальных полей останутся.'
-      : 'Оставить текущий вариант и убрать этот конфликт из списка? Архив останется в резервных копиях.'
-    if (!confirm(question)) return
-    setBusy(conflict.id)
-    try {
-      if (restore) await restoreConflict(conflict)
-      else await dismissConflict(conflict)
-      toast(restore ? 'Сохранённый вариант возвращён' : 'Текущий вариант оставлен')
-    } catch (error) {
-      toast(error instanceof Error ? error.message : 'Не получилось обработать конфликт')
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  return (
-    <section className="stack conflict-section">
-      <h4>Остальные правки</h4>
-      <div className="small muted">
-        Эти правки касаются названий, заметок, структуры и других полей. Открой запись, чтобы сравнить варианты.
-      </div>
-      <div className="conflict-list">
-        {conflicts.map((conflict) => {
-          const changes = conflictChanges(conflict)
-          return (
-            <details className="conflict-item" key={conflict.id}>
-              <summary>
-                <span>
-                  <strong>{TABLE_NAMES[conflict.table] ?? 'Запись'}:</strong> {rowName(conflict)}
-                </span>
-                <span className="small muted">{new Date(conflict.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-              </summary>
-              <div className="conflict-fields small">
-                {changes.length ? changes.map((change) => (
-                  <div className="conflict-field" key={change.field}>
-                    <strong>{FIELD_NAMES[change.field] ?? change.field}</strong>
-                    <div><span className="muted">Выбрано Manuscript:</span> {valueText(change.winning)}</div>
-                    <div><span className="muted">Сохранено отдельно:</span> {valueText(change.losing)}</div>
-                  </div>
-                )) : <div className="muted">Различия относятся только к служебной версии записи.</div>}
-              </div>
-              <div className="row conflict-actions">
-                <button className="btn sm primary" disabled={busy === conflict.id || !changes.length} onClick={() => void act(conflict, true)}>
-                  Вернуть сохранённый вариант
-                </button>
-                <button className="btn sm ghost" disabled={busy === conflict.id} onClick={() => void act(conflict, false)}>
-                  Оставить текущий
-                </button>
-              </div>
-            </details>
-          )
-        })}
-      </div>
-      <button className="btn" style={{ alignSelf: 'flex-start' }} onClick={() => void downloadBackup()}>
-        Скачать копию со всеми версиями
-      </button>
-    </section>
   )
 }
 

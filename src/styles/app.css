@@ -9122,3 +9122,20 @@ button.avatar {
   .volume-trigger { min-height: 44px; }
   :root[data-keyboard='open'] .volume-counter { display: none; }
 }
+
+.sync-setting-values {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding-top: 4px;
+}
+.sync-setting-values > div {
+  padding: 8px;
+  border-radius: var(--r-sm);
+  background: var(--fill);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 380px) {
+  .sync-setting-values { grid-template-columns: 1fr; gap: 6px; }
+}
