@@ -2,6 +2,19 @@ import type { Chapter, Project, Scene } from '../db/db'
 
 export const AUTHOR_SHEET_CHARS = 40_000
 
+export function showManuscriptVolume(project: Pick<Project, 'showVolume' | 'targetChars' | 'chapterMin' | 'chapterMax' | 'sceneBudget'>, chapters: Pick<Chapter, 'targetMin' | 'targetMax'>[]) {
+  return project.showVolume ?? Boolean(project.targetChars || project.chapterMin || project.chapterMax || project.sceneBudget ||
+    chapters.some((chapter) => chapter.targetMin || chapter.targetMax))
+}
+
+export function chapterVolumeNote(progress: ChapterWritingProgress) {
+  if (progress.max !== undefined && progress.chars > progress.max) return `На ${(progress.chars - progress.max).toLocaleString('ru-RU')} знаков больше ориентира`
+  if (progress.min !== undefined && progress.chars < progress.min) return `До ориентира ${(progress.min - progress.chars).toLocaleString('ru-RU')} знаков`
+  if (progress.min !== undefined) return 'В пределах ориентира'
+  if (progress.max !== undefined) return `До верхнего ориентира ${(progress.max - progress.chars).toLocaleString('ru-RU')} знаков`
+  return ''
+}
+
 export type SceneProgressState = 'empty' | 'writing' | 'written' | 'ready'
 
 export function sceneProgressState(scene: Pick<Scene, 'status' | 'charCount' | 'wordCount'>): SceneProgressState {

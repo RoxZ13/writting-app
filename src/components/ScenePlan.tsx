@@ -515,17 +515,14 @@ function Versions({ scene, editor }: { scene: Scene; editor: Editor | null }) {
         Сохранить текущий текст как версию
       </button>
       {snaps?.map((s) => (
-        <div key={s.id} className="snapshot">
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div>{s.reason}</div>
-            <div className="muted">
-              {timeAgo(s.createdAt)} · {s.wordCount} сл.
-            </div>
-          </div>
-          <button className="btn sm ghost" onClick={() => void restore(s.content)}>
-            Вернуть
-          </button>
-        </div>
+        <details key={s.id} className="conflict-item">
+          <summary>
+            <strong>{s.reason}</strong>
+            <span className="small muted">{timeAgo(s.createdAt)}</span>
+          </summary>
+          <pre className="sync-version-text">{docParagraphs(s.content).join('\n\n') || 'Пустой текст'}</pre>
+          <button className="btn sm ghost" onClick={() => void restore(s.content)}>Вернуть эту версию</button>
+        </details>
       ))}
     </div>
   )

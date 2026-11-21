@@ -1,6 +1,7 @@
 import { db, SYNCED_TABLES, type Base, type SceneText, type Snapshot, type SyncedTable, type SyncConflict } from '../db/db'
 import type { Table } from 'dexie'
 import { notifyChange } from '../db/repo'
+import { conflictChanges } from './conflicts'
 import { download } from './exporter'
 import { compareCausality, compareRevisionTokens, compareRows, nextRevision, observeRevision, revisionToken } from './revision'
 
@@ -143,6 +144,7 @@ const shortHash = (value: string) => {
 
 /** Preserve the losing side of a concurrent plan/metadata edit in the synced backup itself. */
 async function keepConflict(table: SyncedTable, recordId: string, losing: Base, winning: Base) {
+  if (!conflictChanges({ table, losing, winning }).length) return
   const signature = [table, recordId, String(revisionToken(losing)), String(revisionToken(winning)), meaningful(losing), meaningful(winning)].join('|')
   const id = `sync-conflict:${shortHash(signature)}`
   if (await db.conflicts.get(id)) return

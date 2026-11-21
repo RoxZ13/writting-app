@@ -18,7 +18,7 @@ import { remoteSyncAllowed } from '../lib/environment'
 import { getYandexToken } from '../lib/yandex'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type SyncConflict } from '../db/db'
-import { conflictChanges, dismissConflict, isUnreviewedSyncVersion, restoreConflict } from '../lib/conflicts'
+import { conflictChanges, dismissConflict, isReviewableConflict, isUnreviewedSyncVersion, restoreConflict } from '../lib/conflicts'
 import { SyncTextReview } from '../components/SyncTextReview'
 import { StorageDiagnostics } from '../components/StorageDiagnostics'
 
@@ -30,7 +30,7 @@ export function SettingsView({ sync, showVersions }: { sync: SyncStatus; showVer
   const [board, setBoard] = useState<BoardLayout>(getBoardLayout)
   const [accent, setAccent] = useState<Accent>(getAccent)
   const conflicts = useLiveQuery(
-    () => db.conflicts.filter((conflict) => !conflict.deleted).toArray().then((rows) => rows.sort((a, b) => b.createdAt - a.createdAt)),
+    () => db.conflicts.filter(isReviewableConflict).toArray().then((rows) => rows.sort((a, b) => b.createdAt - a.createdAt)),
     [],
   ) ?? []
   const versions = useLiveQuery(() => db.snapshots.filter(isUnreviewedSyncVersion).toArray()
@@ -156,7 +156,7 @@ export function SettingsView({ sync, showVersions }: { sync: SyncStatus; showVer
       {(showVersions || conflicts.length > 0 || versions.length > 0) && (
         <section ref={reviews} tabIndex={-1} className="card settings-section stack" aria-label="Разобрать версии">
           <h3>Разобрать версии</h3>
-          {!conflicts.length && !versions.length && <p className="small muted">Нет версий, которые ждут проверки.</p>}
+          {!conflicts.length && !versions.length && <p className="small muted">Нет сохранённых версий для сравнения. Изменения счётчиков текста проверять не нужно.</p>}
           {versions.length > 0 && <SyncTextReview versions={versions} />}
           {conflicts.length > 0 && <ConflictSection conflicts={conflicts} />}
         </section>

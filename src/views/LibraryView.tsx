@@ -119,7 +119,7 @@ function StoryCard({
 }) {
   const nextStep = p.nextStep?.trim()
   const nextChapter = plan?.next
-  const chapterDeadline = !nextStep && nextChapter?.deadline ? nextChapter.deadline : undefined
+  const chapterDeadline = nextChapter?.deadline
   const deadline = deadlineText(chapterDeadline ?? p.deadline)
   const color = p.color ?? '#0b0b0c'
   const cover = useCover(p.id)

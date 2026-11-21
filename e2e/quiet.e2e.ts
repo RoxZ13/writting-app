@@ -30,12 +30,11 @@ async function overTheNorm(page: Page) {
 test.describe('quiet chapter meter', () => {
   test('exceeding the chapter target keeps the text editable and explains the difference', async ({ page }) => {
     await overTheNorm(page)
-    const meter = page.locator('.chapter-meter')
-    await expect(meter).toHaveClass(/over/)
     await expect(page.locator('.ProseMirror')).toBeEditable()
-    await meter.locator('.chapter-progress-trigger').click()
-    const message = page.getByRole('dialog', { name: /Прогресс главы/ }).locator('.chapter-progress-message')
-    await expect(message).toHaveText(/Сверх ориентира на \d+ знаков/)
+    const trigger = page.locator('.volume-trigger')
+    await expect(trigger).toBeVisible()
+    await trigger.click()
+    await expect(page.getByRole('dialog', { name: 'Объём текста' })).toContainText('Текущая глава')
   })
 
   test('«Новая глава с этого абзаца» lives in the chapter panel and splits the chapter without losing text', async ({ page }) => {

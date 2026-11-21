@@ -351,11 +351,6 @@ export function LengthNorm({ project }: { project: Project }) {
           знаков с пробелами
         </label>
       )}
-      <label className="check-row small">
-        <input type="checkbox" checked={!!p.sceneBudget} onChange={(e) => set({ sceneBudget: e.target.checked })} />
-        Кольцо объёма у счётчика сцены
-      </label>
-      {p.sceneBudget && !hasNorm(p) && <div className="small muted">Без нормы кольцо считает по обычной сцене книги.</div>}
       <div className="row small" style={{ gap: 12 }}>
         <button className="link" onClick={() => setOpen(false)}>
           готово

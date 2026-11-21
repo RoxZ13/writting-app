@@ -46,7 +46,8 @@ import { go } from '../lib/router'
 import { getBoardLayout } from '../lib/session'
 import { Icon } from '../components/Icon'
 import { offerUndo, once, redo, toastUndo, undo, undoable, undoKey } from '../lib/undo'
-import { chapterWritingProgress, sceneProgressState } from '../lib/writing-progress'
+import { chapterWritingProgress, showManuscriptVolume } from '../lib/writing-progress'
+import { ChapterVolumeIndicator } from '../components/VolumeCounter'
 
 type Lens = { kind: 'all' } | { kind: 'line'; id: string } | { kind: 'markers' } | { kind: 'hero'; id: string }
 
@@ -634,22 +635,15 @@ function AskLock({ data }: { data: ProjectData }) {
 
 function BoardChapterProgress({ data, chapter, scenes, singleChapter = false }: { data: ProjectData; chapter: Chapter; scenes: Scene[]; singleChapter?: boolean }) {
   const progress = chapterWritingProgress(data.project, scenes, undefined, chapter)
-  if (!progress.target && !progress.written && !progress.ready) return null
-  if (singleChapter && !progress.target && !progress.ready) return null
-  const number = (value: number) => Math.round(value).toLocaleString('ru-RU')
+  const showVolume = showManuscriptVolume(data.project, data.chapters) && Boolean(progress.target)
+  if (!showVolume && (singleChapter ? !progress.ready : !progress.written && !progress.ready)) return null
   return (
-    <div className="board-chapter-progress" title={progress.target ? `Лимит главы: ${number(progress.target)} знаков` : 'Готовность сцен главы'}>
-      {progress.target && <div className="board-chapter-track">
-        <span style={{ width: `${Math.min(100, progress.ratio * 100)}%` }} />
-        {!singleChapter && scenes.map((scene, index) => <i key={scene.id} className={sceneProgressState(scene)} style={{ left: `${((index + 1) / scenes.length) * 100}%` }} />)}
-      </div>}
+    <div className="board-chapter-progress">
+      {showVolume && <ChapterVolumeIndicator project={data.project} progress={progress} />}
       <div className="board-chapter-progress-copy">
-        {progress.target
-          ? <span>{number(progress.chars)} зн. · цель {progress.min && progress.max ? `${number(progress.min)}–${number(progress.max)}` : number(progress.target)}</span>
-          : !singleChapter && <span>{progress.written} из {progress.total} написано</span>}
         {singleChapter
           ? progress.ready > 0 && <strong>Глава готова</strong>
-          : <strong>{progress.ready} {progress.ready === 1 ? 'сцена готова' : 'сцен готово'}</strong>}
+          : <><span>{progress.written} из {progress.total} написано</span><strong>{progress.ready} {progress.ready === 1 ? 'сцена готова' : 'сцен готово'}</strong></>}
       </div>
     </div>
   )

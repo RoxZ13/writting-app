@@ -86,7 +86,7 @@ export async function openWorkspaceTab(page: Page, name: 'Текст' | 'Дос�
 export async function openChapterProgress(page: Page) {
   await page.locator('.write-top').getByRole('button', { name: 'Ещё', exact: true }).click()
   await page.getByRole('button', { name: 'Объём и готовность', exact: true }).click()
-  const panel = page.getByRole('dialog', { name: /Прогресс главы/ })
+  const panel = page.getByRole('dialog', { name: 'Объём текста' })
   await expect(panel).toBeVisible()
   return panel
 }
@@ -95,7 +95,8 @@ export async function setChapterMaximum(page: Page, max?: number) {
   const panel = await openChapterProgress(page)
   await panel.getByRole('button', { name: 'Цели', exact: true }).click()
   const goals = page.getByRole('dialog', { name: 'Цели книги и главы' })
-  const field = goals.locator('.goal-settings-group', { hasText: 'Общий объём главы' }).getByLabel('Максимум, знаков')
+  const field = goals.locator('details').filter({ hasText: 'Общий ориентир главы' }).getByLabel('Максимум, знаков')
+  if (!(await field.isVisible())) await goals.getByText('Общий ориентир главы', { exact: true }).click()
   await field.fill(max === undefined ? '' : String(max))
   await field.blur()
   await goals.getByRole('button', { name: 'Закрыть цели' }).click()

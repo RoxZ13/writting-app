@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from './db/db'
-import { isUnreviewedSyncVersion } from './lib/conflicts'
+import { isReviewableConflict, isUnreviewedSyncVersion } from './lib/conflicts'
 import { useCallback, useEffect, useState } from 'react'
 import { getCloudConfig, getSyncStatus, onSyncStatus, startCloudSync, type SyncStatus } from './db/cloud'
 import { useProjectData, useProjects, type ProjectData } from './lib/hooks'
@@ -127,7 +127,7 @@ export function App() {
   const yandex = remoteSyncAllowed() && !!getYandexToken()
   const pendingReviews = useLiveQuery(async () => {
     const [metadata, versions] = await Promise.all([
-      db.conflicts.filter((entry) => !entry.deleted).count(),
+      db.conflicts.filter(isReviewableConflict).count(),
       db.snapshots.filter(isUnreviewedSyncVersion).count(),
     ])
     return metadata + versions

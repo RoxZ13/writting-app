@@ -45,6 +45,8 @@ export interface Project extends Base {
   targetWords?: number
   /** Fixed planned length of the whole book, in characters with spaces. It never grows when chapters are added. */
   targetChars?: number
+  /** Show the manuscript's character counter. Older projects inherit it from their goals. */
+  showVolume?: boolean
   /** How many chapters the book will have — a landmark besides the deadline. 0 = «не знаю» (shown as «?»). */
   targetChapters?: number
   /** The «lock the written chapters?» question after an import was asked, whatever the answer. */

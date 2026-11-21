@@ -40,7 +40,7 @@ function SyncTextReviewItem({ version }: { version: Snapshot }) {
   return (
     <details className="conflict-item" onToggle={(event) => setOpen(event.currentTarget.open)}>
       <summary>
-        <strong>{names?.label || 'Версия текста'}</strong>
+        <div><strong>{names?.label || 'Версия текста'}</strong><div className="small muted">{open ? 'Свернуть текст' : 'Посмотреть текст'}</div></div>
         <span className="small muted">{new Date(version.createdAt).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
       </summary>
       {open && (

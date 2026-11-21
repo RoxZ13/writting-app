@@ -1,7 +1,7 @@
 import type { Editor } from '@tiptap/react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { db, type Chapter, type Marker, type Note, type Project, type Scene, type SceneText } from '../db/db'
+import { db, type Marker, type Note, type Project, type Scene, type SceneText } from '../db/db'
 import { createMarker, createNote, createScene, patch, save, snapshotScene } from '../db/repo'
 import { SceneNow, ScenePlan, sceneMarkers } from '../components/ScenePlan'
 import { Icon } from '../components/Icon'
@@ -21,16 +21,15 @@ import { go } from '../lib/router'
 import { hotkey, session } from '../lib/session'
 import { clock, useSprint } from '../lib/sprint'
 import { endFocus, FocusStart } from '../components/Focus'
-import { sumChars } from '../lib/length'
-import { ChapterMeter } from '../components/ChapterMeter'
-import { chapterProgress, dayKey, totalWords, wordsOn } from '../lib/pace'
+import { ChapterVolumeIndicator, VolumeCounter } from '../components/VolumeCounter'
+import { chapterWritingProgress, showManuscriptVolume } from '../lib/writing-progress'
+import { chapterProgress } from '../lib/pace'
 import { MARKER_STATES } from '../lib/status'
-import { docParagraphs, emptyDoc, formatWords, lastSentences, pluralRu } from '../lib/text'
+import { docParagraphs, emptyDoc, lastSentences, pluralRu } from '../lib/text'
 import { loadTypo } from '../lib/typography'
 import { diffParagraphs } from '../lib/diff'
-import { InlineEdit, Modal, toast } from '../lib/ui'
+import { Modal, toast } from '../lib/ui'
 import { FindBar } from '../components/FindBar'
-import { TextStats } from '../components/TextStats'
 import { typesetDoc } from '../components/Typography'
 import { Shortcuts } from '../components/Shortcuts'
 import { SceneActions, SceneGestureButton } from '../components/SceneActions'
@@ -104,7 +103,6 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   const text = useLiveQuery(() => db.texts.get(sceneId), [sceneId])
   const [panels, setPanels] = useState(loadPanels)
   const [mode, setModeState] = useState<Mode>(loadMode)
-  const [words, setWords] = useState<number | null>(null)
   const [live, setLive] = useState<{ id: string; chars: number } | null>(null)
   const [editor, setEditor] = useState<Editor | null>(null)
   const [action, setAction] = useState<SelectionAction | null>(null)
@@ -292,8 +290,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   }
 
   const onWords = useCallback(
-    (n: number, chars: number) => {
-      setWords(n)
+    (_words: number, chars: number) => {
       setLive({ id: sceneId, chars })
     },
     [sceneId],
@@ -309,6 +306,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   const enterWritingSession = () => {
     if (writingSession || savingSession) return
     setMenuOpen(false)
+    setChapterProgressOpen(false)
     setFind(null)
     closeOverlays()
     setWritingSession(true)
@@ -349,13 +347,9 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   const chapter = data.chapterById.get(scene.chapterId)
   const due = sceneMarkers(data, scene).toPay.length
   const beatsDone = scene.beats.filter((b) => b.done).length
-  // The chapter's length right now: the other scenes as saved, this one as typed.
-  const chapterChars =
-    sumChars(data.scenes.filter((s) => s.chapterId === scene.chapterId && s.id !== scene.id)) +
-    (live?.id === scene.id ? live.chars : (scene.charCount ?? 0))
+  const liveChars = live?.id === scene.id ? live.chars : (scene.charCount ?? 0)
   const chapterScenes = chapter && !chapter.pool ? data.scenes.filter((s) => s.chapterId === scene.chapterId) : []
   const wholeChapter = chapterScenes.length === 1 && (!scene.title.trim() || scene.title === 'Первая сцена')
-  const bookWords = totalWords([...data.scenes, ...data.pool.scenes]) - scene.wordCount + (words ?? scene.wordCount)
   const quickMenuTools: MenuTool[] = [
     ['bolt', 'Быстрая заметка', isMac ? '⌘J' : 'Ctrl+J', () => window.dispatchEvent(new Event('manuscript:capture'))],
     ['search', 'Найти и заменить', isMac ? '⌘⇧H' : 'Ctrl+H', () => setFind({ replace: true })],
@@ -529,45 +523,10 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
         <div className="passport-wrap">
           <SceneNow data={data} scene={scene} wholeChapter={wholeChapter} onOpenPlan={openPlan} />
         </div>
-        {chapter && !chapter.pool && (
-          <ChapterMeter
-            project={data.project}
-            chars={chapterChars}
-            chapter={chapter}
-            scene={scene}
-            scenes={chapterScenes}
-            bookScenes={data.scenes}
-            chapters={data.chapters}
-            wholeChapter={wholeChapter}
-            open={chapterProgressOpen}
-            setOpen={setChapterProgressOpen}
-          />
-        )}
-
         <div className="editor-area">
           {rewriting && <RewriteOld scene={scene} editor={editor} onOpenPlan={openPlan} onDone={() => setModeState('write')} />}
           <div className="editor-wrap">
             {text && !rewriting && storyEmpty && <TitlePage key={`title-${scene.id}`} project={data.project} editor={editor} empty />}
-            {text && !rewriting && (
-              <header className={`scene-head ${wholeChapter ? 'whole-chapter' : ''}`}>
-                {!wholeChapter && <div className="scene-head-chapter">{chapter?.title}</div>}
-                {wholeChapter && chapter ? (
-                  <InlineEdit
-                    className="scene-head-title"
-                    value={chapter.title}
-                    placeholder="Глава без названия"
-                    onSave={(title) => void patch<Chapter>('chapters', chapter.id, { title })}
-                  />
-                ) : (
-                  <InlineEdit
-                    className="scene-head-title"
-                    value={scene.title}
-                    placeholder={sceneName(data, scene)}
-                    onSave={(title) => void patch<Scene>('scenes', scene.id, { title })}
-                  />
-                )}
-              </header>
-            )}
             {text && (
               <SceneEditor
                 scene={scene}
@@ -599,18 +558,10 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
         )}
       </div>
 
-      <TextStats
-        editor={editor}
-        chapterWords={data.scenes
-          .filter((s) => s.chapterId === scene.chapterId)
-          .reduce((n, s) => n + (s.id === scene.id ? (words ?? s.wordCount) : s.wordCount), 0)}
-        bookWords={bookWords}
-        today={wordsOn(data.project, dayKey())}
-        project={data.project}
-        scene={scene}
-        chapterScenes={chapter && !chapter.pool ? chapterScenes : null}
-        bookScenes={[...data.scenes, ...data.pool.scenes]}
-      />
+      <VolumeCounter project={data.project} chapter={chapter?.pool ? undefined : chapter}
+        scene={scene} scenes={chapterScenes} bookScenes={data.scenes} chapters={data.chapters}
+        liveChars={liveChars} wholeChapter={wholeChapter} open={chapterProgressOpen} setOpen={setChapterProgressOpen}
+        hidden={compact && writingSession} />
       {keysOpen && <Shortcuts onClose={() => setKeysOpen(false)} />}
 
       <aside className="write-brief" aria-label={`О ${wholeChapter ? 'главе' : 'сцене'}`}>
@@ -687,19 +638,19 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
       return next
     })
   const cp = chapterProgress(data.project, data.chapters, data.scenes)
-  const words = totalWords([...data.scenes, ...data.pool.scenes])
   const addScene = async (chapterId: string) => {
     const s = await createScene(data.project.id, chapterId, '')
     go({ view: 'text', sceneId: s.id })
     onPick()
   }
+  const showVolume = showManuscriptVolume(data.project, data.chapters)
   const groups = [...data.outline, ...(data.pool.scenes.length && data.pool.chapter ? [{ chapter: data.pool.chapter, scenes: data.pool.scenes }] : [])]
   return (
     <nav className="navi" aria-label="Главы и сцены">
       <div className="navi-head">
         <div className="navi-book">{data.project.title}</div>
         <div className="navi-sub">
-          {cp.written} из {cp.of} {cp.total === 1 && !cp.unknown ? 'главы' : 'глав'} · {formatWords(words)}
+          {cp.written} из {cp.of} {cp.total === 1 && !cp.unknown ? 'главы' : 'глав'}
         </div>
       </div>
       <div className="navi-label">Главы</div>
@@ -734,6 +685,7 @@ function Structure({ data, sceneId, onPick }: { data: ProjectData; sceneId: stri
                 ? <Icon name="right" size={15} />
                 : !isOpen && scenes.length > 0 && <span className="navi-count">{scenes.length}</span>}
             </button>
+            {showVolume && !chapter.pool && <ChapterVolumeIndicator project={data.project} progress={chapterWritingProgress(data.project, scenes, undefined, chapter)} />}
             {isOpen && !wholeText && (
               <div className="navi-scenes">
                 {scenes.map((s) => (

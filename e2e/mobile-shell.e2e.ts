@@ -36,7 +36,7 @@ test('the status-bar inset leaves room for the book title and the writer toolbar
   const header = page.locator('.app-header')
   const bookTitle = header.locator('.project-home')
   const toolbar = page.locator('.write-top')
-  const meter = page.locator('.chapter-meter')
+  const meter = page.locator('.volume-counter')
   await expect(header).toHaveCSS('height', '114px')
 
   const assertBarsFit = async () => {
@@ -60,21 +60,20 @@ test('the status-bar inset leaves room for the book title and the writer toolbar
   await page.reload()
   await page.evaluate(() => document.documentElement.style.setProperty('--app-safe-top', '62px'))
   await expect(page.getByRole('button', { name: 'Продолжить', exact: true })).toBeHidden()
-  await expect(meter.locator('.chapter-progress-track')).toBeVisible()
+  await expect(meter.locator('.volume-trigger')).toBeVisible()
   await expect(editor).toContainText('Проверка строки в редакторе.')
   await expect.poll(() => page.evaluate(() => {
     window.scrollTo({ top: 480, behavior: 'instant' })
     return window.scrollY
   })).toBeGreaterThan(100)
   await assertBarsFit()
-  const toolbarBox = (await toolbar.boundingBox())!
-  const meterBox = (await meter.boundingBox())!
-  expect(meterBox.y).toBeGreaterThanOrEqual(toolbarBox.y + toolbarBox.height - 0.5)
+  const counterBox = (await meter.boundingBox())!
+  expect(counterBox.y + counterBox.height).toBeGreaterThan(page.viewportSize()!.height - 64)
 
   await setKeyboardViewport(page, true)
   await expect(header).toHaveCSS('position', 'relative')
   await expect(toolbar).toHaveCSS('position', 'relative')
-  await expect(meter).toHaveCSS('position', 'relative')
+  await expect(meter).toBeHidden()
   await expect(page.locator('.resume')).toBeHidden()
   await page.evaluate(() => window.scrollTo(0, 0))
   await assertBarsFit()
@@ -107,7 +106,7 @@ test('writing mode keeps the text and Done, saves, then restores navigation', as
   await expect(page.locator('.tabs-mobile')).toBeHidden()
   await expect(toolbar.getByRole('button', { name: 'Ещё' })).toBeHidden()
   await page.keyboard.insertText('Чистая страница для новой главы.')
-  await expect(page.locator('.chapter-meter')).toBeHidden()
+  await expect(page.locator('.volume-counter')).toBeHidden()
   await toolbar.getByRole('button', { name: 'Готово' }).click()
   await expect(page.locator('.tabs-mobile')).toBeHidden()
   await expect(toolbar.getByRole('button', { name: 'Ещё' })).toBeVisible()
@@ -162,18 +161,18 @@ test('chapter progress keeps plan controls in a separate sheet on phones', async
   await startStory(page)
   await page.locator('.ProseMirror').click()
   await page.keyboard.type('Первая фраза')
-  await expect(page.locator('.chapter-progress-trigger')).toHaveCount(0)
+  await expect(page.locator('.volume-trigger')).toHaveCount(0)
   const progress = await openChapterProgress(page)
   await expect(progress).toBeVisible()
-  await expect(progress.locator('.chapter-goal-settings')).toHaveCount(0)
-  await expect(progress.locator('.chapter-progress-book')).not.toHaveAttribute('open', '')
+  await expect(progress.getByText('Вся рукопись', { exact: true })).toBeVisible()
+  await expect(progress.getByText('Авторские листы', { exact: true })).toBeVisible()
 
   await progress.getByRole('button', { name: 'Цели' }).click()
   const goals = page.getByRole('dialog', { name: 'Цели книги и главы' })
   await expect(goals).toBeVisible()
-  await expect(goals.getByLabel('Максимум, знаков', { exact: true }).filter({ visible: true })).toBeVisible()
-  await expect(goals.getByText('План книги', { exact: true })).toBeVisible()
-  await expect(goals.getByLabel('Объём, знаков')).toBeHidden()
+  await expect(goals.getByLabel('Объём, знаков')).toBeVisible()
+  await goals.getByText('Общий ориентир главы', { exact: true }).click()
+  await expect(goals.locator('details[open]').getByLabel('Максимум, знаков')).toBeVisible()
 })
 
 test('the phone board starts with the next writing action, not repeated headings', async ({ page }, info) => {
@@ -296,7 +295,7 @@ test('a fresh visit opens the library with the next step and readiness under its
   await expect(editor).toHaveText('Текст первой главы.')
   const progress = await openChapterProgress(page)
   await progress.getByRole('button', { name: 'Отметить главу готовой' }).click()
-  await expect(progress).toContainText('Глава отмечена готовой')
+  await expect(progress.getByRole('button', { name: 'Вернуть главу в работу' })).toBeVisible()
   await page.goto('/')
   await expect(story.locator('.story-progress')).toContainText('готово 1 из 1')
   await expect(story.getByRole('button', { name: /Перечитать первую главу/ })).toBeVisible()

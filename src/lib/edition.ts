@@ -68,6 +68,7 @@ async function writeEdition(projectId: string): Promise<{ projectId: string; fir
     pageChars: old.pageChars,
     lengthUnit: old.lengthUnit,
     sceneBudget: old.sceneBudget,
+    showVolume: old.showVolume,
   }
   await save<Project>('projects', p)
 

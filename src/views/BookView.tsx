@@ -9,6 +9,7 @@ import { EssenceFields } from '../components/Plot'
 import { DateChip } from '../components/DateChip'
 import { useCover } from '../lib/cover'
 import { LengthNorm, NumberField, PaceSection, PublishingSetup, PublishSection } from '../components/BookSections'
+import { bookWritingProgress, showManuscriptVolume } from '../lib/writing-progress'
 import { chapterProgress } from '../lib/pace'
 import { chapterToFicbook, chapterToRich, download, exportDocx, loadChapters } from '../lib/exporter'
 import { platformOf } from '../lib/platforms'
@@ -23,6 +24,7 @@ export function BookView({ data }: { data: ProjectData }) {
   const set = (changes: Partial<Project>) => void patch<Project>('projects', p.id, changes)
   const words = data.scenes.reduce((n, s) => n + s.wordCount, 0)
   const cover = useCover(p.id)
+  const volumePlan = bookWritingProgress(p, data.chapters, data.scenes)
   const cp = chapterProgress(p, data.chapters, data.scenes)
   const early = words < 1000 && !data.chapters.some((c) => c.publishedAt)
   const planPeek = [p.deadline ? `до ${p.deadline}` : '', p.targetChapters ? `${p.targetChapters} глав` : '', p.targetChars ? `${p.targetChars.toLocaleString('ru-RU')} знаков` : ''].filter(Boolean).join(' · ')
@@ -99,7 +101,12 @@ export function BookView({ data }: { data: ProjectData }) {
               <span className="field-label">Плановый объём книги, знаков</span>
               <NumberField value={p.targetChars} placeholder="например, 400 000" onSave={(targetChars) => set({ targetChars })} />
             </label>
+            <label className="check-row">
+              <input type="checkbox" checked={showManuscriptVolume(p, data.chapters)} onChange={(event) => set({ showVolume: event.target.checked })} />
+              Показывать объём в редакторе
+            </label>
             <LengthNorm project={p} />
+            {volumePlan.forecast && <p className="small muted">Примерный итоговый объём — {volumePlan.forecast.toLocaleString('ru-RU')} знаков. Расчёт по готовым главам.</p>}
             {!p.dailyGoal && !p.targetWords && (paceSetup ? (
               <div className="book-pace-setup">
                 <label>

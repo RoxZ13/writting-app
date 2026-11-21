@@ -1,3 +1,4 @@
+import { isReviewableConflict } from './conflicts'
 import { makeBackup, mergeSyncedBackup, type Backup, type SyncBase } from './backup'
 import { db, SYNCED_TABLES } from '../db/db'
 import { onLocalChange } from '../db/repo'
@@ -101,7 +102,7 @@ export function syncNow(): Promise<void> {
       } else {
         await syncWithStore(s)
       }
-      const conflicts = await db.conflicts.filter((conflict) => !conflict.deleted).count()
+      const conflicts = await db.conflicts.filter(isReviewableConflict).count()
       setState({ state: 'ok', at: Date.now(), ...(conflicts ? { conflicts } : {}) })
     } catch (e) {
       setState({ state: 'error', message: e instanceof Error ? e.message : String(e) })

@@ -4,6 +4,7 @@ import { patch, remove, save, snapshotScene } from '../db/repo'
 import { makeExcerpt } from './importer'
 import { docCharCount, docParagraphs, docWordCount } from './text'
 
+const DERIVED_SCENE_FIELDS = new Set(['charCount', 'wordCount', 'excerpt', 'lastPos'])
 const INTERNAL_FIELDS = new Set(['id', 'projectId', 'createdAt', 'updatedAt', 'syncRev', 'syncVersion'])
 
 const same = (a: unknown, b: unknown) => a === b || JSON.stringify(a) === JSON.stringify(b)
@@ -15,12 +16,16 @@ export interface ConflictChange {
 }
 
 /** Domain fields that actually differ between the two archived variants. */
-export function conflictChanges(conflict: Pick<SyncConflict, 'losing' | 'winning'>): ConflictChange[] {
+export function conflictChanges(conflict: Pick<SyncConflict, 'losing' | 'winning'> & { table?: string }): ConflictChange[] {
   const losing = conflict.losing as unknown as Record<string, unknown>
   const winning = conflict.winning as unknown as Record<string, unknown>
   return [...new Set([...Object.keys(losing), ...Object.keys(winning)])]
-    .filter((field) => !INTERNAL_FIELDS.has(field) && !same(losing[field], winning[field]))
+    .filter((field) => !INTERNAL_FIELDS.has(field) && !(conflict.table === 'scenes' && DERIVED_SCENE_FIELDS.has(field)) && !same(losing[field], winning[field]))
     .map((field) => ({ field, losing: losing[field], winning: winning[field] }))
+}
+
+export function isReviewableConflict(conflict: SyncConflict) {
+  return !conflict.deleted && conflictChanges(conflict).length > 0
 }
 
 function originalTable(conflict: SyncConflict): SyncedTable {
@@ -35,7 +40,10 @@ function originalTable(conflict: SyncConflict): SyncedTable {
  */
 export async function restoreConflict(conflict: SyncConflict): Promise<void> {
   const table = originalTable(conflict)
+  if (!isReviewableConflict(conflict)) return
   await db.transaction('rw', db.table(table), db.conflicts, db.outbox, db.meta, async () => {
+    const pending = await db.conflicts.get(conflict.id)
+    if (!pending || pending.deleted) throw new Error('Эту правку уже разобрали.')
     const current = (await db.table(table).get(conflict.recordId)) as Base | undefined
     if (current) {
       const next = { ...current } as unknown as Record<string, unknown>
