@@ -90,7 +90,8 @@ test.describe('a Ficbook export of ~110 scenes', () => {
     await page.getByRole('dialog', { name: 'Импорт истории' }).getByRole('button', { name: 'Импортировать' }).click()
     await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 180_000 })
     const textMs = Date.now() - t0
-    await page.goto('/#/board')
+    await page.waitForURL(/#\/text(?:\/|$)/)
+    await page.locator('.tabs-desktop').getByRole('button', { name: 'Доска', exact: true }).click()
     await expect(page.locator(DESKTOP_COLUMNS)).toHaveCount(17, { timeout: 180_000 })
     const boardMs = Date.now() - t0
     log(`welcome import -> last scene: ${textMs} ms; board with 17 columns: ${boardMs} ms`)
@@ -210,6 +211,8 @@ test.describe('a Ficbook export of ~110 scenes', () => {
     await page.evaluate((id) => window.dispatchEvent(new CustomEvent('manuscript:open', { detail: { id } })), importedProject)
     await expect(page.locator(DESKTOP_COLUMNS)).toHaveCount(17)
     await page.goto('/#/book')
+    await page.locator('summary', { hasText: 'Публикация' }).click()
+    await page.getByRole('group', { name: 'Площадка публикации' }).getByRole('button', { name: 'Фикбук', exact: true }).click()
     await page.locator('summary', { hasText: 'Все главы и план выкладки' }).click()
     const copy = page.getByTitle('Скопировать для Фикбука')
     await expect(copy).toHaveCount(17)
@@ -299,7 +302,8 @@ for (const rate of [1, 4]) {
     await page.locator(WELCOME_IMPORT).setInputFiles(asFile('many.txt', book.text))
     await page.getByRole('dialog', { name: 'Импорт истории' }).getByRole('button', { name: 'Импортировать' }).click()
     await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 600_000 })
-    await page.goto('/#/board')
+    await page.waitForURL(/#\/text(?:\/|$)/)
+    await page.locator('.tabs-mobile:visible, .tabs-desktop:visible').getByRole('button', { name: 'Доска', exact: true }).click()
     await (phone ? expect(page.locator('.tl-chapter')).toHaveCount(18, { timeout: 600_000 }) : expect(page.locator(DESKTOP_COLUMNS)).toHaveCount(17, { timeout: 600_000 }))
     result.importToBoardMs = Date.now() - t0
     result.importLongTasks = await longTasksSince(page, l0)
@@ -325,7 +329,15 @@ for (const rate of [1, 4]) {
       const card = phone ? page.locator('.tl-scene').first() : page.locator('article.card-scene').nth(150)
       await card.scrollIntoViewIfNeeded()
       const t = Date.now()
-      await card.click()
+      if (phone) {
+        await card.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 180, clientY: 300 })
+        const actions = page.getByRole('dialog', { name: /Действия со сценой/ })
+        await expect(actions).toBeVisible()
+        await card.dispatchEvent('pointerup', { pointerType: 'touch', clientX: 180, clientY: 300 })
+        await actions.getByRole('button', { name: 'Карточка сцены' }).click()
+      } else {
+        await card.click()
+      }
       await expect(page.locator('.sheet')).toBeVisible({ timeout: 60_000 })
       result.sheetOpenMs = Date.now() - t
       result.sheetLongTasks = await longTasksSince(page, since)

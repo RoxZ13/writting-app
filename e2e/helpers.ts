@@ -58,6 +58,20 @@ export async function startStory(page: Page) {
   return editor
 }
 
+export async function openChapterPlan(page: Page) {
+  const shortcut = page.locator('.plan-tool')
+  if (await shortcut.isVisible()) {
+    await shortcut.click()
+  } else {
+    await page.locator('.write-top').getByRole('button', { name: 'Ещё', exact: true }).click()
+    await page.getByText('Ещё инструменты', { exact: true }).click()
+    await page.getByRole('button', { name: 'О главе', exact: true }).click()
+  }
+  const plan = page.getByRole('region', { name: 'О главе', exact: true })
+  await expect(plan).toBeVisible()
+  return plan
+}
+
 /** Click into the editor and type with the real keyboard. */
 export async function typeInEditor(page: Page, text: string, opts: { end?: boolean } = {}) {
   const editor = page.locator('.ProseMirror')

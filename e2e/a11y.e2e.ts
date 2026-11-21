@@ -34,12 +34,11 @@ async function seedStory(page: Page, { extras }: { extras?: boolean } = {}) {
   await page.locator(WELCOME_IMPORT).setInputFiles(asFile('small.txt', book.text))
   await page.getByRole('dialog', { name: 'Импорт истории' }).getByRole('button', { name: 'Импортировать' }).click()
   await expect(page.locator('.ProseMirror')).toBeVisible({ timeout: 30_000 })
-  await page.goto('/#/board')
-  await expect(page.locator('.board, .timeline')).toBeVisible()
+  await page.waitForURL((url) => url.hash === '#/text' || url.hash.startsWith('#/text/'))
+  await ensureBoard(page)
   if (extras) {
     // Navigate through the visible mobile/desktop shell after the import has settled.
     // A direct hash written while the import refresh finishes can be replaced by lastSceneId.
-    await page.waitForTimeout(1_000)
     const charactersTab = page.locator('.tabs-mobile:visible > button, .tabs-desktop:visible > button').filter({ hasText: 'Герои' })
     await charactersTab.click()
     await expect(page.locator('.characters-layout')).toBeVisible()
@@ -64,7 +63,6 @@ async function seedStory(page: Page, { extras }: { extras?: boolean } = {}) {
 }
 
 async function ensureBoard(page: Page) {
-  await page.waitForTimeout(300)
   if (!(await page.locator('.board:visible, .timeline:visible').count())) {
     await page.locator('.tabs-mobile:visible > button, .tabs-desktop:visible > button').filter({ hasText: 'Доска' }).click()
   }
@@ -168,8 +166,7 @@ const SCREENS: Screen[] = [
   {
     name: 'board',
     open: async (page) => {
-      await page.goto('/#/board')
-      await expect(page.locator('.board, .timeline')).toBeVisible()
+      await ensureBoard(page)
     },
   },
   {
@@ -210,7 +207,7 @@ const SCREENS: Screen[] = [
     open: async (page) => {
       await page.goto('/#/book')
       await page.locator('summary', { hasText: 'Файлы и версии' }).click()
-      await expect(page.getByRole('button', { name: 'Вся история в Word (.docx)' })).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Скачать Word-копию (.docx)' })).toBeVisible()
     },
   },
   {
@@ -496,7 +493,7 @@ test('touch: the text toolbar and the selection bubble reach 44×44 px of hit ar
   // Select a line: the bubble appears.
   await editor.click()
   await page.keyboard.type('Слово для выделения')
-  await page.keyboard.press('Shift+Home')
+  for (let i = 0; i < 'выделения'.length; i++) await page.keyboard.press('Shift+ArrowLeft')
   await expect(page.locator('.bubble button').first()).toBeVisible()
   const inBubble = await hitSize('.bubble button')
   expect(inBubble.length).toBeGreaterThan(0)

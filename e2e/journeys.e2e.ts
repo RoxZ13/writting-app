@@ -1,6 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
 import fs from 'node:fs'
-import { aliveRows, allTexts, dbAll, docText, firstSceneId, startStory, typeInEditor, waitSaveTick, waitTextInDb, wordsIn } from './helpers'
+import { aliveRows, allTexts, dbAll, docText, firstSceneId, openChapterPlan, startStory, typeInEditor, waitSaveTick, waitTextInDb, wordsIn } from './helpers'
 
 test.setTimeout(45_000)
 
@@ -356,14 +356,9 @@ async function newStoryFromLibrary(page: Page) {
 
 async function deleteStoryInLibrary(page: Page, which: string) {
   const card = page.locator(`.story${which}`).first()
-  const actions = card.locator('summary[aria-label^="Настроить"]')
+  const actions = card.getByRole('button', { name: /^Настроить «/ })
   const del = card.getByRole('button', { name: 'Удалить историю' })
   await actions.click()
-  // Under load WebKit sometimes misses the first tap on <summary>; a person would simply tap again.
-  if (!(await del.isVisible().catch(() => false))) {
-    await page.waitForTimeout(500)
-    if (!(await del.isVisible().catch(() => false))) await actions.click()
-  }
   await del.click()
 }
 
@@ -516,9 +511,9 @@ test.describe('12. restoring a version updates the counters (B-109)', () => {
     await waitSaveTick(page)
     await waitTextInDb(page, v1)
     page.on('dialog', (d) => void d.accept())
-    const openPlan = () => page.locator('.tool', { hasText: 'О сцене' }).click()
-    const closePlan = () => page.locator('.plan').getByRole('button', { name: 'Скрыть «О сцене»', exact: true }).click() // on a phone the panel covers the page
-    const openVersions = () => page.locator('summary', { hasText: 'Ещё: линии, глава, версии' }).click()
+    const openPlan = () => openChapterPlan(page)
+    const closePlan = () => page.locator('.plan').getByRole('button', { name: 'Скрыть «О главе»', exact: true }).click()
+    const openVersions = () => page.locator('summary', { hasText: 'Ещё: линии, версии' }).click()
     await openPlan()
     await openVersions()
     await page.getByRole('button', { name: 'Сохранить текущий текст как версию' }).click()
@@ -528,7 +523,8 @@ test.describe('12. restoring a version updates the counters (B-109)', () => {
     // a completely different, longer text
     // A triple click selects the paragraph everywhere; Ctrl+A selects nothing in the iPhone emulation.
     await page.locator('.ProseMirror p').first().click({ clickCount: 3 })
-    await page.keyboard.type('Омега сигма тау ипсилон фи хи пси ро пи омикрон ню')
+    const v2 = 'Омега сигма тау ипсилон фи хи пси ро пи омикрон ню'
+    await page.keyboard.type(v2)
     await waitSaveTick(page)
     await expect.poll(async () => (await aliveRows<any>(page, 'scenes'))[0].wordCount).toBe(11)
 
@@ -537,13 +533,17 @@ test.describe('12. restoring a version updates the counters (B-109)', () => {
 
     await page.locator('.snapshot').getByRole('button', { name: 'Вернуть' }).click()
     await expect(page.locator('.ProseMirror')).toHaveText(v1)
-    await expect(page.locator('.stats-chip')).toContainText('5')
-    await page.waitForTimeout(1500)
+    await waitTextInDb(page, v1)
+    await expect.poll(async () => (await aliveRows<any>(page, 'scenes'))[0].wordCount).toBe(wordsIn(v1))
     const scenes = (await aliveRows<any>(page, 'scenes')).sort((a, b) => a.order - b.order)
     const scene = scenes[0]
     expect(await allTexts(page).then((t) => t[0].text)).toBe(v1)
     expect(scene.wordCount, 'scene.wordCount follows the restored text').toBe(wordsIn(v1))
     expect(scene.charCount, 'scene.charCount follows the restored text').toBe(v1.length)
     expect(scene.excerpt, 'card excerpt follows the restored text').toContain('Альфа')
+    const snapshots = await aliveRows<any>(page, 'snapshots')
+    expect(snapshots.some((snapshot) => snapshot.reason === 'Перед восстановлением' && docText(snapshot.content) === v2)).toBe(true)
+    await page.reload()
+    await expect(page.locator('.ProseMirror')).toHaveText(v1)
   })
 })

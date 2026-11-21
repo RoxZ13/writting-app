@@ -32,10 +32,10 @@ export function Welcome({ onCreated, sync }: { onCreated: (id: string, view: 'te
   }
 
   return (
-    <div className="welcome">
+    <main className="welcome">
       <div className="card welcome-card">
         <div className="brand" style={{ marginBottom: 18 }}>
-          <div className="logo">Manuscript.</div>
+          <h1 className="logo">Manuscript.</h1>
           <div className="tagline">тихое место для историй</div>
         </div>
         <p className="muted" style={{ marginTop: 0 }}>
@@ -99,6 +99,6 @@ export function Welcome({ onCreated, sync }: { onCreated: (id: string, view: 'te
           onConfirm={(book) => void create('text', importFile, book).finally(() => setImportFile(null))}
         />
       )}
-    </div>
+    </main>
   )
 }

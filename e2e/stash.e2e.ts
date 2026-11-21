@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { aliveRows, dbAll, docText, firstSceneId, startStory, typeInEditor, waitSaveTick, waitTextInDb } from './helpers'
+import { aliveRows, dbAll, docText, firstSceneId, openChapterPlan, startStory, typeInEditor, waitSaveTick, waitTextInDb } from './helpers'
 
 test.setTimeout(60_000)
 
@@ -121,7 +121,7 @@ test.describe('«В запас»', () => {
   test('d1. «Вернуть в текст» from the scene plan: inserted at the cursor, note archived', async ({ page }) => {
     await writeAndSelect(page)
     await stash(page)
-    await page.getByTitle(/План сцены:/).click()
+    await openChapterPlan(page)
     const back = page.getByRole('button', { name: 'Вернуть в текст' })
     await expect(back).toBeVisible()
     await expect(page.locator('.pp-stash')).toContainText('Она не пришла вовсе.')
@@ -143,7 +143,7 @@ test.describe('«В запас»', () => {
     await expect(page.getByRole('heading', { name: 'Заметки' })).toBeVisible()
     await page.getByRole('button', { name: /Привязанные к сценам/ }).click()
     await expect(page.locator('.note-item')).toContainText('из сцены «')
-    await page.getByRole('button', { name: 'Вернуть в текст' }).click()
+    await page.locator('.note-item').getByRole('button', { name: 'Вернуть', exact: true }).click()
 
     await page.waitForFunction(() => location.hash.startsWith('#/text/'))
     await expect.poll(() => editorText(page)).toContain(P2)
