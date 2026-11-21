@@ -2639,6 +2639,10 @@ main.page {
   .data-safety-label {
     display: none;
   }
+  .data-safety[data-state="conflict"] .data-safety-label {
+    display: inline;
+    font-size: var(--fs-xs);
+  }
   .tabs {
     position: fixed;
     left: 0;
@@ -9093,6 +9097,8 @@ button.avatar {
   .app-text .write.writing-session .write-top {
     position: sticky;
     top: var(--visual-top-offset, 0px);
+    background: var(--paper);
+    transition: none;
     justify-content: space-between;
     padding-top: calc(var(--app-safe-top) + 4px);
     padding-bottom: 4px;
@@ -9737,4 +9743,16 @@ button.avatar {
   .old-text {
     max-height: min(72dvh, 680px);
   }
+}
+
+.sync-version-text {
+  max-height: 18rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 4px 0 0;
+  padding: 8px 10px;
+  background: var(--fill);
+  border-radius: var(--r-sm);
+  font: inherit;
 }

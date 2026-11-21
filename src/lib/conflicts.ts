@@ -1,5 +1,8 @@
-import { db, SYNCED_TABLES, type Base, type SyncConflict, type SyncedTable } from '../db/db'
-import { remove, save } from '../db/repo'
+import { db, SYNCED_TABLES, type Base, type Scene, type Snapshot, type SyncConflict, type SyncedTable } from '../db/db'
+import { patch, remove, save, snapshotScene } from '../db/repo'
+
+import { makeExcerpt } from './importer'
+import { docCharCount, docParagraphs, docWordCount } from './text'
 
 const INTERNAL_FIELDS = new Set(['id', 'projectId', 'createdAt', 'updatedAt', 'syncRev', 'syncVersion'])
 
@@ -52,4 +55,34 @@ export async function restoreConflict(conflict: SyncConflict): Promise<void> {
 /** Keep the current variant and close this archived conflict on all devices. */
 export async function dismissConflict(conflict: SyncConflict): Promise<void> {
   await remove('conflicts', conflict.id)
+}
+
+export function isUnreviewedSyncVersion(version: Snapshot) {
+  return !version.deleted && !version.syncReviewed && version.reason.endsWith('(конфликт синхронизации)')
+}
+
+/** Review the saved copy without deleting it from the scene's history. */
+export async function reviewSyncVersion(id: string, replacement?: { currentContent: unknown }) {
+  await db.transaction('rw', db.snapshots, db.texts, db.scenes, db.outbox, db.meta, async () => {
+    const version = await db.snapshots.get(id)
+    if (!version || !isUnreviewedSyncVersion(version)) throw new Error('Эту версию уже разобрали.')
+    if (replacement) {
+      const [current, scene] = await Promise.all([db.texts.get(version.sceneId), db.scenes.get(version.sceneId)])
+      if (!current || current.deleted || !scene || scene.deleted) throw new Error('Сцена недоступна. Сохранённый текст можно скопировать.')
+      if (!same(current.content, replacement.currentContent)) throw new Error('Текст изменился. Сравни версии ещё раз.')
+      if (!same(current.content, version.content)) {
+        const wordCount = docWordCount(version.content)
+        const paragraphs = docParagraphs(version.content).map((p) => p.trim()).filter(Boolean)
+        await snapshotScene(current, 'Перед восстановлением версии')
+        await save('texts', { ...current, content: version.content, wordCount })
+        await patch<Scene>('scenes', scene.id, {
+          wordCount,
+          charCount: docCharCount(version.content),
+          excerpt: makeExcerpt(scene.epigraph && paragraphs[0] === scene.epigraph ? paragraphs.slice(1) : paragraphs),
+          lastPos: undefined,
+        })
+      }
+    }
+    await patch<Snapshot>('snapshots', id, { syncReviewed: true })
+  })
 }

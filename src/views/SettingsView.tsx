@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   currentEmail,
   getCloudConfig,
@@ -18,11 +18,12 @@ import { remoteSyncAllowed } from '../lib/environment'
 import { getYandexToken } from '../lib/yandex'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type SyncConflict } from '../db/db'
-import { conflictChanges, dismissConflict, restoreConflict } from '../lib/conflicts'
+import { conflictChanges, dismissConflict, isUnreviewedSyncVersion, restoreConflict } from '../lib/conflicts'
+import { SyncTextReview } from '../components/SyncTextReview'
 import { StorageDiagnostics } from '../components/StorageDiagnostics'
 
 /** Settings of the app itself (not of a book): look, devices, installing, backup. */
-export function SettingsView({ sync }: { sync: SyncStatus }) {
+export function SettingsView({ sync, showVersions }: { sync: SyncStatus; showVersions?: boolean }) {
   const iosBuild = navigator.userAgent.match(/\bManuscriptIOS\/([\d.]+)(?:\s|$)/)?.[1]
   const macBuild = navigator.userAgent.match(/\bManuscriptMac\/([\d.]+)(?:\s|$)/)?.[1]
   const [theme, setTheme] = useState<Theme>(getTheme)
@@ -32,6 +33,16 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
     () => db.conflicts.filter((conflict) => !conflict.deleted).toArray().then((rows) => rows.sort((a, b) => b.createdAt - a.createdAt)),
     [],
   ) ?? []
+  const versions = useLiveQuery(() => db.snapshots.filter(isUnreviewedSyncVersion).toArray()
+    .then((rows) => rows.sort((a, b) => b.createdAt - a.createdAt)), []) ?? []
+  const reviews = useRef<HTMLElement>(null)
+  const focusReviews = () => {
+    reviews.current?.focus({ preventScroll: true })
+    reviews.current?.scrollIntoView({ block: 'start' })
+  }
+  useEffect(() => {
+    if (showVersions) focusReviews()
+  }, [showVersions])
   const restore = async (file: File) => {
     try {
       const dump = await readBackupFile(file)
@@ -129,7 +140,7 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
 
       {remoteSyncAllowed() ? (
         <>
-          <CloudDisks />
+          <CloudDisks reviewCount={conflicts.length + versions.length} onReview={focusReviews} />
           {/* The old Supabase sync: shown only where it was set up, so it does not stand next to the Disk as a second «Устройства». */}
           {!getYandexToken() && getCloudConfig() && <SyncSection sync={sync} />}
         </>
@@ -142,7 +153,14 @@ export function SettingsView({ sync }: { sync: SyncStatus }) {
         </section>
       )}
 
-      {conflicts.length > 0 && <ConflictSection conflicts={conflicts} />}
+      {(showVersions || conflicts.length > 0 || versions.length > 0) && (
+        <section ref={reviews} tabIndex={-1} className="card settings-section stack" aria-label="Разобрать версии">
+          <h3>Разобрать версии</h3>
+          {!conflicts.length && !versions.length && <p className="small muted">Нет версий, которые ждут проверки.</p>}
+          {versions.length > 0 && <SyncTextReview versions={versions} />}
+          {conflicts.length > 0 && <ConflictSection conflicts={conflicts} />}
+        </section>
+      )}
 
       <section className="card settings-section stack">
         <h3>Установить как приложение</h3>
@@ -227,10 +245,7 @@ function rowName(conflict: SyncConflict) {
 function valueText(value: unknown): string {
   if (value === undefined || value === null || value === '') return 'не задано'
   if (typeof value === 'boolean') return value ? 'да' : 'нет'
-  if (typeof value === 'string' || typeof value === 'number') {
-    const text = String(value)
-    return text.length > 120 ? `${text.slice(0, 117)}…` : text
-  }
+  if (typeof value === 'string' || typeof value === 'number') return String(value)
   if (Array.isArray(value)) return value.length ? `${value.length} ${value.length === 1 ? 'элемент' : 'элемента'}` : 'пусто'
   return 'изменено'
 }
@@ -255,10 +270,10 @@ function ConflictSection({ conflicts }: { conflicts: SyncConflict[] }) {
   }
 
   return (
-    <section className="card settings-section stack conflict-section">
-      <h3>Сохранены конфликтующие правки</h3>
+    <section className="stack conflict-section">
+      <h4>Остальные правки</h4>
       <div className="small muted">
-        На разных устройствах одновременно меняли одну запись. Manuscript выбрал текущий вариант, но сохранил второй. Проверьте {conflicts.length === 1 ? 'его' : `все ${conflicts.length}`}.
+        Эти правки касаются названий, заметок, структуры и других полей. Открой запись, чтобы сравнить варианты.
       </div>
       <div className="conflict-list">
         {conflicts.map((conflict) => {

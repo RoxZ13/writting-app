@@ -6,7 +6,7 @@ export type Route =
   | { view: 'characters' }
   | { view: 'lore' }
   | { view: 'inbox' }
-  | { view: 'settings' }
+  | { view: 'settings'; versions?: boolean }
   | { view: 'library' }
   | { view: 'book' }
   | { view: 'help' }
@@ -14,7 +14,8 @@ export type Route =
 export function parseHash(hash: string): Route {
   const [, view, id] = hash.replace(/^#/, '').split('/')
   if (view === 'write' || view === 'text') return { view: 'text', sceneId: id || undefined }
-  if (view === 'board' || view === 'characters' || view === 'lore' || view === 'inbox' || view === 'settings' || view === 'library' || view === 'book' || view === 'help') return { view }
+  if (view === 'settings') return id === 'versions' ? { view: 'settings', versions: true } : { view: 'settings' }
+  if (view === 'board' || view === 'characters' || view === 'lore' || view === 'inbox' || view === 'library' || view === 'book' || view === 'help') return { view }
   return { view: 'library' }
 }
 
@@ -23,7 +24,7 @@ type Target = Route | { view: 'write'; sceneId: string }
 
 export function go(route: Target) {
   const r: Route = route.view === 'write' ? { view: 'text', sceneId: route.sceneId } : route
-  const hash = r.view === 'text' ? (r.sceneId ? `#/text/${r.sceneId}` : '#/text') : `#/${r.view}`
+  const hash = r.view === 'text' ? (r.sceneId ? `#/text/${r.sceneId}` : '#/text') : r.view === 'settings' && r.versions ? '#/settings/versions' : `#/${r.view}`
   if (location.hash !== hash) location.hash = hash
 }
 

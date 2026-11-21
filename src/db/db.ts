@@ -220,6 +220,7 @@ export interface Snapshot extends Base {
   wordCount: number
   reason: string
   createdAt: number
+  syncReviewed?: boolean
 }
 
 /** A losing side of a concurrent non-text edit. Kept in backups even before a recovery UI is added. */

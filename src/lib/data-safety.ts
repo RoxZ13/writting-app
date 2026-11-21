@@ -17,12 +17,19 @@ export function dataSafetyStatus(opts: {
   file: FileSyncState
   cloud: SyncStatus
   preview?: boolean
+  pendingReviews?: number
 }): DataSafetyStatus {
+  if (opts.pendingReviews) return {
+    state: 'conflict',
+    label: 'Разобрать версии',
+    title: `Версий и правок для проверки: ${opts.pendingReviews}`,
+    provider: opts.yandex ? 'yandex' : opts.supabase ? 'supabase' : 'local',
+  }
   if (opts.yandex) {
     const file = opts.file
     if (file.state === 'pending') return { state: 'pending', label: 'Ждёт облако', title: 'Сохранено на устройстве · ждёт отправки на Яндекс Диск', provider: 'yandex' }
     if (file.state === 'syncing') return { state: 'syncing', label: 'В облако…', title: 'Сохранено на устройстве · отправляется на Яндекс Диск', provider: 'yandex' }
-    if (file.state === 'ok' && file.conflicts)
+    if (file.state === 'ok' && file.conflicts && opts.pendingReviews === undefined)
       return {
         state: 'conflict',
         label: 'Есть конфликт',

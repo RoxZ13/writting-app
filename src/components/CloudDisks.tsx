@@ -11,7 +11,7 @@ const ago = (at: number) => {
  * «Своё облако»: the stories kept in step through the author's own cloud disk. For now Яндекс Диск;
  * Dropbox and Google Drive go here the same way.
  */
-export function CloudDisks() {
+export function CloudDisks({ reviewCount = 0, onReview }: { reviewCount?: number; onReview?: () => void }) {
   const [state, setState] = useState<FileSyncState>(getFileSyncState)
   const [connected, setConnected] = useState(() => !!getYandexToken())
   const [clientId, setClientId] = useState(getYandexClientId() ?? '')
@@ -25,9 +25,7 @@ export function CloudDisks() {
       : state.state === 'syncing'
       ? 'Синхронизация…'
       : state.state === 'ok'
-        ? state.conflicts
-          ? `Синхронизировано · конфликтующих правок: ${state.conflicts}`
-          : `Синхронизировано ${ago(state.at)}`
+        ? `Синхронизировано ${ago(state.at)}`
         : state.state === 'offline'
           ? 'Нет интернета — отправится само, когда сеть появится'
           : state.state === 'error'
@@ -77,6 +75,8 @@ export function CloudDisks() {
           </button>
         )}
       </div>
+
+      {reviewCount > 0 && onReview && <button className="btn sm" onClick={onReview}>Разобрать версии · {reviewCount}</button>}
 
       <div className="cloud-row soon">
         <span className="cloud-logo" aria-hidden="true">

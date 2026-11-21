@@ -464,6 +464,17 @@ test('formatting stays within reach while scrolling a long draft with the keyboa
   await expect(toolbar).toHaveCSS('position', 'sticky')
   await expect.poll(async () => (await toolbar.boundingBox())?.y).toBeCloseTo(24, 0)
   await expect(toolbar.getByRole('button', { name: 'Жирный' })).toBeInViewport()
+  await expect(toolbar).toHaveCSS('transition-property', 'none')
+  const duringScroll = await page.evaluate(() => {
+    const viewport = window.visualViewport!
+    for (const offset of [53, 6, 41, 9, 27]) {
+      Object.defineProperty(viewport, 'offsetTop', { configurable: true, value: offset })
+      viewport.dispatchEvent(new Event('scroll'))
+    }
+    return document.querySelector('.write-top')!.getBoundingClientRect().top
+  })
+  expect(duringScroll).toBeCloseTo(24, 0)
+  await expect.poll(async () => (await toolbar.boundingBox())?.y).toBeCloseTo(27, 0)
 })
 
 test('Word export offers the current chapter and the whole manuscript', async ({ page }) => {

@@ -1,3 +1,6 @@
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from './db/db'
+import { isUnreviewedSyncVersion } from './lib/conflicts'
 import { useCallback, useEffect, useState } from 'react'
 import { getCloudConfig, getSyncStatus, onSyncStatus, startCloudSync, type SyncStatus } from './db/cloud'
 import { useProjectData, useProjects, type ProjectData } from './lib/hooks'
@@ -47,6 +50,7 @@ export function App() {
     const viewport = window.visualViewport
     let viewportWidth = window.innerWidth
     let fullHeight = viewport?.height ?? window.innerHeight
+    let viewportScrollTimer: number | undefined
     const syncVisibleViewport = () => {
       const visibleHeight = viewport?.height ?? window.innerHeight
       if (window.innerWidth !== viewportWidth) {
@@ -69,12 +73,17 @@ export function App() {
     syncVisibleViewport()
     const settleTimer = window.setTimeout(syncVisibleViewport, 250)
     viewport?.addEventListener('resize', syncVisibleViewport)
-    viewport?.addEventListener('scroll', syncVisibleViewport)
+    const afterViewportScroll = () => {
+      window.clearTimeout(viewportScrollTimer)
+      viewportScrollTimer = window.setTimeout(syncVisibleViewport, 140)
+    }
+    viewport?.addEventListener('scroll', afterViewportScroll)
     window.addEventListener('resize', syncVisibleViewport)
     return () => {
       window.clearTimeout(settleTimer)
       viewport?.removeEventListener('resize', syncVisibleViewport)
-      viewport?.removeEventListener('scroll', syncVisibleViewport)
+      window.clearTimeout(viewportScrollTimer)
+      viewport?.removeEventListener('scroll', afterViewportScroll)
       window.removeEventListener('resize', syncVisibleViewport)
       document.documentElement.style.removeProperty('--visual-bottom-offset')
       document.documentElement.style.removeProperty('--visual-top-offset')
@@ -116,10 +125,18 @@ export function App() {
   }, [])
 
   const yandex = remoteSyncAllowed() && !!getYandexToken()
+  const pendingReviews = useLiveQuery(async () => {
+    const [metadata, versions] = await Promise.all([
+      db.conflicts.filter((entry) => !entry.deleted).count(),
+      db.snapshots.filter(isUnreviewedSyncVersion).count(),
+    ])
+    return metadata + versions
+  }, [])
   const safety = dataSafetyStatus({
     yandex,
     supabase: remoteSyncAllowed() && !yandex && !!getCloudConfig(),
     file: fileSync,
+    pendingReviews,
     cloud: sync,
     preview: __PREVIEW__,
   })
@@ -241,7 +258,7 @@ export function App() {
         </aside>
         <main className="lib-main">
           {route.view === 'library' && <LibraryView projects={projects} currentId={data.project.id} onOpen={selectProject} />}
-          {route.view === 'settings' && <SettingsView sync={sync} />}
+          {route.view === 'settings' && <SettingsView sync={sync} showVersions={route.versions} />}
           {route.view === 'help' && <HelpView />}
         </main>
         <Toaster />
@@ -311,7 +328,7 @@ function AppHeader({ data, route, sceneId, safety, onSearch }: { data: ProjectDa
             data-state={safety.state}
             title={safety.title}
             aria-label={`${safety.label}. ${safety.title}`}
-            onClick={() => go({ view: 'settings' })}
+            onClick={() => go({ view: 'settings', versions: safety.state === 'conflict' })}
           >
             <span className="sync-dot" data-state={safety.state} />
             <span className="data-safety-label">{safety.label}</span>
