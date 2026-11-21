@@ -44,3 +44,16 @@ Personal Team. Профиль действует 7 дней с момента в
 
 [Правила Apple для Personal Team](https://developer.apple.com/help/account/basics/about-your-developer-account)
 · [Включение режима разработчика](https://developer.apple.com/documentation/xcode/enabling-developer-mode-on-a-device)
+
+## Manuscript на Mac
+
+Открой этот же `Manuscript.xcodeproj`. Вверху окна, рядом со схемой **Manuscript**,
+выбери **My Mac (Mac Catalyst)**. В **Signing & Capabilities** выбери свою команду,
+если Xcode просит подпись. Нажми **⌘R**, чтобы собрать и открыть приложение.
+
+После первой сборки открой папку с приложением командой **Product → Show Build Folder in Finder**.
+В `Products/Debug-maccatalyst` лежит `Manuscript.app`. Скопируй его в папку «Программы»
+и запускай из Finder, Spotlight или Dock.
+
+У приложения на Mac своё локальное хранилище. Чтобы открыть прежние рукописи,
+подключи тот же Яндекс Диск в настройках Manuscript или верни свежую JSON-копию.

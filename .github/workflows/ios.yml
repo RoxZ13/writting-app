@@ -17,3 +17,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: xcodebuild -project ios/Manuscript.xcodeproj -scheme Manuscript -destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO build
+  mac:
+    runs-on: macos-26
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: xcodebuild -project ios/Manuscript.xcodeproj -scheme Manuscript -destination 'platform=macOS,variant=Mac Catalyst' -derivedDataPath "$RUNNER_TEMP/ManuscriptMac" CODE_SIGNING_ALLOWED=NO build
+      - name: Validate Mac application
+        run: |
+          app="$RUNNER_TEMP/ManuscriptMac/Build/Products/Debug-maccatalyst/Manuscript.app"
+          test -x "$app/Contents/MacOS/Manuscript"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist"

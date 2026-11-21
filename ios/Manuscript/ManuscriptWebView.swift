@@ -9,7 +9,11 @@ final class ManuscriptWebView: WKWebView {
         self.manuscriptURL = manuscriptURL
         let configuration = WKWebViewConfiguration()
         if let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String {
+            #if targetEnvironment(macCatalyst)
+            configuration.applicationNameForUserAgent = "ManuscriptMac/\(build)"
+            #else
             configuration.applicationNameForUserAgent = "ManuscriptIOS/\(build)"
+            #endif
         }
         super.init(frame: .zero, configuration: configuration)
     }
