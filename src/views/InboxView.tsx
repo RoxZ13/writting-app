@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { uid, type Note, type NoteKind } from '../db/db'
 import { updateBeats } from '../components/ScenePlan'
 import { createMarker, createNote, patch, remove } from '../db/repo'
@@ -6,7 +6,7 @@ import { sceneLabel, sceneName, type ProjectData } from '../lib/hooks'
 import { go } from '../lib/router'
 import { returnToText } from '../lib/stash'
 import { NOTE_KINDS, noteKind, timeAgo } from '../lib/status'
-import { toast } from '../lib/ui'
+import { InlineEdit, toast } from '../lib/ui'
 
 type Filter = 'inbox' | 'questions' | 'attached' | 'archive'
 
@@ -14,9 +14,11 @@ export function InboxView({ data }: { data: ProjectData }) {
   const [filter, setFilter] = useState<Filter>('inbox')
   const [text, setText] = useState('')
   const [kind, setKind] = useState<NoteKind>('idea')
+  const [composing, setComposing] = useState(false)
+  const saving = useRef(false)
 
   const lists: Record<Filter, Note[]> = {
-    inbox: data.notes.filter((n) => !n.archived && !n.sceneId && !n.used && !(n.characterIds ?? []).length),
+    inbox: data.notes.filter((n) => !n.archived && !n.used && (n.sceneId || !(n.characterIds ?? []).length)),
     questions: data.notes.filter((n) => !n.archived && n.kind === 'question'),
     attached: data.notes.filter((n) => !n.archived && n.sceneId),
     archive: data.notes.filter((n) => n.archived),
@@ -24,26 +26,41 @@ export function InboxView({ data }: { data: ProjectData }) {
   const shown = lists[filter]
 
   const add = async () => {
-    if (!text.trim()) return
-    await createNote(text.trim(), kind, data.project.id)
-    setText('')
+    if (!text.trim() || saving.current) return
+    saving.current = true
+    try {
+      await createNote(text.trim(), kind, data.project.id)
+      setText('')
+      setKind('idea')
+      setComposing(false)
+      setFilter('inbox')
+    } catch {
+      toast('Не удалось сохранить заметку. Попробуй ещё раз.')
+    } finally {
+      saving.current = false
+    }
   }
 
   return (
     <div>
       <div className="toolbar">
         <h1 style={{ marginRight: 'auto' }}>Заметки</h1>
+        <button className="btn primary" aria-expanded={composing} onClick={() => setComposing((open) => !open)}>
+          {composing ? 'Свернуть' : '+ Заметка'}
+        </button>
       </div>
 
-      <div className="card inbox-capture">
+      {composing && <div className="card inbox-capture">
         <textarea
+          autoFocus
           className="capture-text"
           style={{ minHeight: 50 }}
+          aria-label="Текст заметки"
           placeholder="Записать мысль…"
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
               e.preventDefault()
               void add()
             }
@@ -60,25 +77,25 @@ export function InboxView({ data }: { data: ProjectData }) {
             Сохранить
           </button>
         </div>
-      </div>
+      </div>}
 
-      {data.notes.length > 0 && <div className="seg inbox-filters">
+      {(lists.questions.length > 0 || lists.attached.length > 0 || lists.archive.length > 0 || filter !== 'inbox') && <div className="seg inbox-filters">
         {(
           [
-            ['inbox', 'Неразобранные'],
+            ['inbox', 'Все'],
             ['questions', 'Вопросы'],
             ['attached', 'Привязанные к сценам'],
             ['archive', 'Архив'],
           ] as [Filter, string][]
-        ).map(([f, label]) => (
+        ).filter(([f]) => f === 'inbox' || f === filter || lists[f].length > 0).map(([f, label]) => (
           <button key={f} aria-pressed={filter === f} onClick={() => setFilter(f)}>
-            {label} <span className="muted">{lists[f].length}</span>
+            {label}
           </button>
         ))}
       </div>}
 
       {shown.length === 0 ? (
-        <div className="empty inbox-empty">{filter === 'inbox' ? 'Пока пусто' : 'Пусто'}</div>
+        <div className="empty inbox-empty">{filter === 'inbox' ? 'Здесь будут мысли и отложенные фрагменты по этой истории.' : 'Здесь пока нет заметок.'}</div>
       ) : (
         <div className="card" style={{ padding: 0 }}>
           {shown.map((n) => (
@@ -113,7 +130,10 @@ function NoteRow({ note, data }: { note: Note; data: ProjectData }) {
         {k.icon}
       </span>
       <div className="note-main">
-        <div className="note-text">{note.text}</div>
+        {open
+          ? <InlineEdit className="input note-text" multiline label="Текст заметки" value={note.text}
+            onSave={(value) => { if (value.trim()) void patch<Note>('notes', note.id, { text: value.trim() }) }} />
+          : <div className="note-text">{note.text}</div>}
         <div className="small muted" style={{ marginTop: 4 }}>
           {timeAgo(note.createdAt)}
           {scene && (
@@ -184,6 +204,9 @@ function NoteRow({ note, data }: { note: Note; data: ProjectData }) {
               <button className="btn sm ghost" onClick={() => void remove('notes', note.id)}>
                 Удалить
               </button>
+              <button className="btn sm ghost" onClick={() => void patch<Note>('notes', note.id, { archived: !note.archived })}>
+                {note.archived ? 'Из архива' : note.kind === 'question' ? 'Вопрос решён' : 'В архив'}
+              </button>
             </div>
           </div>
         )}
@@ -192,14 +215,7 @@ function NoteRow({ note, data }: { note: Note; data: ProjectData }) {
         {!!note.content && scene && !note.archived && (
           <button className="btn sm" onClick={() => void returnToText(note)}>Вернуть</button>
         )}
-        <button className="btn sm ghost" onClick={() => setOpen(!open)}>{open ? 'Готово' : 'Разобрать'}</button>
-        <button
-          className="btn sm ghost"
-          title={note.archived ? 'Вернуть' : note.kind === 'question' ? 'Вопрос решён' : 'В архив'}
-          onClick={() => void patch<Note>('notes', note.id, { archived: !note.archived })}
-        >
-          {note.archived ? 'Вернуть' : 'В архив'}
-        </button>
+        <button className="btn sm ghost" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Готово' : 'Разобрать'}</button>
       </div>
     </div>
   )

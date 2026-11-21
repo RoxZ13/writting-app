@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { startStory, waitTextInDb } from './helpers'
+import { aliveRows, startStory, waitTextInDb } from './helpers'
 
 test('the mobile shell behaves like an app surface', async ({ page }, info) => {
   test.skip(info.project.name === 'desktop', 'phone shell only')
@@ -29,7 +29,7 @@ test('the status-bar inset leaves room for the book title and the writer toolbar
   // The emulated window has no physical status bar; give it the inset of a notched phone.
   await page.evaluate(() => document.documentElement.style.setProperty('--app-safe-top', '62px'))
   const header = page.locator('.app-header')
-  const bookTitle = header.locator('.project-name-mobile summary')
+  const bookTitle = header.locator('.project-home')
   const toolbar = page.locator('.write-top')
   const meter = page.locator('.chapter-meter')
   await expect(header).toHaveCSS('height', '114px')
@@ -37,7 +37,7 @@ test('the status-bar inset leaves room for the book title and the writer toolbar
   const assertBarsFit = async () => {
     const geometry = await page.evaluate(() => {
       const header = document.querySelector('.app-header')!.getBoundingClientRect()
-      const title = document.querySelector('.project-name-mobile summary')!.getBoundingClientRect()
+      const title = document.querySelector('.project-home')!.getBoundingClientRect()
       const toolbar = document.querySelector('.write-top')!.getBoundingClientRect()
       return { titleTop: title.top, titleBottom: title.bottom, headerBottom: header.bottom, toolbarTop: toolbar.top }
     })
@@ -84,6 +84,39 @@ test('settings distinguishes the installed iOS build from the web version', asyn
   await page.goto('/#/settings')
   await expect(page.locator('.app-version')).toContainText('Версия от')
   await expect(page.locator('.app-version')).toContainText('Сборка iOS 3')
+})
+
+test('writing mode keeps the text and Done, saves, then restores navigation', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'mobile writing mode')
+  const editor = await startStory(page)
+  await expect(editor).toHaveCSS('font-size', '16px')
+  const toolbar = page.locator('.write-top')
+  await toolbar.getByRole('button', { name: 'Писать', exact: true }).click()
+  await expect(editor).toBeFocused()
+  await expect(page.locator('.tabs-mobile')).toBeHidden()
+  await expect(toolbar.getByRole('button', { name: 'Ещё' })).toBeHidden()
+  await page.keyboard.insertText('Чистая страница для новой главы.')
+  await expect(page.locator('.chapter-meter')).toBeHidden()
+  await toolbar.getByRole('button', { name: 'Готово' }).click()
+  await expect(page.locator('.tabs-mobile')).toBeVisible()
+  await expect(toolbar.getByRole('button', { name: 'Ещё' })).toBeVisible()
+  await waitTextInDb(page, 'Чистая страница для новой главы.')
+})
+
+test('notes open with a short list and a separate composer', async ({ page }) => {
+  await startStory(page)
+  await page.goto('/#/inbox')
+  await expect(page.getByRole('textbox', { name: 'Текст заметки' })).toHaveCount(0)
+  await page.getByRole('button', { name: '+ Заметка' }).click()
+  const text = page.getByRole('textbox', { name: 'Текст заметки' })
+  await text.fill('Первая строка\nВторая строка')
+  await page.getByRole('button', { name: 'Сохранить', exact: true }).click()
+  await expect(page.locator('.note-item')).toContainText('Вторая строка')
+  await expect(text).toHaveCount(0)
+  await page.locator('.note-item').getByRole('button', { name: 'Разобрать' }).click()
+  await text.fill('Уточнённая мысль')
+  await text.blur()
+  await expect.poll(async () => (await aliveRows<any>(page, 'notes')).some((note) => note.text === 'Уточнённая мысль')).toBe(true)
 })
 
 test('chapter progress keeps plan controls in a separate sheet on phones', async ({ page }, info) => {
@@ -141,7 +174,8 @@ test('a chapter with one text opens the editor in one tap', async ({ page }, inf
 test('the chapter navigator does not add a scene level to a whole chapter', async ({ page }, info) => {
   test.skip(info.project.name === 'desktop', 'phone navigator only')
   await startStory(page)
-  await page.locator('.scene-nav-tool').click()
+  await page.getByRole('button', { name: 'Ещё', exact: true }).click()
+  await page.getByRole('button', { name: 'Перейти к главе' }).click()
 
   const navigator = page.locator('.write-side')
   await expect(navigator).toBeVisible()

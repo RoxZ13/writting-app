@@ -6273,16 +6273,6 @@ button.avatar {
    Coherent mobile information architecture: contextual actions remain
    beside their object; master lists stay quiet until an item is opened.
    ===================================================================== */
-.project-settings-label {
-  margin-left: 6px;
-  color: var(--ink-3);
-  font-size: var(--fs-xs);
-  font-weight: 500;
-}
-.project-settings-icon {
-  display: none;
-  color: var(--ink-3);
-}
 .gesture-item,
 .navi-scene-wrap {
   min-width: 0;
@@ -6552,12 +6542,6 @@ button.avatar {
 }
 
 @media (max-width: 760px) {
-  .project-settings-label {
-    display: none;
-  }
-  .project-settings-icon {
-    display: inline-grid;
-  }
   .book-stage {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -8982,9 +8966,6 @@ button.avatar {
     border-bottom: 1px solid var(--line);
     border-radius: 0;
   }
-  .character-find {
-    margin: 14px 4px 4px;
-  }
   .branches {
     margin-top: 14px;
     border: 0;
@@ -9046,9 +9027,18 @@ button.avatar {
   }
 }
 
-/* First-run and mobile shell: one intent choice, and the book title owns the
-   compact navigation menu when the desktop logo is not present. */
-.project-name-mobile {
+.project-home {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.project-home-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.project-home-back {
   display: none;
 }
 .start-story-choice {
@@ -9107,33 +9097,14 @@ button.avatar {
 }
 
 @media (max-width: 760px) {
-  .project-name-desktop {
-    display: none;
-  }
-  .project-name-mobile {
-    display: block;
-    min-width: 0;
-  }
-  .project-name-mobile > summary.project-name {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    min-width: 0;
+  .project-home {
     max-width: min(62vw, 280px);
+    min-height: 44px;
   }
-  .project-name-mobile > summary.project-name::after {
-    content: '⌄';
-    color: var(--ink-3);
-    font-size: var(--fs-xs);
-  }
-  .project-name-mobile[open] > summary.project-name::after {
-    transform: rotate(180deg);
-  }
-  .project-menu-list {
-    top: 38px;
-    right: auto;
-    left: 0;
-    min-width: 190px;
+  .project-home-back {
+    display: block;
+    font-size: 22px;
+    line-height: 1;
   }
   .start-story-choice {
     align-self: end;
@@ -9142,6 +9113,42 @@ button.avatar {
     margin: 0;
     border-radius: var(--r-xl) var(--r-xl) 0 0;
     padding-bottom: calc(24px + env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 600px) {
+  :root {
+    --write-toolbar-height: 60px;
+  }
+  .project-book-settings,
+  .write-top > .scene-nav-tool,
+  .chapter-progress-label {
+    display: none;
+  }
+  .chapter-progress-trigger {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .hero-profile .wf-scene {
+    flex-wrap: wrap;
+  }
+  .write-top > .writing-session-toggle {
+    min-height: 44px;
+    font-weight: 650;
+  }
+  .app-text:has(.writing-session) > :is(.app-header, .tabs-mobile),
+  .write.writing-session :is(.chapter-meter, .text-stats, .passport-wrap, .resume, .find-bar, .old-text),
+  .write.writing-session .write-top > :not(.writing-session-toggle) {
+    display: none;
+  }
+  .app-text .write.writing-session .write-top {
+    position: sticky;
+    top: 0;
+    justify-content: flex-end;
+    padding-top: calc(var(--app-safe-top) + 4px);
+    padding-bottom: 4px;
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
   }
 }
 
@@ -9250,11 +9257,6 @@ button.avatar {
 }
 .hero-row-title > span {
   display: none;
-}
-.character-find {
-  display: inline-block;
-  margin: 14px 4px 0;
-  color: var(--ink-3);
 }
 .hero-profile {
   min-height: 0 !important;

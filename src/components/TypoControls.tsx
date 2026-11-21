@@ -77,6 +77,9 @@ export function TypoControls() {
       <details className="typo-more">
         <summary>Больше настроек</summary>
         <div className="typo">
+          <button className="btn sm ghost" onClick={() => set({ ...t, font: DEFAULT_TYPO.font, size: DEFAULT_TYPO.size })}>
+            Вернуть шрифт и размер по умолчанию
+          </button>
           <Choice
             label="Вид"
             k="calm"

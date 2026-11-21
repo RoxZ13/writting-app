@@ -17,7 +17,7 @@ import { AppErrorBoundary } from './components/AppErrorBoundary'
 
 showTheme(getTheme())
 applyAccent(getAccent())
-applyTypo(loadTypo())
+applyTypo(loadTypo(), { persist: false })
 navigator.storage?.persist?.().catch(() => {})
 
 // Back from Yandex sign-in: keep the token. Connected to a Disk: keep the stories in step with it.

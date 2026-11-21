@@ -45,7 +45,7 @@ export function SceneEditor({
 }: {
   scene: Scene
   initial: SceneText
-  onReady: (editor: Editor) => void
+  onReady: (editor: Editor, saveNow: () => Promise<boolean>) => void
   onWords: (n: number, chars: number) => void
   /** False while there are unsaved changes, true once they are on the device. */
   onSaved?: (saved: boolean) => void
@@ -158,7 +158,7 @@ export function SceneEditor({
   useEffect(() => {
     if (!editor) return
     session.editor = editor
-    onReady(editor)
+    onReady(editor, saver.flush)
     const pos = Math.min(scene.lastPos ?? editor.state.doc.content.size, editor.state.doc.content.size - 1)
     editor.commands.setTextSelection(Math.max(1, pos))
     requestAnimationFrame(() => {

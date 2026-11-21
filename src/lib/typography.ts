@@ -18,7 +18,7 @@ export interface Typo {
   resume: 'on' | 'off'
 }
 
-export const DEFAULT_TYPO: Typo = { font: 'serif', size: 18, width: 'medium', leading: 'normal', para: 'gap', typewriter: 'off', calm: 'off', focusPara: 'off', spell: 'edit', resume: 'on' }
+export const DEFAULT_TYPO: Typo = { font: 'sans', size: 16, width: 'medium', leading: 'normal', para: 'gap', typewriter: 'off', calm: 'off', focusPara: 'off', spell: 'edit', resume: 'on' }
 
 const KEY = 'manuscript.typo'
 const CALM_DEFAULT_KEY = 'manuscript.calmDefault2'
@@ -41,7 +41,7 @@ export function loadTypo(): Typo {
   }
 }
 
-export function applyTypo(t: Typo) {
+export function applyTypo(t: Typo, { persist = true } = {}) {
   const root = document.documentElement.style
   root.setProperty('--text-font', FONT[t.font])
   root.setProperty('--text-size', `${t.size}px`)
@@ -53,6 +53,7 @@ export function applyTypo(t: Typo) {
   document.documentElement.dataset.focuspara = t.focusPara
   document.documentElement.dataset.spell = t.spell
   window.dispatchEvent(new Event('manuscript:typo'))
+  if (!persist) return
   try {
     localStorage.setItem(KEY, JSON.stringify(t))
   } catch {

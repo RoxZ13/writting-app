@@ -23,7 +23,7 @@ export function LibraryView({
 }: {
   projects: Project[]
   currentId: string
-  onOpen: (id: string, view?: 'text' | 'board') => void
+  onOpen: (id: string, view?: 'text' | 'board' | 'book') => void
 }) {
   const [busy, setBusy] = useState(false)
   const [choosing, setChoosing] = useState(false)
@@ -121,7 +121,7 @@ function StoryCard({
   p: Project
   current: boolean
   stats?: { words: number; scenes: number; chapters: number; written: number; total: number; of: string }
-  onOpen: (view?: 'text' | 'board') => void
+  onOpen: (view?: 'text' | 'board' | 'book') => void
 }) {
   const dl = deadlineText(p.deadline)
   const color = p.color ?? '#0b0b0c'
@@ -147,6 +147,7 @@ function StoryCard({
           </button>
           {settingsOpen && (
             <div className="menu-list card story-menu">
+              <button onClick={() => onOpen('book')}>Параметры книги</button>
               <label className="menu-field">
                 <span>Название</span>
                 <input

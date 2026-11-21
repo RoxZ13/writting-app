@@ -1,6 +1,6 @@
 import type { Editor } from '@tiptap/react'
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { db, type Chapter, type Marker, type Note, type Project, type Scene, type SceneText } from '../db/db'
 import { createMarker, createNote, createScene, patch, save, snapshotScene } from '../db/repo'
 import { SceneNow, ScenePlan, sceneMarkers } from '../components/ScenePlan'
@@ -112,6 +112,9 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   const [finishing, setFinishing] = useState(false)
   const [typoOpen, setTypoOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [writingSession, setWritingSession] = useState(false)
+  const [savingSession, setSavingSession] = useState(false)
+  const saveNow = useRef<() => Promise<boolean>>(() => Promise.resolve(true))
   const { sprint, left } = useSprint()
   // Focus, as in Ulysses: while the timer runs only the text is on screen; the bars come back at the top edge.
   const focusRun = !!sprint && sprint.projectId === data.project.id && left > 0
@@ -295,7 +298,32 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
   const [saved, setSaved] = useState(true)
   // Whether the story was empty when the page opened.
   const [storyEmpty] = useState(() => [...data.scenes, ...data.pool.scenes].every((s) => !s.wordCount))
-  const onReady = useCallback((ed: Editor) => setEditor(ed), [])
+  const onReady = useCallback((ed: Editor, flush: () => Promise<boolean>) => {
+    saveNow.current = flush
+    setEditor(ed)
+  }, [])
+
+  const toggleWritingSession = async () => {
+    if (!editor) return
+    if (!writingSession) {
+      setMenuOpen(false)
+      setTypoOpen(false)
+      setFind(null)
+      closeOverlays()
+      setWritingSession(true)
+      editor.view.focus()
+      return
+    }
+    setSavingSession(true)
+    try {
+      if (await saveNow.current()) {
+        editor.view.dom.blur()
+        setWritingSession(false)
+      }
+    } finally {
+      setSavingSession(false)
+    }
+  }
 
   if (!scene) return null
 
@@ -307,6 +335,7 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
     panels.plan && 'brief-open',
     typing && 'typing',
     rewriting && 'rewriting',
+    compact && writingSession && 'writing-session',
   ]
     .filter(Boolean)
     .join(' ')
@@ -368,6 +397,12 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
 
       <div className="write-center">
         <div className="write-top">
+          {compact && (
+            <button type="button" className="tool writing-session-toggle" disabled={!editor || savingSession} onClick={() => void toggleWritingSession()}>
+              <Icon name={writingSession ? 'check' : 'pen'} size={18} />
+              {savingSession ? 'Сохраняю…' : writingSession ? 'Готово' : 'Писать'}
+            </button>
+          )}
           <button
             className={`tool scene-nav-tool ${panels.nav ? 'on' : ''}`}
             title={panels.nav ? `Скрыть ${wholeChapter ? 'главы' : 'сцены'}` : `Показать ${wholeChapter ? 'главы' : 'сцены'}`}
@@ -474,10 +509,14 @@ export function WriteView({ data, sceneId, onSearch }: { data: ProjectData; scen
                   </div>
                   {compact ? (
                     <>
+                      {renderMenuTool(['panel', wholeChapter ? 'Перейти к главе' : 'Перейти к сцене', '', () => togglePanel('nav')])}
                       {quickMenuTools.map(renderMenuTool)}
                       <details className="write-menu-more">
                         <summary>Ещё инструменты</summary>
-                        <div>{moreMenuTools.map(renderMenuTool)}</div>
+                        <div>
+                          {moreMenuTools.map(renderMenuTool)}
+                          {renderMenuTool(['settings', 'Параметры книги', '', () => go({ view: 'book' })])}
+                        </div>
                       </details>
                     </>
                   ) : desktopMenuTools.map(renderMenuTool)}

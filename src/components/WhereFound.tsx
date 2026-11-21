@@ -24,7 +24,7 @@ export function useWhereFound(data: ProjectData): Map<string, Found[]> | undefin
  * «Где встречается»: the scenes of a hero or a lore entry, grouped by chapter. A tap opens the scene;
  * «×» on a scene found only by its name means «не то» — it will not show up there again.
  */
-export function WhereFound({ data, found, onNotThis }: { data: ProjectData; found?: Found[]; onNotThis: (sceneId: string) => void }) {
+export function WhereFound({ data, found, onNotThis, onInclude }: { data: ProjectData; found?: Found[]; onNotThis: (sceneId: string) => void; onInclude?: (sceneId: string) => Promise<void> }) {
   if (found === undefined) return null
   if (!found.length) return <div className="where-found muted small">Пока нигде в тексте</div>
   const byChapter = new Map<string, Found[]>()
@@ -48,6 +48,9 @@ export function WhereFound({ data, found, onNotThis }: { data: ProjectData; foun
                 <button className="link-plain" title={s.goal || s.excerpt || ''} onClick={() => go({ view: 'text', sceneId: s.id })}>
                   {sceneName(data, s).replace(/^Сцена /, 'сц. ')}
                 </button>
+                {onInclude && (f.manual
+                  ? <span className="small muted">В составе сцены</span>
+                  : <button className="btn sm ghost" onClick={() => void onInclude(s.id)}>Добавить в состав сцены</button>)}
                 {!f.manual && (
                   <button className="wf-not" title="Не то — здесь это имя о другом" aria-label="Не то" onClick={() => onNotThis(s.id)}>
                     <Icon name="close" size={15} />

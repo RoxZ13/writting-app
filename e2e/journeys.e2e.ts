@@ -337,14 +337,9 @@ test.describe('7. find and replace', () => {
 })
 
 // ---------------------------------------------------------------------------------------------
-/** Library: the logo on desktop, or the book menu on a phone. */
+/** The title is a direct shortcut to the library. */
 const toLibrary = async (page: Page) => {
-  const logo = page.locator('.app-header .logo:visible')
-  if (await logo.count()) await logo.click()
-  else {
-    await page.locator('.project-name-mobile > summary').click()
-    await page.getByRole('button', { name: 'Все истории' }).click()
-  }
+  await page.getByRole('button', { name: /^Все истории ·/ }).click()
   await expect(page.getByRole('heading', { name: 'Истории' })).toBeVisible()
 }
 

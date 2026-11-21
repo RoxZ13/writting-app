@@ -145,7 +145,7 @@ export function App() {
   }, [projectId])
 
   // A story opens where it was left: the text, or the board for someone who plans first.
-  const selectProject = useCallback((id: string, view?: 'text' | 'board') => {
+  const selectProject = useCallback((id: string, view?: 'text' | 'board' | 'book') => {
     setProjectId(id)
     setCurrentProjectId(id)
     go({ view: view ?? lastView(id) })
@@ -294,20 +294,13 @@ function AppHeader({ data, route, safety, onSearch }: { data: ProjectData; route
         <div className="crumb">
           <button className="logo" title="Все истории" onClick={() => go({ view: 'library' })}>Manuscript.</button>
           <span className="slash">/</span>
-          <button className="project-name project-name-desktop" title="Параметры книги" onClick={() => go({ view: 'book' })}>
-            {data.project.title}
-            <span className="project-settings-label">Параметры</span>
-            <span className="project-settings-icon"><Icon name="settings" size={13} /></span>
+          <button className="project-name project-home" aria-label={`Все истории · ${data.project.title}`} onClick={() => go({ view: 'library' })}>
+            <span className="project-home-back" aria-hidden="true">‹</span>
+            <span className="project-home-title">{data.project.title}</span>
           </button>
-          <details className="menu project-name-mobile">
-            <summary className="project-name" aria-label={`Меню книги «${data.project.title}»`}>
-              {data.project.title}
-            </summary>
-            <div className="menu-list card project-menu-list">
-              <button onClick={() => go({ view: 'book' })}>О книге</button>
-              <button onClick={() => go({ view: 'library' })}>Все истории</button>
-            </div>
-          </details>
+          <button className="project-book-settings icon-btn" aria-label="Параметры книги" onClick={() => go({ view: 'book' })}>
+            <Icon name="settings" size={16} />
+          </button>
           <button
             className="data-safety"
             data-state={safety.state}

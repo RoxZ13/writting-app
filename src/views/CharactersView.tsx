@@ -1,9 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { db, type Scene } from '../db/db'
-import { alive, save } from '../db/repo'
-import { countMentions, heroesFromDescription, mentionPatterns } from '../lib/heroes'
-import { docParagraphs, pluralRu } from '../lib/text'
-import { Modal } from '../lib/ui'
+import { heroesFromDescription } from '../lib/heroes'
+import { pluralRu } from '../lib/text'
 import type { Character, Note } from '../db/db'
 import { createNote, findOrCreateCharacter, mergeCharacters, patch, remove } from '../db/repo'
 import type { ProjectData } from '../lib/hooks'
@@ -33,7 +31,6 @@ export function CharactersView({ data }: { data: ProjectData }) {
   const norm = (x: string) => x.trim().toLowerCase().replace(/ё/g, 'е')
   const known = new Set(data.characters.map((c) => norm(c.name)))
   const suggested = heroesFromDescription(data.project.description).filter((n) => !known.has(norm(n)))
-  const [tagging, setTagging] = useState(false)
   const found = useWhereFound(data)
   const active = activeId ? data.characterById.get(activeId) : undefined
   const roleOrder = { main: 0, supporting: 1, episodic: 2 } as const
@@ -60,7 +57,6 @@ export function CharactersView({ data }: { data: ProjectData }) {
           </button>
         </div>
       )}
-      {tagging && <TagScenes data={data} onClose={() => setTagging(false)} />}
       <div className={`characters-layout ${active ? 'has-active' : ''}`}>
         <section className="character-master card">
           <div className="character-list-head">
@@ -94,9 +90,6 @@ export function CharactersView({ data }: { data: ProjectData }) {
               />
             ))}
           </div>
-          {data.characters.length > 0 && (
-            <button className="link small character-find" onClick={() => setTagging(true)}>Найти упоминания в тексте</button>
-          )}
         </section>
         {active && (
           <section className="character-detail">
@@ -131,7 +124,6 @@ function Person({ data, c, found, onDeleted }: { data: ProjectData; c: Character
   const [quote, setQuote] = useState('')
   const line = data.lines.find((l) => l.name === c.name)
   const lines = data.notes.filter((n) => (n.kind === 'quote' || n.kind === 'dialogue') && n.characterIds?.includes(c.id) && !n.archived)
-  const sceneCount = [...data.scenes, ...data.pool.scenes].filter((scene) => scene.characterIds?.includes(c.id)).length
   const set = (changes: Partial<Character>) => void patch<Character>('characters', c.id, changes)
   // Scenes and quotes stay; they just no longer name this hero.
   const delHero = async () => {
@@ -173,11 +165,17 @@ function Person({ data, c, found, onDeleted }: { data: ProjectData; c: Character
       </div>
       <section className="hero-in-story">
         <div className="hero-section-label">В истории</div>
-        <div className="hero-story-facts">
-          <span>{sceneCount ? `${sceneCount} ${pluralRu(sceneCount, 'сцена', 'сцены', 'сцен')}` : 'Ещё не добавлен в сцены'}</span>
-          {line && <span style={{ color: line.color }}>● линия «{line.name}»</span>}
-        </div>
-        {!!found?.length && <WhereFound data={data} found={found} onNotThis={(sid) => set({ ignoreSceneIds: [...(c.ignoreSceneIds ?? []), sid] })} />}
+        {line && <div className="hero-story-facts" style={{ color: line.color }}>● линия «{line.name}»</div>}
+        <WhereFound data={data} found={found}
+          onNotThis={(sid) => set({ ignoreSceneIds: [...(c.ignoreSceneIds ?? []), sid] })}
+          onInclude={async (sid) => {
+            await db.transaction('rw', db.scenes, db.outbox, db.meta, async () => {
+              const scene = await db.scenes.get(sid)
+              if (!scene || scene.deleted || scene.characterIds?.includes(c.id)) return
+              await patch<Scene>('scenes', sid, { characterIds: [...(scene.characterIds ?? []), c.id] })
+            })
+          }}
+        />
       </section>
       <details className="hero-fold">
         <summary><span>Имена и реплики</span><span className="small muted">{lines.length || ''}</span></summary>
@@ -244,86 +242,5 @@ function QuoteRow({ n, data }: { n: Note; data: ProjectData }) {
         </button>
       )}
     </div>
-  )
-}
-
-/** Look through the whole book and mark each scene with the heroes who appear in it. */
-function TagScenes({ data, onClose }: { data: ProjectData; onClose: () => void }) {
-  const [found, setFound] = useState<Map<string, string[]> | null>(null)
-  const [picked, setPicked] = useState<Set<string>>(new Set(data.characters.map((c) => c.id)))
-
-  useEffect(() => {
-    void (async () => {
-      const patterns = mentionPatterns(data.characters)
-      const texts = alive(await db.texts.where('projectId').equals(data.project.id).toArray())
-      const map = new Map<string, string[]>()
-      for (const t of texts) {
-        if (!data.sceneById.has(t.id)) continue
-        const plain = docParagraphs(t.content).join('\n')
-        for (const [cid, re] of patterns) {
-          // Two mentions or more: a name dropped once in passing does not make someone part of the scene.
-          if (countMentions(plain, re) >= 2) map.set(cid, [...(map.get(cid) ?? []), t.id])
-        }
-      }
-      setFound(map)
-    })()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const apply = async () => {
-    if (!found) return
-    const add = new Map<string, Set<string>>()
-    for (const [cid, scenes] of found) if (picked.has(cid)) for (const sid of scenes) add.set(sid, (add.get(sid) ?? new Set()).add(cid))
-    for (const [sid, ids] of add) {
-      const s = await db.scenes.get(sid)
-      if (!s) continue
-      const next = [...new Set([...(s.characterIds ?? []), ...ids])]
-      if (next.length !== (s.characterIds ?? []).length) await save<Scene>('scenes', { ...s, characterIds: next })
-    }
-    toast(`Отмечено в ${add.size} сценах`)
-    onClose()
-  }
-
-  return (
-    <Modal onClose={onClose} label="Найти героев в сценах">
-      <div className="stack">
-        <h2>Где кто появляется</h2>
-        {!found ? (
-          <div className="muted">Читаю историю…</div>
-        ) : (
-          <>
-            <div className="small muted">Сцена отмечается, если имя встречается в ней хотя бы дважды. Уже отмеченное не снимается.</div>
-            {data.characters.map((c) => (
-              <label key={c.id} className="row" style={{ flexWrap: 'nowrap' }}>
-                <input
-                  type="checkbox"
-                  checked={picked.has(c.id)}
-                  onChange={(e) => {
-                    const next = new Set(picked)
-                    if (e.target.checked) next.add(c.id)
-                    else next.delete(c.id)
-                    setPicked(next)
-                  }}
-                />
-                <span className="avatar small" style={{ background: c.color }}>
-                  {c.name.trim()[0]?.toUpperCase()}
-                </span>
-                <span style={{ flex: 1 }}>{c.name}</span>
-                <span className="muted small">{found.get(c.id)?.length ?? 0} сц.</span>
-              </label>
-            ))}
-            <div className="row">
-              <span className="spacer" />
-              <button className="btn ghost" onClick={onClose}>
-                Отмена
-              </button>
-              <button className="btn primary" onClick={() => void apply()}>
-                Отметить
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </Modal>
   )
 }
