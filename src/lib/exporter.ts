@@ -114,7 +114,7 @@ export function chapterToRich({ scenes }: ExportChapter): { html: string; text: 
 // ---------------- DOCX ----------------
 
 export async function exportDocx(projectTitle: string, chapters: ExportChapter[]): Promise<Blob> {
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType } = await import('docx')
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, AlignmentType, UnderlineType } = await import('docx')
 
   const para = (p: PMNode) =>
     new Paragraph({
@@ -128,6 +128,7 @@ export async function exportDocx(projectTitle: string, chapters: ExportChapter[]
               italics: has(n.marks, 'italic'),
               bold: has(n.marks, 'bold'),
               strike: has(n.marks, 'strike'),
+              underline: has(n.marks, 'underline') ? { type: UnderlineType.SINGLE } : undefined,
             }),
       ),
     })

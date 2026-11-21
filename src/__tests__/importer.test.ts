@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { ManuscriptDB, useDatabase, db } from '../db/db'
 import { importBook, importChapters } from '../components/ImportPanel'
 import { blocksToChapters, isChapterTitle, isEpigraph, parseBook, parseTaggedRuns, textToBlocks } from '../lib/importer'
-import { chapterToFicbook, chapterToRich, tidyTypography } from '../lib/exporter'
+import { chapterToFicbook, chapterToRich, exportDocx, tidyTypography } from '../lib/exporter'
 import type { Chapter, Scene } from '../db/db'
 
 describe('import', () => {
@@ -294,4 +294,16 @@ describe('import into the database: notes', () => {
     expect(await db.texts.where('projectId').equals('p').count()).toBe(0)
     expect((await db.projects.get('p'))?.lastSceneId).toBeUndefined()
   })
+})
+
+it('keeps underlining from the editor in the Word document', async () => {
+  const { convertToHtml } = await import('mammoth')
+  const chapter = { title: 'Глава 1' } as Chapter
+  const content = { type: 'doc', content: [{ type: 'paragraph', content: [
+    { type: 'text', text: 'Важно', marks: [{ type: 'underline' }] },
+  ] }] }
+  const scene = { content } as Scene & { content: unknown }
+  const blob = await exportDocx('Рукопись', [{ chapter, scenes: [scene] }])
+  const { value } = await convertToHtml({ buffer: Buffer.from(await blob.arrayBuffer()) }, { styleMap: ['u => u'] })
+  expect(value).toContain('<u>Важно</u>')
 })
