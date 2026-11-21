@@ -39,14 +39,14 @@ test('an archived metadata conflict can be reviewed and restored', async ({ page
   )
 
   await page.goto('/#/settings')
-  await expect(page.getByRole('heading', { name: 'Сохранены конфликтующие правки' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Остальные правки' })).toBeVisible()
   await page.getByText('История: Новая история').click()
   await expect(page.getByText('Название с телефона')).toBeVisible()
 
   page.once('dialog', (dialog) => dialog.accept())
   await page.getByRole('button', { name: 'Вернуть сохранённый вариант' }).click()
   await expect(page.getByText('Сохранённый вариант возвращён')).toBeVisible()
-  await expect(page.getByRole('heading', { name: 'Сохранены конфликтующие правки' })).toHaveCount(0)
+  await expect(page.getByRole('heading', { name: 'Остальные правки' })).toHaveCount(0)
 
   await expect.poll(async () => (await aliveRows<any>(page, 'projects'))[0]?.title).toBe('Название с телефона')
   expect((await dbAll<any>(page, 'conflicts')).find((row) => row.id === conflictId)?.deleted).toBe(true)
